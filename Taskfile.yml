@@ -1,0 +1,146 @@
+version: '3'
+
+vars:
+  BINARY_NAME: hooks
+  MAIN_FILE: main.go
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  deps:
+    desc: Download and verify dependencies
+    cmds:
+      - go mod download
+      - go mod verify
+      - go mod tidy
+
+  build:
+    desc: Build the binary
+    deps: [format]
+    cmds:
+      - go build -o {{.BINARY_NAME}} .
+    generates:
+      - "{{.BINARY_NAME}}"
+
+  build-all:
+    desc: Build for multiple platforms
+    deps: [format]
+    cmds:
+      - mkdir -p dist
+      - GOOS=linux GOARCH=amd64 go build -o dist/{{.BINARY_NAME}}-linux-amd64 .
+      - GOOS=darwin GOARCH=amd64 go build -o dist/{{.BINARY_NAME}}-darwin-amd64 .
+      - GOOS=darwin GOARCH=arm64 go build -o dist/{{.BINARY_NAME}}-darwin-arm64 .
+      - GOOS=windows GOARCH=amd64 go build -o dist/{{.BINARY_NAME}}-windows-amd64.exe .
+
+  format:
+    desc: Format Go code
+    cmds:
+      - gofmt -s -w .
+      - go mod tidy
+
+  lint:
+    desc: Run linter
+    cmds:
+      - |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          golangci-lint run
+        else
+          echo "golangci-lint not found, running go vet instead"
+          go vet ./...
+        fi
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v ./...
+
+  test-coverage:
+    desc: Run tests with coverage
+    cmds:
+      - go test -v -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report generated{{":"}} coverage.html"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f {{.BINARY_NAME}}
+      - rm -rf dist/
+      - rm -f coverage.out coverage.html
+
+  install:
+    desc: Install the binary to GOPATH/bin
+    deps: [build]
+    cmds:
+      - go install .
+
+  run:
+    desc: Run the application
+    deps: [build]
+    cmds:
+      - ./{{.BINARY_NAME}} {{.CLI_ARGS}}
+
+  dev:
+    desc: Development workflow (format, lint, test, build)
+    cmds:
+      - task: format
+      - task: lint
+      - task: test
+      - task: build
+
+  release:
+    desc: Prepare release (clean, deps, dev, build-all)
+    cmds:
+      - task: clean
+      - task: deps
+      - task: dev
+      - task: build-all
+      - echo "Release artifacts built in dist/"
+
+  check:
+    desc: Run all checks (format, lint, test)
+    cmds:
+      - task: format
+      - task: lint
+      - task: test
+
+  demo:
+    desc: Run demo commands
+    deps: [build]
+    cmds:
+      - echo "=== Available templates ==="
+      - ./{{.BINARY_NAME}} list
+      - echo ""
+      - echo "=== Security template preview ==="
+      - ./{{.BINARY_NAME}} show security | head -20
+      - echo "..."
+
+  setup-dev:
+    desc: Setup development environment
+    cmds:
+      - |
+        echo "Installing development tools..."
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          echo "Installing golangci-lint..."
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        fi
+        if ! command -v task >/dev/null 2>&1; then
+          echo "Task runner not found. Install from: https://taskfile.dev/installation/"
+        fi
+      - task: deps
+      - echo "Development environment ready!"
+
+  watch:
+    desc: Watch for changes and rebuild
+    deps: [build]
+    cmds:
+      - |
+        if command -v fswatch >/dev/null 2>&1; then
+          fswatch -o . -e ".*" -i "\\.go$" | xargs -n1 -I{} task build
+        else
+          echo "fswatch not found. Install with: brew install fswatch (macOS) or apt-get install fswatch (Linux)"
+          echo "Alternatively, use: find . -name '*.go' | entr task build"
+        fi

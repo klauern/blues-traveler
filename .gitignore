@@ -1,0 +1,35 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go build
+hooks
+*-hook
+test-*
+
+# Go workspace file
+go.work
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude settings (usually project-specific)
+.claude/
+
+# Coverage reports
+coverage.out
+coverage.html
+
+# Build artifacts
+dist/

@@ -1,10 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"strings"
-)
-
 // HookTemplate represents a template for generating hooks
 type HookTemplate struct {
 	Name        string
