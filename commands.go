@@ -10,55 +10,45 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List available hook types",
-	Long:  `List all available hook types that can be run.`,
+	Short: "List available hook plugins",
+	Long:  `List all registered hook plugins that can be run.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		hookTypes := GetHookTypes()
-
-		fmt.Println("Available hook types:")
+		fmt.Println("Available hook plugins:")
 		fmt.Println()
-
-		for name, hookType := range hookTypes {
-			fmt.Printf("  %s - %s\n", name, hookType.Description)
+		for _, key := range PluginKeys() {
+			p, _ := GetPlugin(key)
+			fmt.Printf("  %s - %s\n", key, p.Description())
 		}
 		fmt.Println()
-		fmt.Println("Use 'hooks run <type>' to run a hook type.")
-		fmt.Println("Use 'hooks install <type>' to install a hook type in Claude Code settings.")
+		fmt.Println("Use 'hooks run <key>' to run a plugin.")
+		fmt.Println("Use 'hooks install <key>' to install a plugin in Claude Code settings.")
 	},
 }
 
 var runCmd = &cobra.Command{
-	Use:   "run [type]",
-	Short: "Run a specific hook type",
-	Long:  `Run a specific hook type directly. This is typically called by Claude Code.`,
+	Use:   "run [plugin-key]",
+	Short: "Run a specific hook plugin",
+	Long:  `Run a specific hook plugin directly. This is typically called by Claude Code.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		hookType := args[0]
-
-		hookTypes := GetHookTypes()
-		hook, exists := hookTypes[hookType]
+		key := args[0]
+		plugin, exists := GetPlugin(key)
 		if !exists {
-			fmt.Fprintf(os.Stderr, "Error: Hook type '%s' not found.\n", hookType)
-			fmt.Fprintf(os.Stderr, "Available hook types: %s\n", strings.Join(getHookTypeNames(), ", "))
+			fmt.Fprintf(os.Stderr, "Error: Plugin '%s' not found.\n", key)
+			fmt.Fprintf(os.Stderr, "Available plugins: %s\n", strings.Join(PluginKeys(), ", "))
 			os.Exit(1)
 		}
-
-		// Run the hook
-		fmt.Printf("Starting %s...\n", hook.Name)
-		if err := hook.Runner(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running hook: %v\n", err)
+		fmt.Printf("Starting %s...\n", plugin.Name())
+		if err := plugin.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error running plugin: %v\n", err)
 			os.Exit(1)
 		}
 	},
 }
 
 func getHookTypeNames() []string {
-	hookTypes := GetHookTypes()
-	names := make([]string, 0, len(hookTypes))
-	for name := range hookTypes {
-		names = append(names, name)
-	}
-	return names
+	// Backwards-compatible helper now delegates to plugin registry.
+	return PluginKeys()
 }
 
 var installCmd = &cobra.Command{
@@ -70,11 +60,10 @@ This will automatically configure the hook to run for the specified events.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		hookType := args[0]
 
-		// Validate hook type exists
-		hookTypes := GetHookTypes()
-		if _, exists := hookTypes[hookType]; !exists {
-			fmt.Fprintf(os.Stderr, "Error: Hook type '%s' not found.\n", hookType)
-			fmt.Fprintf(os.Stderr, "Available hook types: %s\n", strings.Join(getHookTypeNames(), ", "))
+		// Validate plugin exists
+		if _, exists := GetPlugin(hookType); !exists {
+			fmt.Fprintf(os.Stderr, "Error: Plugin '%s' not found.\n", hookType)
+			fmt.Fprintf(os.Stderr, "Available plugins: %s\n", strings.Join(PluginKeys(), ", "))
 			os.Exit(1)
 		}
 
