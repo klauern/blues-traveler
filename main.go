@@ -9,15 +9,13 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "hooks",
-	Short: "CLI tool for managing Claude Code hooks",
-	Long:  `A CLI tool to quickly create and manage Claude Code hooks using the cchooks library.`,
+	Short: "Claude Code hook runner and manager",
+	Long:  `A CLI tool that runs Claude Code hooks directly and manages hook installations.`,
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(createCmd)
-	rootCmd.AddCommand(showCmd)
-	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(uninstallCmd)
 	rootCmd.AddCommand(listHooksCmd)

@@ -1,29 +1,53 @@
 package main
 
-// HookTemplate represents a template for generating hooks
-type HookTemplate struct {
-	Name        string
-	Description string
-	Code        string
-}
-
-// GetHookTemplates returns available hook templates
-func GetHookTemplates() map[string]HookTemplate {
-	return map[string]HookTemplate{
-		"security": {
-			Name:        "Security Hook",
-			Description: "Blocks dangerous commands and provides security controls",
-			Code: `package main
-
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/brads3290/cchooks"
 )
 
-func main() {
+// HookType represents available hook types
+type HookType struct {
+	Name        string
+	Description string
+	Runner      func() error
+}
+
+// GetHookTypes returns available hook types
+func GetHookTypes() map[string]HookType {
+	return map[string]HookType{
+		"security": {
+			Name:        "Security Hook",
+			Description: "Blocks dangerous commands and provides security controls",
+			Runner:      runSecurityHook,
+		},
+		"format": {
+			Name:        "Format Hook",
+			Description: "Enforces code formatting standards",
+			Runner:      runFormatHook,
+		},
+		"debug": {
+			Name:        "Debug Hook",
+			Description: "Logs all tool usage for debugging purposes",
+			Runner:      runDebugHook,
+		},
+		"audit": {
+			Name:        "Audit Hook",
+			Description: "Comprehensive audit logging with JSON output",
+			Runner:      runAuditHook,
+		},
+	}
+}
+
+// runSecurityHook implements security blocking logic
+func runSecurityHook() error {
 	runner := &cchooks.Runner{
 		PreToolUse: func(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 			// Block dangerous commands
@@ -55,36 +79,24 @@ func main() {
 	}
 
 	runner.Run()
-}`,
-		},
-		"format": {
-			Name:        "Format Hook",
-			Description: "Enforces code formatting standards",
-			Code: `package main
+	return nil
+}
 
-import (
-	"context"
-	"fmt"
-	"path/filepath"
-	"strings"
-
-	"github.com/brads3290/cchooks"
-)
-
-func main() {
+// runFormatHook implements code formatting logic
+func runFormatHook() error {
 	runner := &cchooks.Runner{
 		PostToolUse: func(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 			// Format code files after editing
 			if event.ToolName == "Edit" || event.ToolName == "Write" {
 				var filePath string
-				
+
 				if event.ToolName == "Edit" {
-					edit, err := event.AsEdit()
+					edit, err := event.InputAsEdit()
 					if err == nil {
 						filePath = edit.FilePath
 					}
 				} else if event.ToolName == "Write" {
-					write, err := event.AsWrite()
+					write, err := event.InputAsWrite()
 					if err == nil {
 						filePath = write.FilePath
 					}
@@ -92,53 +104,44 @@ func main() {
 
 				if filePath != "" {
 					ext := strings.ToLower(filepath.Ext(filePath))
-					
+
 					switch ext {
 					case ".go":
-						return cchooks.RunCommand("gofmt -w " + filePath)
+						// TODO: Execute gofmt command
+						fmt.Printf("Would format Go file: %s\n", filePath)
 					case ".js", ".ts", ".jsx", ".tsx":
-						return cchooks.RunCommand("prettier --write " + filePath)
+						// TODO: Execute prettier command
+						fmt.Printf("Would format JS/TS file: %s\n", filePath)
 					case ".py":
-						return cchooks.RunCommand("black " + filePath)
+						// TODO: Execute black command
+						fmt.Printf("Would format Python file: %s\n", filePath)
 					}
 				}
 			}
 
-			return cchooks.Continue()
+			return cchooks.Allow()
 		},
 	}
 
 	runner.Run()
-}`,
-		},
-		"debug": {
-			Name:        "Debug Hook",
-			Description: "Logs all tool usage for debugging purposes",
-			Code: `package main
+	return nil
+}
 
-import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/brads3290/cchooks"
-)
-
-func main() {
+// runDebugHook implements debug logging logic
+func runDebugHook() error {
 	// Setup logging
 	logFile, err := os.OpenFile("claude-hooks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatalln("Failed to open log file:", err)
+		return fmt.Errorf("failed to open log file: %v", err)
 	}
 	defer logFile.Close()
-	
+
 	logger := log.New(logFile, "", log.LstdFlags)
 
 	runner := &cchooks.Runner{
 		PreToolUse: func(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 			logger.Printf("PRE-TOOL: %s", event.ToolName)
-			
+
 			// Log specific tool details
 			switch event.ToolName {
 			case "Bash":
@@ -161,57 +164,40 @@ func main() {
 
 			return cchooks.Approve()
 		},
-		
+
 		PostToolUse: func(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
-			logger.Printf("POST-TOOL: %s (Success: %t)", event.ToolName, event.Success)
-			if !event.Success && event.Error != "" {
-				logger.Printf("  Error: %s", event.Error)
-			}
-			return cchooks.Continue()
+			logger.Printf("POST-TOOL: %s", event.ToolName)
+			return cchooks.Allow()
 		},
 	}
 
 	fmt.Println("Debug hook started - logging to claude-hooks.log")
 	runner.Run()
-}`,
-		},
-		"audit": {
-			Name:        "Audit Hook",
-			Description: "Comprehensive audit logging with JSON output",
-			Code: `package main
+	return nil
+}
 
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"time"
-
-	"github.com/brads3290/cchooks"
-)
-
+// AuditEntry represents an audit log entry
 type AuditEntry struct {
-	Timestamp string                 ` + "`json:\"timestamp\"`" + `
-	Event     string                 ` + "`json:\"event\"`" + `
-	ToolName  string                 ` + "`json:\"tool_name\"`" + `
-	Success   *bool                  ` + "`json:\"success,omitempty\"`" + `
-	Error     string                 ` + "`json:\"error,omitempty\"`" + `
-	Details   map[string]interface{} ` + "`json:\"details,omitempty\"`" + `
+	Timestamp string                 `json:"timestamp"`
+	Event     string                 `json:"event"`
+	ToolName  string                 `json:"tool_name"`
+	Details   map[string]interface{} `json:"details,omitempty"`
 }
 
 func logAuditEntry(entry AuditEntry) {
 	entry.Timestamp = time.Now().Format(time.RFC3339)
-	
+
 	jsonData, err := json.Marshal(entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to marshal audit entry: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println(string(jsonData))
 }
 
-func main() {
+// runAuditHook implements comprehensive audit logging
+func runAuditHook() error {
 	runner := &cchooks.Runner{
 		PreToolUse: func(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 			entry := AuditEntry{
@@ -219,7 +205,7 @@ func main() {
 				ToolName: event.ToolName,
 				Details:  make(map[string]interface{}),
 			}
-			
+
 			// Add tool-specific details
 			switch event.ToolName {
 			case "Bash":
@@ -243,31 +229,23 @@ func main() {
 					entry.Details["file_path"] = read.FilePath
 				}
 			}
-			
+
 			logAuditEntry(entry)
 			return cchooks.Approve()
 		},
-		
+
 		PostToolUse: func(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 			entry := AuditEntry{
 				Event:    "post_tool_use",
 				ToolName: event.ToolName,
-				Success:  &event.Success,
-				Error:    event.Error,
 				Details:  make(map[string]interface{}),
 			}
-			
-			if event.Output != "" {
-				entry.Details["output_length"] = len(event.Output)
-			}
-			
+
 			logAuditEntry(entry)
-			return cchooks.Continue()
+			return cchooks.Allow()
 		},
 	}
 
 	runner.Run()
-}`,
-		},
-	}
+	return nil
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,148 +10,73 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List available hook templates",
-	Long:  `List all available hook templates that can be created.`,
+	Short: "List available hook types",
+	Long:  `List all available hook types that can be run.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		templates := GetHookTemplates()
+		hookTypes := GetHookTypes()
 
-		fmt.Println("Available hook templates:")
+		fmt.Println("Available hook types:")
 		fmt.Println()
 
-		for name, template := range templates {
-			fmt.Printf("  %s - %s\n", name, template.Description)
+		for name, hookType := range hookTypes {
+			fmt.Printf("  %s - %s\n", name, hookType.Description)
 		}
 		fmt.Println()
-		fmt.Println("Use 'hooks create <template>' to create a hook from a template.")
-		fmt.Println("Use 'hooks show <template>' to preview a template.")
+		fmt.Println("Use 'hooks run <type>' to run a hook type.")
+		fmt.Println("Use 'hooks install <type>' to install a hook type in Claude Code settings.")
 	},
 }
 
-var createCmd = &cobra.Command{
-	Use:   "create [template] [name]",
-	Short: "Create a new hook from a template",
-	Long:  `Create a new hook file from one of the available templates.`,
-	Args:  cobra.RangeArgs(1, 2),
-	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
-
-		templates := GetHookTemplates()
-		template, exists := templates[templateName]
-		if !exists {
-			fmt.Fprintf(os.Stderr, "Error: Template '%s' not found.\n", templateName)
-			fmt.Fprintf(os.Stderr, "Available templates: %s\n", strings.Join(getTemplateNames(), ", "))
-			os.Exit(1)
-		}
-
-		// Determine output filename
-		var filename string
-		if len(args) > 1 {
-			filename = args[1]
-		} else {
-			filename = templateName + "-hook"
-		}
-
-		// Ensure .go extension
-		if !strings.HasSuffix(filename, ".go") {
-			filename += ".go"
-		}
-
-		// Check if file already exists
-		if _, err := os.Stat(filename); err == nil {
-			fmt.Fprintf(os.Stderr, "Error: File '%s' already exists.\n", filename)
-			os.Exit(1)
-		}
-
-		// Write template to file
-		err := os.WriteFile(filename, []byte(template.Code), 0644)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Created %s hook: %s\n", template.Name, filename)
-		fmt.Printf("Description: %s\n", template.Description)
-		fmt.Println()
-		fmt.Printf("Next steps:\n")
-		fmt.Printf("  1. Review and customize the hook code in %s\n", filename)
-		fmt.Printf("  2. Build the hook: go build -o %s %s\n",
-			strings.TrimSuffix(filename, ".go"), filename)
-		fmt.Printf("  3. Configure Claude Code to use the hook\n")
-	},
-}
-
-var showCmd = &cobra.Command{
-	Use:   "show [template]",
-	Short: "Show the code for a template",
-	Long:  `Display the source code for a hook template without creating a file.`,
+var runCmd = &cobra.Command{
+	Use:   "run [type]",
+	Short: "Run a specific hook type",
+	Long:  `Run a specific hook type directly. This is typically called by Claude Code.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
+		hookType := args[0]
 
-		templates := GetHookTemplates()
-		template, exists := templates[templateName]
+		hookTypes := GetHookTypes()
+		hook, exists := hookTypes[hookType]
 		if !exists {
-			fmt.Fprintf(os.Stderr, "Error: Template '%s' not found.\n", templateName)
-			fmt.Fprintf(os.Stderr, "Available templates: %s\n", strings.Join(getTemplateNames(), ", "))
+			fmt.Fprintf(os.Stderr, "Error: Hook type '%s' not found.\n", hookType)
+			fmt.Fprintf(os.Stderr, "Available hook types: %s\n", strings.Join(getHookTypeNames(), ", "))
 			os.Exit(1)
 		}
 
-		fmt.Printf("Template: %s\n", template.Name)
-		fmt.Printf("Description: %s\n", template.Description)
-		fmt.Println()
-		fmt.Println("Code:")
-		fmt.Println("---")
-		fmt.Println(template.Code)
+		// Run the hook
+		fmt.Printf("Starting %s...\n", hook.Name)
+		if err := hook.Runner(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error running hook: %v\n", err)
+			os.Exit(1)
+		}
 	},
 }
 
-func getTemplateNames() []string {
-	templates := GetHookTemplates()
-	names := make([]string, 0, len(templates))
-	for name := range templates {
+func getHookTypeNames() []string {
+	hookTypes := GetHookTypes()
+	names := make([]string, 0, len(hookTypes))
+	for name := range hookTypes {
 		names = append(names, name)
 	}
 	return names
 }
 
-// Add build command
-var buildCmd = &cobra.Command{
-	Use:   "build [file]",
-	Short: "Build a hook file into an executable",
-	Long:  `Build a Go hook file into an executable that can be used with Claude Code.`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		sourceFile := args[0]
-
-		// Check if source file exists
-		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error: File '%s' does not exist.\n", sourceFile)
-			os.Exit(1)
-		}
-
-		// Determine output name
-		outputName := strings.TrimSuffix(filepath.Base(sourceFile), ".go")
-
-		// Build the hook
-		buildCmd := fmt.Sprintf("go build -o %s %s", outputName, sourceFile)
-		fmt.Printf("Building: %s\n", buildCmd)
-
-		// You would typically use exec.Command here, but for simplicity:
-		fmt.Printf("Run this command to build your hook:\n")
-		fmt.Printf("  %s\n", buildCmd)
-		fmt.Println()
-		fmt.Printf("Then configure Claude Code to use: ./%s\n", outputName)
-	},
-}
-
 var installCmd = &cobra.Command{
-	Use:   "install [hook-binary] [options]",
-	Short: "Install a hook into Claude Code settings",
-	Long: `Install a hook binary into your Claude Code settings.json file.
+	Use:   "install [hook-type] [options]",
+	Short: "Install a hook type into Claude Code settings",
+	Long: `Install a hook type into your Claude Code settings.json file.
 This will automatically configure the hook to run for the specified events.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		hookBinary := args[0]
+		hookType := args[0]
+
+		// Validate hook type exists
+		hookTypes := GetHookTypes()
+		if _, exists := hookTypes[hookType]; !exists {
+			fmt.Fprintf(os.Stderr, "Error: Hook type '%s' not found.\n", hookType)
+			fmt.Fprintf(os.Stderr, "Available hook types: %s\n", strings.Join(getHookTypeNames(), ", "))
+			os.Exit(1)
+		}
 
 		// Get flags
 		global, _ := cmd.Flags().GetBool("global")
@@ -175,18 +99,15 @@ This will automatically configure the hook to run for the specified events.`,
 			os.Exit(1)
 		}
 
-		// Check if hook binary exists
-		if _, err := os.Stat(hookBinary); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error: Hook binary '%s' does not exist.\n", hookBinary)
+		// Get path to this executable
+		execPath, err := os.Executable()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Failed to get executable path: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Convert to absolute path
-		absPath, err := filepath.Abs(hookBinary)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to get absolute path: %v\n", err)
-			os.Exit(1)
-		}
+		// Create command: hooks run <type>
+		hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
 
 		// Get settings path
 		settingsPath, err := getSettingsPath(global)
@@ -207,7 +128,7 @@ This will automatically configure the hook to run for the specified events.`,
 		if timeoutFlag > 0 {
 			timeout = &timeoutFlag
 		}
-		addHookToSettings(settings, event, matcher, absPath, timeout)
+		addHookToSettings(settings, event, matcher, hookCommand, timeout)
 
 		// Save settings
 		if err := saveSettings(settingsPath, settings); err != nil {
@@ -220,10 +141,10 @@ This will automatically configure the hook to run for the specified events.`,
 			scope = "global"
 		}
 
-		fmt.Printf("✅ Successfully installed hook in %s settings\n", scope)
+		fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
 		fmt.Printf("   Event: %s\n", event)
 		fmt.Printf("   Matcher: %s\n", matcher)
-		fmt.Printf("   Command: %s\n", absPath)
+		fmt.Printf("   Command: %s\n", hookCommand)
 		fmt.Printf("   Settings: %s\n", settingsPath)
 		fmt.Println()
 		fmt.Println("The hook will be active in new Claude Code sessions.")
@@ -232,20 +153,23 @@ This will automatically configure the hook to run for the specified events.`,
 }
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall [hook-binary]",
-	Short: "Remove a hook from Claude Code settings",
-	Long:  `Remove a hook binary from your Claude Code settings.json file.`,
+	Use:   "uninstall [hook-type]",
+	Short: "Remove a hook type from Claude Code settings",
+	Long:  `Remove a hook type from your Claude Code settings.json file.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		hookBinary := args[0]
+		hookType := args[0]
 		global, _ := cmd.Flags().GetBool("global")
 
-		// Convert to absolute path for comparison
-		absPath, err := filepath.Abs(hookBinary)
+		// Get path to this executable
+		execPath, err := os.Executable()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to get absolute path: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: Failed to get executable path: %v\n", err)
 			os.Exit(1)
 		}
+
+		// Create command pattern to match: hooks run <type>
+		hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
 
 		// Get settings path
 		settingsPath, err := getSettingsPath(global)
@@ -262,10 +186,10 @@ var uninstallCmd = &cobra.Command{
 		}
 
 		// Remove hook from settings
-		removed := removeHookFromSettings(settings, absPath)
+		removed := removeHookFromSettings(settings, hookCommand)
 
 		if !removed {
-			fmt.Printf("Hook '%s' was not found in settings.\n", absPath)
+			fmt.Printf("Hook type '%s' was not found in settings.\n", hookType)
 			os.Exit(1)
 		}
 
@@ -280,8 +204,8 @@ var uninstallCmd = &cobra.Command{
 			scope = "global"
 		}
 
-		fmt.Printf("✅ Successfully removed hook from %s settings\n", scope)
-		fmt.Printf("   Command: %s\n", absPath)
+		fmt.Printf("✅ Successfully removed %s hook from %s settings\n", hookType, scope)
+		fmt.Printf("   Command: %s\n", hookCommand)
 		fmt.Printf("   Settings: %s\n", settingsPath)
 	},
 }
