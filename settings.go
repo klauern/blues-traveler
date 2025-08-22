@@ -30,11 +30,17 @@ type HooksConfig struct {
 	SessionStart     []HookMatcher `json:"SessionStart,omitempty"`
 }
 
+// PluginConfig stores per-plugin settings (extendable later with plugin-specific fields).
+// A nil Enabled means default (enabled). If Enabled=false, the plugin is disabled.
+type PluginConfig struct {
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 type Settings struct {
-	Hooks HooksConfig `json:"hooks,omitempty"`
-	// Add other common settings fields as needed
-	DefaultModel string                 `json:"defaultModel,omitempty"`
-	Other        map[string]interface{} `json:"-"`
+	Hooks        HooksConfig             `json:"hooks,omitempty"`
+	Plugins      map[string]PluginConfig `json:"plugins,omitempty"`
+	DefaultModel string                  `json:"defaultModel,omitempty"`
+	Other        map[string]interface{}  `json:"-"`
 }
 
 func getSettingsPath(global bool) (string, error) {
@@ -82,10 +88,16 @@ func loadSettings(settingsPath string) (*Settings, error) {
 		return nil, fmt.Errorf("failed to parse settings: %v", err)
 	}
 
-	// Store unknown fields
+	// Store unknown fields (remove known keys first)
 	delete(raw, "hooks")
+	delete(raw, "plugins")
 	delete(raw, "defaultModel")
 	settings.Other = raw
+
+	// Ensure maps initialized
+	if settings.Plugins == nil {
+		settings.Plugins = make(map[string]PluginConfig)
+	}
 
 	return settings, nil
 }
@@ -93,7 +105,7 @@ func loadSettings(settingsPath string) (*Settings, error) {
 func saveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
@@ -115,12 +127,17 @@ func saveSettings(settingsPath string, settings *Settings) error {
 		output["hooks"] = settings.Hooks
 	}
 
+	// Only add plugins if non-empty
+	if len(settings.Plugins) > 0 {
+		output["plugins"] = settings.Plugins
+	}
+
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal settings: %v", err)
 	}
 
-	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+	if err := os.WriteFile(settingsPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write settings file: %v", err)
 	}
 
@@ -136,6 +153,22 @@ func isHooksConfigEmpty(hooks HooksConfig) bool {
 		len(hooks.SubagentStop) == 0 &&
 		len(hooks.PreCompact) == 0 &&
 		len(hooks.SessionStart) == 0
+}
+
+// IsPluginEnabled returns true if the plugin is enabled (default) or explicitly enabled.
+// Returns false if explicitly disabled in settings.
+func (s *Settings) IsPluginEnabled(key string) bool {
+	if s == nil {
+		return true
+	}
+	if s.Plugins == nil {
+		return true
+	}
+	cfg, ok := s.Plugins[key]
+	if !ok || cfg.Enabled == nil {
+		return true
+	}
+	return *cfg.Enabled
 }
 
 func addHookToSettings(settings *Settings, event, matcher, command string, timeout *int) {
