@@ -431,3 +431,25 @@ func removeAllKlauerHooksFromSettings(settings *Settings) int {
 
 	return removed
 }
+
+// isPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.
+// Defaults to enabled if settings cannot be loaded or plugin key absent.
+func isPluginEnabled(pluginKey string) bool {
+	// Project settings
+	if projectPath, err := getSettingsPath(false); err == nil {
+		if s, err := loadSettings(projectPath); err == nil {
+			if !s.IsPluginEnabled(pluginKey) {
+				return false
+			}
+		}
+	}
+	// Global settings fallback
+	if globalPath, err := getSettingsPath(true); err == nil {
+		if s, err := loadSettings(globalPath); err == nil {
+			if !s.IsPluginEnabled(pluginKey) {
+				return false
+			}
+		}
+	}
+	return true
+}

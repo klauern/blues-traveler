@@ -11,64 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ClaudeCodeEvent represents a Claude Code hook event type
-type ClaudeCodeEvent struct {
-	Name               string
-	Description        string
-	SupportedByCCHooks bool
-}
-
-// getClaudeCodeEvents returns all available Claude Code hook events
-func getClaudeCodeEvents() []ClaudeCodeEvent {
-	return []ClaudeCodeEvent{
-		{
-			Name:               "PreToolUse",
-			Description:        "Runs after Claude creates tool parameters and before processing the tool call",
-			SupportedByCCHooks: true,
-		},
-		{
-			Name:               "PostToolUse",
-			Description:        "Runs immediately after a tool completes successfully",
-			SupportedByCCHooks: true,
-		},
-		{
-			Name:               "Notification",
-			Description:        "Runs when Claude needs permission to use a tool or when input has been idle for 60 seconds",
-			SupportedByCCHooks: true,
-		},
-		{
-			Name:               "Stop",
-			Description:        "Runs when the main Claude Code agent has finished responding",
-			SupportedByCCHooks: true,
-		},
-		{
-			Name:               "UserPromptSubmit",
-			Description:        "Runs when the user submits a prompt, before Claude processes it",
-			SupportedByCCHooks: false,
-		},
-		{
-			Name:               "SubagentStop",
-			Description:        "Runs when a Claude Code subagent (Task tool call) has finished responding",
-			SupportedByCCHooks: false,
-		},
-		{
-			Name:               "PreCompact",
-			Description:        "Runs before Claude Code is about to run a compact operation",
-			SupportedByCCHooks: false,
-		},
-		{
-			Name:               "SessionStart",
-			Description:        "Runs when Claude Code starts a new session or resumes an existing session",
-			SupportedByCCHooks: false,
-		},
-		{
-			Name:               "SessionEnd",
-			Description:        "Runs when a Claude Code session ends",
-			SupportedByCCHooks: false,
-		},
-	}
-}
-
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List available hook plugins",
@@ -163,18 +105,9 @@ This will automatically configure the hook to run for the specified events.`,
 		logEnabled, _ := cmd.Flags().GetBool("log")
 
 		// Validate event
-		events := getClaudeCodeEvents()
-		eventValid := false
-		validEventNames := make([]string, len(events))
-		for i, validEvent := range events {
-			validEventNames[i] = validEvent.Name
-			if event == validEvent.Name {
-				eventValid = true
-			}
-		}
-		if !eventValid {
+		if !IsValidEventType(event) {
 			fmt.Fprintf(os.Stderr, "Error: Invalid event '%s'.\n", event)
-			fmt.Fprintf(os.Stderr, "Valid events: %s\n", strings.Join(validEventNames, ", "))
+			fmt.Fprintf(os.Stderr, "Valid events: %s\n", strings.Join(ValidEventTypes(), ", "))
 			fmt.Fprintf(os.Stderr, "Use 'hooks list-events' to see all available events with descriptions.\n")
 			os.Exit(1)
 		}
@@ -423,7 +356,7 @@ var listEventsCmd = &cobra.Command{
 		fmt.Println("Available Claude Code Hook Events:")
 		fmt.Println()
 
-		events := getClaudeCodeEvents()
+		events := AllClaudeCodeEvents()
 		ccHooksSupported := 0
 		for _, event := range events {
 			status := ""

@@ -14,12 +14,12 @@ func TestRegisterPluginDuplicate(t *testing.T) {
 		t.Fatalf("test precondition failed: plugin %s already exists", key)
 	}
 	// First registration should succeed
-	err := RegisterPlugin(key, NewFuncPlugin("Temp", "Temporary test plugin", func() error { return nil }))
+	err := RegisterPlugin(key, NewFuncPlugin(key, "Temp", "Temporary test plugin", func() error { return nil }))
 	if err != nil {
 		t.Fatalf("expected first registration success, got error: %v", err)
 	}
 	// Second registration should fail
-	err = RegisterPlugin(key, NewFuncPlugin("Temp2", "Another", func() error { return nil }))
+	err = RegisterPlugin(key, NewFuncPlugin(key+"2", "Temp2", "Another", func() error { return nil }))
 	if err == nil {
 		t.Fatalf("expected duplicate registration error, got nil")
 	}

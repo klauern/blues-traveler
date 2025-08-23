@@ -8,37 +8,27 @@ import (
 	"github.com/klauern/klauer-hooks/internal/hooks"
 )
 
-// Plugin defines the behavior for all dynamically registered hook plugins.
-// This interface remains for backward compatibility but now wraps the new Hook interface
-type Plugin interface {
-	Name() string
-	Description() string
-	Run() error
-}
-
-// hookAdapter wraps a Hook to implement the Plugin interface
-type hookAdapter struct {
-	hook hooks.Hook
-}
-
-func (h *hookAdapter) Name() string        { return h.hook.Name() }
-func (h *hookAdapter) Description() string { return h.hook.Description() }
-func (h *hookAdapter) Run() error          { return h.hook.Run() }
+// Plugin is now an alias for Hook interface for backward compatibility
+// The Hook interface from internal/hooks is more complete and serves the same purpose
+type Plugin = hooks.Hook
 
 // funcPlugin is an adapter to allow simple function-based plugins to be registered quickly.
 type funcPlugin struct {
+	key         string
 	name        string
 	description string
 	fn          func() error
 }
 
+func (f *funcPlugin) Key() string         { return f.key }
 func (f *funcPlugin) Name() string        { return f.name }
 func (f *funcPlugin) Description() string { return f.description }
 func (f *funcPlugin) Run() error          { return f.fn() }
+func (f *funcPlugin) IsEnabled() bool     { return true } // Simple plugins are always enabled
 
 // NewFuncPlugin creates a simple Plugin from a function and metadata.
-func NewFuncPlugin(name, description string, fn func() error) Plugin {
-	return &funcPlugin{name: name, description: description, fn: fn}
+func NewFuncPlugin(key, name, description string, fn func() error) Plugin {
+	return &funcPlugin{key: key, name: name, description: description, fn: fn}
 }
 
 var (
@@ -96,24 +86,6 @@ func PluginKeys() []string {
 	return keys
 }
 
-// RegisterHookAsPlugin registers a hook from the modular system as a plugin
-func RegisterHookAsPlugin(key string) error {
-	hook, err := hooks.CreateHook(key)
-	if err != nil {
-		return fmt.Errorf("failed to create hook '%s': %v", key, err)
-	}
-
-	adapter := &hookAdapter{hook: hook}
-	return RegisterPlugin(key, adapter)
-}
-
-// MustRegisterHookAsPlugin registers a hook as a plugin, panics on error
-func MustRegisterHookAsPlugin(key string) {
-	if err := RegisterHookAsPlugin(key); err != nil {
-		panic(err)
-	}
-}
-
 // init registers all built-in hooks from the modular system
 func init() {
 	// Setup the settings checker for the hooks system
@@ -121,11 +93,15 @@ func init() {
 		FileSystem:      &hooks.RealFileSystem{},
 		CommandExecutor: &hooks.RealCommandExecutor{},
 		RunnerFactory:   hooks.DefaultRunnerFactory,
-		SettingsChecker: isPluginEnabled, // Use the existing function from main
+		SettingsChecker: isPluginEnabled, // Use the existing function from settings.go
 	})
 
-	// Register all hooks from the modular system
+	// Register all hooks from the modular system directly
 	for _, key := range hooks.GetHookKeys() {
-		MustRegisterHookAsPlugin(key)
+		hook, err := hooks.CreateHook(key)
+		if err != nil {
+			panic(fmt.Errorf("failed to create hook '%s': %v", key, err))
+		}
+		MustRegisterPlugin(key, hook)
 	}
 }
