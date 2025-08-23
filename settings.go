@@ -154,7 +154,8 @@ func isHooksConfigEmpty(hooks HooksConfig) bool {
 		len(hooks.Stop) == 0 &&
 		len(hooks.SubagentStop) == 0 &&
 		len(hooks.PreCompact) == 0 &&
-		len(hooks.SessionStart) == 0
+		len(hooks.SessionStart) == 0 &&
+		len(hooks.SessionEnd) == 0
 }
 
 // IsPluginEnabled returns true if the plugin is enabled (default) or explicitly enabled.
