@@ -1,0 +1,70 @@
+package hooks
+
+import (
+	"testing"
+)
+
+// Test{{.Name}}Hook tests the {{.LowerName}} hook functionality
+func Test{{.Name}}Hook(t *testing.T) {
+	// Setup mock context
+	mockFS := &MockFileSystem{}
+	mockCmd := &MockCommandExecutor{}
+	mockRunner := func(pre func(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface,
+		post func(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface) *cchooks.Runner {
+		// Return a mock runner for testing
+		return &cchooks.Runner{}
+	}
+	
+	ctx := &HookContext{
+		FileSystem:      mockFS,
+		CommandExecutor: mockCmd,
+		RunnerFactory:   mockRunner,
+		SettingsChecker: func(string) bool { return true },
+	}
+
+	// Create hook instance
+	hook := New{{.Name}}Hook(ctx)
+
+	// Test basic properties
+	if hook.Key() != "{{.LowerName}}" {
+		t.Errorf("Expected key '{{.LowerName}}', got '%s'", hook.Key())
+	}
+
+	if hook.Name() != "{{.Name}} Hook" {
+		t.Errorf("Expected name '{{.Name}} Hook', got '%s'", hook.Name())
+	}
+
+	// Test that hook is enabled by default
+	if !hook.IsEnabled() {
+		t.Error("Expected hook to be enabled by default")
+	}
+
+	// Test running the hook (should not error)
+	err := hook.Run()
+	if err != nil {
+		t.Errorf("Hook run failed: %v", err)
+	}
+}
+
+// Test{{.Name}}HookDisabled tests the hook when disabled
+func Test{{.Name}}HookDisabled(t *testing.T) {
+	ctx := &HookContext{
+		FileSystem:      &MockFileSystem{},
+		CommandExecutor: &MockCommandExecutor{},
+		RunnerFactory:   func(pre, post interface{}) *cchooks.Runner { return &cchooks.Runner{} },
+		SettingsChecker: func(string) bool { return false }, // Disabled
+	}
+
+	hook := New{{.Name}}Hook(ctx)
+
+	// Test that hook is disabled
+	if hook.IsEnabled() {
+		t.Error("Expected hook to be disabled")
+	}
+
+	// Running disabled hook should still work but skip execution
+	err := hook.Run()
+	if err != nil {
+		t.Errorf("Disabled hook run failed: %v", err)
+	}
+}

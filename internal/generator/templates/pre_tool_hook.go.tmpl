@@ -1,0 +1,48 @@
+package hooks
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/brads3290/cchooks"
+)
+
+// {{.Name}}Hook implements {{.Description}}
+type {{.Name}}Hook struct {
+	*BaseHook
+}
+
+// New{{.Name}}Hook creates a new {{.LowerName}} hook instance
+func New{{.Name}}Hook(ctx *HookContext) Hook {
+	base := NewBaseHook("{{.LowerName}}", "{{.Name}} Hook", "{{.Description}}", ctx)
+	return &{{.Name}}Hook{BaseHook: base}
+}
+
+// Run implements the Hook interface
+func (h *{{.Name}}Hook) Run() error {
+	if !h.IsEnabled() {
+		fmt.Println("{{.Name}} plugin disabled - skipping")
+		return nil
+	}
+
+	runner := h.Context().RunnerFactory(h.preToolUseHandler, nil)
+	runner.Run()
+	return nil
+}
+
+func (h *{{.Name}}Hook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	// TODO: Implement your pre-tool logic here
+	// Example: Check if the tool is allowed
+	
+	if event.ToolName == "Bash" {
+		bash, err := event.AsBash()
+		if err != nil {
+			return cchooks.Block("failed to parse bash command")
+		}
+		
+		// TODO: Add your command validation logic here
+		fmt.Printf("{{.Name}} Hook: Processing bash command: %s\n", bash.Command)
+	}
+
+	return cchooks.Approve()
+}

@@ -1,0 +1,48 @@
+package hooks
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/brads3290/cchooks"
+)
+
+// {{.Name}}Hook implements {{.Description}}
+type {{.Name}}Hook struct {
+	*BaseHook
+}
+
+// New{{.Name}}Hook creates a new {{.LowerName}} hook instance
+func New{{.Name}}Hook(ctx *HookContext) Hook {
+	base := NewBaseHook("{{.LowerName}}", "{{.Name}} Hook", "{{.Description}}", ctx)
+	return &{{.Name}}Hook{BaseHook: base}
+}
+
+// Run implements the Hook interface
+func (h *{{.Name}}Hook) Run() error {
+	if !h.IsEnabled() {
+		fmt.Println("{{.Name}} plugin disabled - skipping")
+		return nil
+	}
+
+	runner := h.Context().RunnerFactory(nil, h.postToolUseHandler)
+	runner.Run()
+	return nil
+}
+
+func (h *{{.Name}}Hook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+	// TODO: Implement your post-tool logic here
+	
+	switch event.ToolName {
+	case "Edit", "Write":
+		// TODO: Add logic for when files are edited or written
+		fmt.Printf("{{.Name}} Hook: File operation completed: %s\n", event.ToolName)
+	case "Bash":
+		// TODO: Add logic for after bash commands
+		fmt.Printf("{{.Name}} Hook: Bash command completed\n")
+	default:
+		fmt.Printf("{{.Name}} Hook: Tool %s completed\n", event.ToolName)
+	}
+
+	return cchooks.Allow()
+}
