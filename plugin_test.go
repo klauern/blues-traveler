@@ -6,6 +6,8 @@ import (
 
 // Test that registering a new plugin works and duplicate keys error.
 func TestRegisterPluginDuplicate(t *testing.T) {
+	t.Attr("category", "registration")
+	t.Attr("component", "plugin-registry")
 	key := "test-temp-plugin"
 	// Ensure key not already present
 	if _, exists := GetPlugin(key); exists {
@@ -25,6 +27,8 @@ func TestRegisterPluginDuplicate(t *testing.T) {
 
 // Test that PluginKeys returns sorted keys (lexicographically ascending).
 func TestPluginKeysSorted(t *testing.T) {
+	t.Attr("category", "ordering")
+	t.Attr("component", "plugin-registry")
 	keys := PluginKeys()
 	for i := 1; i < len(keys); i++ {
 		if keys[i-1] > keys[i] {
@@ -49,6 +53,8 @@ func TestPluginKeysSorted(t *testing.T) {
 
 // Test Settings.IsPluginEnabled logic (default enabled, explicit disable).
 func TestIsPluginEnabled(t *testing.T) {
+	t.Attr("category", "settings")
+	t.Attr("component", "plugin-config")
 	s := &Settings{
 		Plugins: map[string]PluginConfig{},
 	}

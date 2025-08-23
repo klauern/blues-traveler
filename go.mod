@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/brads3290/cchooks v0.7.0
 	github.com/spf13/cobra v1.9.1
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

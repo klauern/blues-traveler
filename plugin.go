@@ -4,15 +4,26 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/klauern/klauer-hooks/internal/hooks"
 )
 
 // Plugin defines the behavior for all dynamically registered hook plugins.
-// Implementations may hold internal state/config if needed.
+// This interface remains for backward compatibility but now wraps the new Hook interface
 type Plugin interface {
 	Name() string
 	Description() string
 	Run() error
 }
+
+// hookAdapter wraps a Hook to implement the Plugin interface
+type hookAdapter struct {
+	hook hooks.Hook
+}
+
+func (h *hookAdapter) Name() string        { return h.hook.Name() }
+func (h *hookAdapter) Description() string { return h.hook.Description() }
+func (h *hookAdapter) Run() error          { return h.hook.Run() }
 
 // funcPlugin is an adapter to allow simple function-based plugins to be registered quickly.
 type funcPlugin struct {
@@ -85,32 +96,36 @@ func PluginKeys() []string {
 	return keys
 }
 
-// ----- Registration of built-in plugins -----
-// Each built-in plugin registers itself in init() for automatic discovery.
+// RegisterHookAsPlugin registers a hook from the modular system as a plugin
+func RegisterHookAsPlugin(key string) error {
+	hook, err := hooks.CreateHook(key)
+	if err != nil {
+		return fmt.Errorf("failed to create hook '%s': %v", key, err)
+	}
 
+	adapter := &hookAdapter{hook: hook}
+	return RegisterPlugin(key, adapter)
+}
+
+// MustRegisterHookAsPlugin registers a hook as a plugin, panics on error
+func MustRegisterHookAsPlugin(key string) {
+	if err := RegisterHookAsPlugin(key); err != nil {
+		panic(err)
+	}
+}
+
+// init registers all built-in hooks from the modular system
 func init() {
-	// Security hook
-	MustRegisterPlugin("security", NewFuncPlugin(
-		"Security Hook",
-		"Blocks dangerous commands and provides security controls",
-		runSecurityHook,
-	))
-	// Format hook
-	MustRegisterPlugin("format", NewFuncPlugin(
-		"Format Hook",
-		"Enforces code formatting standards",
-		runFormatHook,
-	))
-	// Debug hook
-	MustRegisterPlugin("debug", NewFuncPlugin(
-		"Debug Hook",
-		"Logs all tool usage for debugging purposes",
-		runDebugHook,
-	))
-	// Audit hook
-	MustRegisterPlugin("audit", NewFuncPlugin(
-		"Audit Hook",
-		"Comprehensive audit logging with JSON output",
-		runAuditHook,
-	))
+	// Setup the settings checker for the hooks system
+	hooks.SetGlobalContext(&hooks.HookContext{
+		FileSystem:      &hooks.RealFileSystem{},
+		CommandExecutor: &hooks.RealCommandExecutor{},
+		RunnerFactory:   hooks.DefaultRunnerFactory,
+		SettingsChecker: isPluginEnabled, // Use the existing function from main
+	})
+
+	// Register all hooks from the modular system
+	for _, key := range hooks.GetHookKeys() {
+		MustRegisterHookAsPlugin(key)
+	}
 }

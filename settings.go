@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
+	"regexp"
+	"strings"
 )
 
 type HookCommand struct {
@@ -28,6 +29,7 @@ type HooksConfig struct {
 	SubagentStop     []HookMatcher `json:"SubagentStop,omitempty"`
 	PreCompact       []HookMatcher `json:"PreCompact,omitempty"`
 	SessionStart     []HookMatcher `json:"SessionStart,omitempty"`
+	SessionEnd       []HookMatcher `json:"SessionEnd,omitempty"`
 }
 
 // PluginConfig stores per-plugin settings (extendable later with plugin-specific fields).
@@ -171,7 +173,7 @@ func (s *Settings) IsPluginEnabled(key string) bool {
 	return *cfg.Enabled
 }
 
-func addHookToSettings(settings *Settings, event, matcher, command string, timeout *int) {
+func addHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
 	hookCmd := HookCommand{
 		Type:    "command",
 		Command: command,
@@ -183,49 +185,105 @@ func addHookToSettings(settings *Settings, event, matcher, command string, timeo
 		Hooks:   []HookCommand{hookCmd},
 	}
 
+	var result MergeResult
 	switch event {
 	case "PreToolUse":
-		settings.Hooks.PreToolUse = mergeHookMatcher(settings.Hooks.PreToolUse, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.PreToolUse, hookMatcher)
+		settings.Hooks.PreToolUse = result.Matchers
 	case "PostToolUse":
-		settings.Hooks.PostToolUse = mergeHookMatcher(settings.Hooks.PostToolUse, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.PostToolUse, hookMatcher)
+		settings.Hooks.PostToolUse = result.Matchers
 	case "UserPromptSubmit":
-		settings.Hooks.UserPromptSubmit = mergeHookMatcher(settings.Hooks.UserPromptSubmit, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.UserPromptSubmit, hookMatcher)
+		settings.Hooks.UserPromptSubmit = result.Matchers
 	case "Notification":
-		settings.Hooks.Notification = mergeHookMatcher(settings.Hooks.Notification, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.Notification, hookMatcher)
+		settings.Hooks.Notification = result.Matchers
 	case "Stop":
-		settings.Hooks.Stop = mergeHookMatcher(settings.Hooks.Stop, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.Stop, hookMatcher)
+		settings.Hooks.Stop = result.Matchers
 	case "SubagentStop":
-		settings.Hooks.SubagentStop = mergeHookMatcher(settings.Hooks.SubagentStop, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.SubagentStop, hookMatcher)
+		settings.Hooks.SubagentStop = result.Matchers
 	case "PreCompact":
-		settings.Hooks.PreCompact = mergeHookMatcher(settings.Hooks.PreCompact, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.PreCompact, hookMatcher)
+		settings.Hooks.PreCompact = result.Matchers
 	case "SessionStart":
-		settings.Hooks.SessionStart = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
+		result = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
+		settings.Hooks.SessionStart = result.Matchers
 	}
+	return result
 }
 
-func mergeHookMatcher(existing []HookMatcher, new HookMatcher) []HookMatcher {
+// MergeResult represents the result of merging hook matchers
+type MergeResult struct {
+	Matchers      []HookMatcher
+	WasDuplicate  bool
+	DuplicateInfo string
+}
+
+// extractHookType extracts the hook type from a klauer-hooks command
+// Example: "/path/to/klauer-hooks run debug --log" -> "debug"
+func extractHookType(command string) string {
+	// Pattern to match "klauer-hooks run <hooktype>" with optional flags
+	re := regexp.MustCompile(`klauer-hooks\s+run\s+(\w+)`)
+	matches := re.FindStringSubmatch(command)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+// isKlauerHooksCommand checks if a command is a klauer-hooks command
+func isKlauerHooksCommand(command string) bool {
+	return strings.Contains(command, "klauer-hooks run")
+}
+
+func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 	// Look for existing matcher
 	for i, matcher := range existing {
 		if matcher.Matcher == new.Matcher {
-			// Append to existing matcher
+			// Check for klauer-hooks command conflicts within this matcher
+			for j, existingHook := range existing[i].Hooks {
+				for _, newHook := range new.Hooks {
+					// Exact duplicate check
+					if existingHook.Command == newHook.Command {
+						return MergeResult{
+							Matchers:      existing,
+							WasDuplicate:  true,
+							DuplicateInfo: fmt.Sprintf("Hook command '%s' already exists for matcher '%s'", newHook.Command, matcher.Matcher),
+						}
+					}
+
+					// Check if both are klauer-hooks commands with the same hook type
+					if isKlauerHooksCommand(existingHook.Command) && isKlauerHooksCommand(newHook.Command) {
+						existingType := extractHookType(existingHook.Command)
+						newType := extractHookType(newHook.Command)
+						if existingType != "" && existingType == newType {
+							// Replace the existing hook with the new one
+							existing[i].Hooks[j] = newHook
+							return MergeResult{
+								Matchers:      existing,
+								WasDuplicate:  true,
+								DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcher.Matcher),
+							}
+						}
+					}
+				}
+			}
+			// No conflicts found, append to existing matcher
 			existing[i].Hooks = append(existing[i].Hooks, new.Hooks...)
-			return existing
+			return MergeResult{
+				Matchers:     existing,
+				WasDuplicate: false,
+			}
 		}
 	}
 	// No existing matcher found, add new one
-	return append(existing, new)
-}
-
-func getDefaultClaudeDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+	return MergeResult{
+		Matchers:     append(existing, new),
+		WasDuplicate: false,
 	}
-
-	if runtime.GOOS == "windows" {
-		return filepath.Join(homeDir, ".claude")
-	}
-	return filepath.Join(homeDir, ".claude")
 }
 
 func removeHookFromSettings(settings *Settings, command string) bool {
@@ -264,4 +322,112 @@ func removeHookFromMatchers(matchers []HookMatcher, command string, removed *boo
 	}
 
 	return result
+}
+
+// countKlauerHooksInSettings counts all klauer-hooks commands in the settings
+func countKlauerHooksInSettings(settings *Settings) int {
+	count := 0
+
+	// Define a helper function to count hooks in a slice of matchers
+	countInMatchers := func(matchers []HookMatcher) int {
+		c := 0
+		for _, matcher := range matchers {
+			for _, hook := range matcher.Hooks {
+				if isKlauerHookCommand(hook.Command) {
+					c++
+				}
+			}
+		}
+		return c
+	}
+
+	count += countInMatchers(settings.Hooks.PreToolUse)
+	count += countInMatchers(settings.Hooks.PostToolUse)
+	count += countInMatchers(settings.Hooks.UserPromptSubmit)
+	count += countInMatchers(settings.Hooks.Notification)
+	count += countInMatchers(settings.Hooks.Stop)
+	count += countInMatchers(settings.Hooks.SubagentStop)
+	count += countInMatchers(settings.Hooks.PreCompact)
+	count += countInMatchers(settings.Hooks.SessionStart)
+
+	return count
+}
+
+// isKlauerHookCommand checks if a command is from klauer-hooks
+func isKlauerHookCommand(command string) bool {
+	return strings.Contains(command, "klauer-hooks run") || strings.Contains(command, "hooks run")
+}
+
+// printKlauerHooksToRemove shows which klauer-hooks will be removed
+func printKlauerHooksToRemove(settings *Settings) {
+	// Define a helper function to print hooks from a slice of matchers
+	printFromMatchers := func(eventName string, matchers []HookMatcher) {
+		found := false
+		for _, matcher := range matchers {
+			for _, hook := range matcher.Hooks {
+				if isKlauerHookCommand(hook.Command) {
+					if !found {
+						fmt.Printf("%s:\n", eventName)
+						found = true
+					}
+					fmt.Printf("  Matcher: %s\n", matcher.Matcher)
+					fmt.Printf("    - %s\n", hook.Command)
+				}
+			}
+		}
+		if found {
+			fmt.Println()
+		}
+	}
+
+	printFromMatchers("PreToolUse", settings.Hooks.PreToolUse)
+	printFromMatchers("PostToolUse", settings.Hooks.PostToolUse)
+	printFromMatchers("UserPromptSubmit", settings.Hooks.UserPromptSubmit)
+	printFromMatchers("Notification", settings.Hooks.Notification)
+	printFromMatchers("Stop", settings.Hooks.Stop)
+	printFromMatchers("SubagentStop", settings.Hooks.SubagentStop)
+	printFromMatchers("PreCompact", settings.Hooks.PreCompact)
+	printFromMatchers("SessionStart", settings.Hooks.SessionStart)
+}
+
+// removeAllKlauerHooksFromSettings removes all klauer-hooks from settings and returns count removed
+func removeAllKlauerHooksFromSettings(settings *Settings) int {
+	removed := 0
+
+	// Define a helper function to remove klauer-hooks from a slice of matchers
+	removeFromMatchers := func(matchers []HookMatcher) []HookMatcher {
+		var result []HookMatcher
+
+		for _, matcher := range matchers {
+			var filteredHooks []HookCommand
+
+			// Keep only non-klauer-hooks
+			for _, hook := range matcher.Hooks {
+				if !isKlauerHookCommand(hook.Command) {
+					filteredHooks = append(filteredHooks, hook)
+				} else {
+					removed++
+				}
+			}
+
+			// Only keep the matcher if it has remaining hooks
+			if len(filteredHooks) > 0 {
+				matcher.Hooks = filteredHooks
+				result = append(result, matcher)
+			}
+		}
+
+		return result
+	}
+
+	settings.Hooks.PreToolUse = removeFromMatchers(settings.Hooks.PreToolUse)
+	settings.Hooks.PostToolUse = removeFromMatchers(settings.Hooks.PostToolUse)
+	settings.Hooks.UserPromptSubmit = removeFromMatchers(settings.Hooks.UserPromptSubmit)
+	settings.Hooks.Notification = removeFromMatchers(settings.Hooks.Notification)
+	settings.Hooks.Stop = removeFromMatchers(settings.Hooks.Stop)
+	settings.Hooks.SubagentStop = removeFromMatchers(settings.Hooks.SubagentStop)
+	settings.Hooks.PreCompact = removeFromMatchers(settings.Hooks.PreCompact)
+	settings.Hooks.SessionStart = removeFromMatchers(settings.Hooks.SessionStart)
+
+	return removed
 }
