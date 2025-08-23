@@ -128,7 +128,7 @@ This will automatically configure the hook to run for the specified events.`,
 		// Get settings path
 		settingsPath, err := getSettingsPath(global)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -207,7 +207,7 @@ var uninstallCmd = &cobra.Command{
 		// Get settings path
 		settingsPath, err := getSettingsPath(global)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -253,7 +253,7 @@ var listHooksCmd = &cobra.Command{
 		// Get settings path
 		settingsPath, err := getSettingsPath(global)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -398,7 +398,7 @@ and optionally a test file. The hook will need to be registered manually in the 
 
 		// Validate hook name
 		if err := generator.ValidateHookName(hookName); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error validating hook name: %v\n", err)
 			os.Exit(1)
 		}
 
