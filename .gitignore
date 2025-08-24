@@ -9,7 +9,8 @@
 *.test
 
 # Output of the go build
-hooks
+/hooks
+/klauer-hooks
 /*-hook
 !/internal/hooks/
 test-*
