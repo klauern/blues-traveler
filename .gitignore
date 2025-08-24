@@ -10,7 +10,8 @@
 
 # Output of the go build
 hooks
-*-hook
+/*-hook
+!/internal/hooks/
 test-*
 
 # Go workspace file

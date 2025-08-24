@@ -1,0 +1,118 @@
+package hooks
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/brads3290/cchooks"
+)
+
+// DebugHook implements debug logging logic
+type DebugHook struct {
+	*BaseHook
+	logger  *log.Logger
+	logFile *os.File
+}
+
+// NewDebugHook creates a new debug hook instance
+func NewDebugHook(ctx *HookContext) Hook {
+	base := NewBaseHook("debug", "Debug Hook", "Logs all tool usage for debugging purposes", ctx)
+	return &DebugHook{BaseHook: base}
+}
+
+// Run implements the Hook interface
+func (h *DebugHook) Run() error {
+	if !h.IsEnabled() {
+		fmt.Println("Debug plugin disabled - skipping")
+		return nil
+	}
+
+	// Setup logging
+	var err error
+	h.logFile, err = h.Context().FileSystem.OpenFile("claude-hooks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	defer func() { _ = h.logFile.Close() }()
+
+	h.logger = log.New(h.logFile, "", log.LstdFlags)
+
+	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
+	fmt.Println("Debug hook started - logging to claude-hooks.log")
+	runner.Run()
+	return nil
+}
+
+func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	h.logger.Printf("PRE-TOOL: %s", event.ToolName)
+
+	// Prepare detailed logging if enabled
+	details := make(map[string]interface{})
+	rawData := make(map[string]interface{})
+
+	// Capture raw data for detailed logging
+	if h.Context().LoggingEnabled {
+		rawData["tool_name"] = event.ToolName
+		// Add more raw data as available from the event
+	}
+
+	// Log specific tool details
+	switch event.ToolName {
+	case "Bash":
+		if bash, err := event.AsBash(); err == nil {
+			h.logger.Printf("  Command: %s", bash.Command)
+			details["command"] = bash.Command
+			details["description"] = bash.Description
+		}
+	case "Edit":
+		if edit, err := event.AsEdit(); err == nil {
+			h.logger.Printf("  File: %s", edit.FilePath)
+			details["file_path"] = edit.FilePath
+			details["old_string_length"] = len(edit.OldString)
+			details["new_string_length"] = len(edit.NewString)
+		}
+	case "Write":
+		if write, err := event.AsWrite(); err == nil {
+			h.logger.Printf("  File: %s", write.FilePath)
+			details["file_path"] = write.FilePath
+			details["content_length"] = len(write.Content)
+		}
+	case "Read":
+		if read, err := event.AsRead(); err == nil {
+			h.logger.Printf("  File: %s", read.FilePath)
+			details["file_path"] = read.FilePath
+		}
+	case "Glob":
+		if glob, err := event.AsGlob(); err == nil {
+			details["pattern"] = glob.Pattern
+		}
+	case "Grep":
+		if grep, err := event.AsGrep(); err == nil {
+			details["pattern"] = grep.Pattern
+		}
+	}
+
+	// Log detailed event data if logging is enabled
+	h.LogHookEvent("pre_tool_use", event.ToolName, rawData, details)
+
+	return cchooks.Approve()
+}
+
+func (h *DebugHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+	h.logger.Printf("POST-TOOL: %s", event.ToolName)
+
+	// Log detailed event data if logging is enabled
+	if h.Context().LoggingEnabled {
+		details := make(map[string]interface{})
+		rawData := make(map[string]interface{})
+
+		rawData["tool_name"] = event.ToolName
+		// Add any available post-tool event data
+
+		h.LogHookEvent("post_tool_use", event.ToolName, rawData, details)
+	}
+
+	return cchooks.Allow()
+}
