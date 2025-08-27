@@ -21,7 +21,7 @@ func NewFormatHook(ctx *HookContext) Hook {
 	return &FormatHook{BaseHook: base}
 }
 
-// Run implements the Hook interface
+// Run executes the format hook.
 func (h *FormatHook) Run() error {
 	if !h.IsEnabled() {
 		fmt.Println("Format plugin disabled - skipping")

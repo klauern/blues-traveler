@@ -20,7 +20,7 @@ func NewSecurityHook(ctx *HookContext) Hook {
 	return &SecurityHook{BaseHook: base}
 }
 
-// Run implements the Hook interface
+// Run executes the security hook.
 func (h *SecurityHook) Run() error {
 	if !h.IsEnabled() {
 		fmt.Println("Security plugin disabled - skipping")

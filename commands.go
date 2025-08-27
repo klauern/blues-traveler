@@ -31,51 +31,52 @@ var listCmd = &cobra.Command{
 var runCmd = &cobra.Command{
 	Use:   "run [plugin-key]",
 	Short: "Run a specific hook plugin",
-	Long:  `Run a specific hook plugin directly. This is typically called by Claude Code.`,
+	Long:  `Run a specific hook plugin. Executes only that hook's handlers (no unified pipeline).`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
 
-		// Get logging flag
-		logEnabled, _ := cmd.Flags().GetBool("log")
-		if logEnabled {
-			// Get log rotation config from our own config file (project first, then global)
-			logConfig := getLogRotationConfigFromFile(false)
-			if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
-				// If project config is empty, try global config
-				logConfig = getLogRotationConfigFromFile(true)
-			}
-
-			// Setup log rotation
-			logPath := GetLogPath(key)
-			rotatingLogger := SetupLogRotation(logPath, logConfig)
-			if rotatingLogger != nil {
-				// Set global logging configuration with rotating logger
-				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
-				fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
-				fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
-					logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)
-
-				// Clean up old logs
-				if err := CleanupOldLogs(filepath.Dir(logPath), logConfig.MaxAge); err != nil {
-					fmt.Printf("Warning: Failed to cleanup old logs: %v\n", err)
-				}
-			} else {
-				// Fallback to standard logging
-				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
-				fmt.Printf("Logging enabled - output will be written to %s\n", logPath)
-			}
-		}
-
-		plugin, exists := GetPlugin(key)
+		// Validate plugin exists early
+		p, exists := GetPlugin(key)
 		if !exists {
 			fmt.Fprintf(os.Stderr, "Error: Plugin '%s' not found.\n", key)
 			fmt.Fprintf(os.Stderr, "Available plugins: %s\n", strings.Join(PluginKeys(), ", "))
 			os.Exit(1)
 		}
-		fmt.Printf("Starting %s...\n", plugin.Name())
-		if err := plugin.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running plugin: %v\n", err)
+
+		// Enablement check before side effects
+		if !isPluginEnabled(key) {
+			fmt.Printf("Plugin '%s' is disabled via settings. Nothing to do.\n", key)
+			return
+		}
+
+		// Logging flag
+		logEnabled, _ := cmd.Flags().GetBool("log")
+		if logEnabled {
+			logConfig := getLogRotationConfigFromFile(false)
+			if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
+				logConfig = getLogRotationConfigFromFile(true)
+			}
+
+			logPath := GetLogPath(key)
+			rotatingLogger := SetupLogRotation(logPath, logConfig)
+			if rotatingLogger != nil {
+				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
+				fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
+				fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
+					logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)
+				if err := CleanupOldLogs(filepath.Dir(logPath), logConfig.MaxAge); err != nil {
+					fmt.Printf("Warning: Failed to cleanup old logs: %v\n", err)
+				}
+			} else {
+				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
+				fmt.Printf("Logging enabled - output will be written to %s\n", logPath)
+			}
+		}
+
+		fmt.Printf("Running hook '%s'...\n", key)
+		if err := p.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "Hook '%s' failed: %v\n", key, err)
 			os.Exit(1)
 		}
 	},

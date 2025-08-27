@@ -3,11 +3,8 @@ package hooks
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"time"
 
 	"github.com/brads3290/cchooks"
 )
@@ -120,8 +117,8 @@ type RunnerFactory func(preHook func(context.Context, *cchooks.PreToolUseEvent) 
 // DefaultRunnerFactory creates a standard cchooks.Runner
 func DefaultRunnerFactory(preHook func(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface,
 	postHook func(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface,
-	rawHook func(context.Context, string) *cchooks.RawResponse) Runner {
-
+	rawHook func(context.Context, string) *cchooks.RawResponse,
+) Runner {
 	runner := &cchooks.Runner{}
 	if preHook != nil {
 		runner.PreToolUse = preHook
@@ -172,59 +169,12 @@ func SetDefaultSettingsChecker(checker func(string) bool) {
 	}
 }
 
-// LogEntry represents a detailed log entry for hook inspection
-type LogEntry struct {
-	Timestamp string                 `json:"timestamp"`
-	HookKey   string                 `json:"hook_key"`
-	Event     string                 `json:"event"`
-	ToolName  string                 `json:"tool_name"`
-	RawData   map[string]interface{} `json:"raw_data,omitempty"`
-	Details   map[string]interface{} `json:"details,omitempty"`
-}
-
-// LogHookEvent logs detailed hook event data to .claude/hooks/<hook-key>.log
+// LogHookEvent delegates to shared logging utility (see logging.go)
 func (h *BaseHook) LogHookEvent(event string, toolName string, rawData map[string]interface{}, details map[string]interface{}) {
 	if !h.context.LoggingEnabled {
 		return
 	}
-
-	entry := LogEntry{
-		Timestamp: time.Now().Format(time.RFC3339),
-		HookKey:   h.key,
-		Event:     event,
-		ToolName:  toolName,
-		RawData:   rawData,
-		Details:   details,
-	}
-
-	// Ensure logging directory exists
-	logDir := h.context.LoggingDir
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create log directory %s: %v\n", logDir, err)
-		return
-	}
-
-	// Create log file path
-	logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", h.key))
-
-	// Marshal entry to JSON
-	jsonData, err := json.MarshalIndent(entry, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to marshal log entry: %v\n", err)
-		return
-	}
-
-	// Append to log file
-	file, err := h.context.FileSystem.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open log file %s: %v\n", logFile, err)
-		return
-	}
-	defer func() { _ = file.Close() }()
-
-	if _, err := file.WriteString(string(jsonData) + "\n"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write to log file: %v\n", err)
-	}
+	logHookEvent(h.context, h.key, event, toolName, rawData, details)
 }
 
 // CreateRawHandler creates a raw handler that logs all incoming JSON data when logging is enabled

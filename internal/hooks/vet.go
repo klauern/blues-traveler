@@ -21,7 +21,7 @@ func NewVetHook(ctx *HookContext) Hook {
 	return &VetHook{BaseHook: base}
 }
 
-// Run implements the Hook interface
+// Run executes the vet hook.
 func (h *VetHook) Run() error {
 	if !h.IsEnabled() {
 		fmt.Println("Vet plugin disabled - skipping")

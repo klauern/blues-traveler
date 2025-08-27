@@ -22,31 +22,40 @@ func NewDebugHook(ctx *HookContext) Hook {
 	return &DebugHook{BaseHook: base}
 }
 
-// Run implements the Hook interface
+// Run executes the debug hook.
 func (h *DebugHook) Run() error {
 	if !h.IsEnabled() {
 		fmt.Println("Debug plugin disabled - skipping")
 		return nil
 	}
-
-	// Setup logging
-	var err error
-	h.logFile, err = h.Context().FileSystem.OpenFile("claude-hooks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
-	if err != nil {
-		return fmt.Errorf("failed to open log file: %v", err)
+	h.ensureLogger()
+	if h.logger == nil {
+		return fmt.Errorf("failed to initialize logger")
 	}
-	defer func() { _ = h.logFile.Close() }()
-
-	h.logger = log.New(h.logFile, "", log.LstdFlags)
-
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
 	fmt.Println("Debug hook started - logging to claude-hooks.log")
 	runner.Run()
 	return nil
 }
 
+func (h *DebugHook) ensureLogger() {
+	if h.logger != nil {
+		return
+	}
+	var err error
+	h.logFile, err = h.Context().FileSystem.OpenFile("claude-hooks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+	if err != nil {
+		// Fallback: leave logger nil
+		return
+	}
+	h.logger = log.New(h.logFile, "", log.LstdFlags)
+}
+
 func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	h.logger.Printf("PRE-TOOL: %s", event.ToolName)
+	h.ensureLogger()
+	if h.logger != nil {
+		h.logger.Printf("PRE-TOOL: %s", event.ToolName)
+	}
 
 	// Prepare detailed logging if enabled
 	details := make(map[string]interface{})
@@ -101,7 +110,10 @@ func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 }
 
 func (h *DebugHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
-	h.logger.Printf("POST-TOOL: %s", event.ToolName)
+	h.ensureLogger()
+	if h.logger != nil {
+		h.logger.Printf("POST-TOOL: %s", event.ToolName)
+	}
 
 	// Log detailed event data if logging is enabled
 	if h.Context().LoggingEnabled {

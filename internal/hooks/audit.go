@@ -29,7 +29,7 @@ func NewAuditHook(ctx *HookContext) Hook {
 	return &AuditHook{BaseHook: base}
 }
 
-// Run implements the Hook interface
+// Run executes the audit hook.
 func (h *AuditHook) Run() error {
 	if !h.IsEnabled() {
 		fmt.Println("Audit plugin disabled - skipping")

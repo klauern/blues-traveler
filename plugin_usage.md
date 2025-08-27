@@ -1,22 +1,23 @@
 # Plugin System Usage
 
-This document explains how to work with the hook plugin architecture for adding linters, formatters, checkers, and other behavioral extensions.
+This document explains how to work with the hook plugin (hook) architecture for adding linters, formatters, checkers, and other behavioral extensions.
 
 ## Overview
 
-Plugins encapsulate hook behavior (security checks, formatting, auditing, etc.).
-They register themselves at init() time via a lightweight registry defined in [`plugin.go`](plugin.go).
+Hooks encapsulate behavior (security checking, formatting, auditing, debugging).
+They are defined as concrete implementations under `internal/hooks` and referenced by key (e.g. `security`, `format`).
+Dynamic runtime registration has been deprecated. The previous helper `NewFuncPlugin` and `RegisterPlugin` pattern were removed in favor of a static, explicit set of hook implementations.
 
 Key goals:
 
-- Zero boilerplate to add a new plugin
-- Stable programmatic listing & execution (`hooks list`, `hooks run <key>`)
-- Per‑plugin enable/disable controls via settings (`plugins` section)
-- Backwards compatibility with existing install/uninstall flow
+- Simple discovery & execution (`hooks list`, `hooks run <key>`)
+- Per‑hook enable/disable controls via settings (`plugins` section)
+- Deterministic set of built‑ins with clear maintenance surface
+- Backwards compatibility layer (shim in [`plugin.go`](plugin.go)) for existing consumers calling `GetPlugin` / `PluginKeys`
 
-## Core Types
+## Core Types (Shim Layer)
 
-Registry + interface (see [`plugin.go`](plugin.go)):
+For backward compatibility the legacy types are still exposed (see [`plugin.go`](plugin.go)):
 
 ```go
 type Plugin interface {
@@ -25,25 +26,13 @@ type Plugin interface {
     Run() error
 }
 
-func RegisterPlugin(key string, p Plugin) error
-func MustRegisterPlugin(key string, p Plugin)
 func GetPlugin(key string) (Plugin, bool)
 func PluginKeys() []string
 ```
 
-A helper adapter allows function-style implementations:
+`RegisterPlugin`, `MustRegisterPlugin` now return (or panic with) an error informing that dynamic registration is deprecated.
 
-```go
-p := NewFuncPlugin("My Plugin Name", "Does something", func() error {
-    // logic
-    return nil
-})
-MustRegisterPlugin("my-key", p)
-```
-
-## Built-In Plugins
-
-Registered in [`plugin.go`](plugin.go):
+## Built-In Hooks
 
 | Key       | Purpose |
 |-----------|---------|
@@ -52,11 +41,11 @@ Registered in [`plugin.go`](plugin.go):
 | debug     | Logs tool usage to a file |
 | audit     | Emits structured JSON events |
 
-Underlying logic lives in [`hooks.go`](hooks.go).
+Implementations live under `internal/hooks/*.go`.
 
 ## Settings Integration
 
-Settings structure (see [`settings.go`](settings.go)) now includes:
+Settings structure (see [`settings.go`](settings.go)):
 
 ```jsonc
 {
@@ -69,65 +58,60 @@ Settings structure (see [`settings.go`](settings.go)) now includes:
 
 Rules:
 
-- Omitted plugin OR `{}` means enabled by default
+- Omitted plugin OR empty object means enabled by default
 - `"enabled": false` explicitly disables it
-- Future plugin-specific config fields can be added inside each object
+- Future plugin‑specific config fields may be added per key
 
-Helper method:
+Helper:
 
 ```go
 func (s *Settings) IsPluginEnabled(key string) bool
 ```
 
-## Adding a New Plugin
+## Adding a New Built-In Hook
 
-1. Create a new file (e.g. `plugin_<name>.go`)
-2. Implement logic (directly or via `NewFuncPlugin`)
-3. Register in `init()`:
+Because dynamic registration is removed, adding a new hook requires:
 
-```go
-func init() {
-    MustRegisterPlugin("mylinter", NewFuncPlugin(
-        "MyLinter",
-        "Enforces XYZ style rules",
-        runMyLinterHook,
-    ))
-}
-```
+1. Create implementation file under `internal/hooks/` implementing the `hooks.Hook` interface.
+2. Add its factory/constructor to the registry list (refer to existing files such as `security.go`).
+3. Update documentation if needed.
+4. Add tests asserting its presence in `PluginKeys()` (via shim) and enabled behavior.
 
-4. Provide the implementation:
+Minimal pattern:
 
 ```go
-func runMyLinterHook() error {
-    // Instantiate cchooks.Runner or any needed machinery
-    // ...
+// internal/hooks/myhook.go
+package hooks
+
+type myHook struct{}
+
+func (h *myHook) Name() string        { return "MyHook" }
+func (h *myHook) Description() string { return "Does something useful" }
+func (h *myHook) Run() error {
+    // logic
     return nil
 }
-```
 
-5. (Optional) Add config support by reading from `Settings.Plugins["mylinter"]`.
+// In registry (implementation dependent), ensure key "myhook" creates *myHook.
+```
 
 ## Execution Flow
 
-- Listing: `hooks list`
-- Direct run (usually by Claude Code): `hooks run <plugin-key>`
-- Installation into Claude settings uses existing CLI:
+- List: `hooks list`
+- Run:  `hooks run <key>`
+- Install into Claude settings:
 
   ```
   hooks install security -e PreToolUse -m "*"
   ```
 
-This writes a command like:
+Stored command resembles:
 
 ```
 <absolute-exe-path> run security
 ```
 
-into the settings hook entries.
-
-## Disabling a Plugin Without Removing Hook Entries
-
-If you want to keep the hook wiring but temporarily disable behavior:
+## Disabling a Hook Without Removing Settings Entries
 
 ```json
 {
@@ -137,89 +121,58 @@ If you want to keep the hook wiring but temporarily disable behavior:
 }
 ```
 
-Your wrapper (caller) should consult `settings.IsPluginEnabled("security")` before invoking (future enhancement—currently direct execution assumes active).
+The CLI performs the `IsPluginEnabled` check prior to execution.
 
-## Extending: Plugin-Specific Configuration
+## Extending: Hook-Specific Configuration
 
-Add fields to `PluginConfig`:
+Extend `PluginConfig`:
 
 ```go
 type PluginConfig struct {
-    Enabled *bool  `json:"enabled,omitempty"`
+    Enabled  *bool `json:"enabled,omitempty"`
     MaxIssues *int `json:"maxIssues,omitempty"`
 }
 ```
 
-Then read inside the plugin:
+Use inside the hook by fetching settings from the global context (see existing hooks for patterns).
 
-```go
-cfg := settings.Plugins["mylinter"]
-if cfg.MaxIssues != nil { /* enforce */ }
-```
+## Testing
 
-## Testing Plugins
+Typical assertions (see `plugin_test.go`):
 
-See forthcoming test file (e.g. `plugin_test.go`) for patterns:
+- Built‑in keys present and sorted
+- `IsPluginEnabled` default / explicit enable / disable logic
 
-- Verify registration presence
-- Ensure duplicate registration errors
-- Validate `IsPluginEnabled` semantics
+Dynamic registration tests were removed with deprecation of runtime registration.
 
 ## Migration Notes
 
 Removed:
 
-- Old `HookType` struct & `GetHookTypes()` in favor of registry
+- Dynamic runtime registration (`NewFuncPlugin`, functional adapters)
+- Pipeline aggregation constructs
 
 Retained:
 
 - CLI verbs (`list`, `run`, `install`, `uninstall`, `list-installed`)
-- Hook execution semantics (still shelling out via settings-installed commands)
+- Uniform `Run()` execution model
+- Settings enable/disable semantics
 
-## Recommended Future Enhancements
+## Future Enhancements (Potential)
 
-- Lazy plugin activation based on event type
-- Structured error categorization for plugin failures
-- Metrics collector plugin (timings, error counts)
-- External plugin discovery via `GOHOOK_PATH` directory scanning + Go plugin `.so` builds (optional advanced step)
-
-## Quick Start Template
-
-```go
-// plugin_mylinter.go
-package main
-
-func runMyLinterHook() error {
-    // TODO: implement logic
-    return nil
-}
-
-func init() {
-    MustRegisterPlugin("mylinter", NewFuncPlugin(
-        "My Linter",
-        "Checks custom project rules",
-        runMyLinterHook,
-    ))
-}
-```
-
-Done—`hooks list` now shows it.
+- Lazy activation based on event type
+- Structured error categorization
+- Metrics (timings, error counts)
+- Optional external discovery (would require a new, explicit extension mechanism)
 
 ## Troubleshooting
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Plugin missing from list | init() not executed (wrong package name) | Ensure `package main` and file included in build |
-| Duplicate key panic | `MustRegisterPlugin` on existing key | Use unique key or switch to `RegisterPlugin` and handle error |
-| Settings not honoring disable | Caller not checking `IsPluginEnabled` | Add guard before invoking plugin logic |
+| Key missing from list | Hook not added to registry | Add constructor entry in registry |
+| Disabled hook still runs | Settings not reloaded / wrong scope | Verify project vs global settings and enable flag |
+| Formatting not applied | File types unsupported | Extend formatter logic / add hook |
 
 ## Summary
 
-The new architecture decouples:
-
-- Registration (static init)
-- Discovery (registry enumeration)
-- Execution (uniform `Run()` method)
-- Configuration (`settings.Plugins`)
-
-This minimizes friction for adding new capability classes (linters, formatters, audit layers) while keeping backward compatibility with existing hook installation semantics.
+The revised architecture favors explicit, static hook definitions for predictability and reduced surface area. A thin shim maintains backward compatibility for existing external tooling expecting the prior registry API while discouraging dynamic mutation.
