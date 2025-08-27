@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/klauern/klauer-hooks/internal/cmd"
+	"github.com/klauern/klauer-hooks/internal/compat"
+	"github.com/klauern/klauer-hooks/internal/core"
+	_ "github.com/klauern/klauer-hooks/internal/hooks" // Import for init() registration
 	"github.com/spf13/cobra"
 )
 
@@ -14,46 +18,41 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(installCmd)
-	rootCmd.AddCommand(uninstallCmd)
-	rootCmd.AddCommand(listHooksCmd)
-	rootCmd.AddCommand(listEventsCmd)
-	rootCmd.AddCommand(generateCmd)
-	rootCmd.AddCommand(configLogCmd)
+	// Create wrapper functions for compatibility
+	getPluginWrapper := func(key string) (interface {
+		Run() error
+		Description() string
+	}, bool) {
+		p, exists := compat.GetPlugin(key)
+		if !exists {
+			return nil, false
+		}
+		return p, true
+	}
 
-	// Add flags for install command
-	installCmd.Flags().BoolP("global", "g", false, "Install to global settings (~/.claude/settings.json)")
-	installCmd.Flags().StringP("event", "e", "PreToolUse", "Hook event (PreToolUse, PostToolUse, UserPromptSubmit, etc.)")
-	installCmd.Flags().StringP("matcher", "m", "*", "Tool matcher pattern (* for all tools)")
-	installCmd.Flags().IntP("timeout", "t", 0, "Command timeout in seconds (0 for no timeout)")
-	installCmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
-	installCmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
+	eventsWrapper := func() []cmd.ClaudeCodeEvent {
+		events := core.AllClaudeCodeEvents()
+		result := make([]cmd.ClaudeCodeEvent, len(events))
+		for i, e := range events {
+			result[i] = cmd.ClaudeCodeEvent{
+				Type:               cmd.EventType(e.Type),
+				Name:               e.Name,
+				Description:        e.Description,
+				SupportedByCCHooks: e.SupportedByCCHooks,
+			}
+		}
+		return result
+	}
 
-	// Add flags for uninstall command
-	uninstallCmd.Flags().BoolP("global", "g", false, "Remove from global settings (~/.claude/settings.json)")
-
-	// Add flags for run command
-	runCmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
-	runCmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
-
-	// Add flags for list-installed command
-	listHooksCmd.Flags().BoolP("global", "g", false, "Show global settings (~/.claude/settings.json)")
-
-	// Add flags for generate command
-	generateCmd.Flags().StringP("description", "d", "", "Description of the hook")
-	generateCmd.Flags().StringP("type", "t", "both", "Hook type: pre, post, or both")
-	generateCmd.Flags().BoolP("test", "", true, "Generate test file")
-	generateCmd.Flags().StringP("output", "o", "", "Output directory (default: internal/hooks)")
-
-	// Add flags for config-log command
-	configLogCmd.Flags().BoolP("global", "g", false, "Configure global settings (~/.claude/settings.json)")
-	configLogCmd.Flags().IntP("max-age", "a", 0, "Maximum age in days to retain log files (default: 30)")
-	configLogCmd.Flags().IntP("max-size", "s", 0, "Maximum size in MB per log file before rotation (default: 10)")
-	configLogCmd.Flags().IntP("max-backups", "b", 0, "Maximum number of backup files to retain (default: 5)")
-	configLogCmd.Flags().BoolP("compress", "c", false, "Compress rotated log files")
-	configLogCmd.Flags().BoolP("show", "", false, "Show current log rotation settings")
+	// Create command instances with dependency injection
+	rootCmd.AddCommand(cmd.NewListCmd(getPluginWrapper, compat.PluginKeys))
+	rootCmd.AddCommand(cmd.NewRunCmd(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys))
+	rootCmd.AddCommand(cmd.NewInstallCmd(getPluginWrapper, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes))
+	rootCmd.AddCommand(cmd.NewUninstallCmd())
+	rootCmd.AddCommand(cmd.NewListInstalledCmd())
+	rootCmd.AddCommand(cmd.NewListEventsCmd(eventsWrapper))
+	rootCmd.AddCommand(cmd.NewGenerateCmd())
+	rootCmd.AddCommand(cmd.NewConfigLogCmd())
 }
 
 func main() {

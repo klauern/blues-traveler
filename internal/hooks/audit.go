@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // AuditHook implements comprehensive audit logging
 type AuditHook struct {
-	*BaseHook
+	*core.BaseHook
 }
 
 // AuditEntry represents an audit log entry
@@ -24,8 +25,8 @@ type AuditEntry struct {
 }
 
 // NewAuditHook creates a new audit hook instance
-func NewAuditHook(ctx *HookContext) Hook {
-	base := NewBaseHook("audit", "Audit Hook", "Comprehensive audit logging with JSON output", ctx)
+func NewAuditHook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("audit", "Audit Hook", "Comprehensive audit logging with JSON output", ctx)
 	return &AuditHook{BaseHook: base}
 }
 

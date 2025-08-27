@@ -1,4 +1,4 @@
-package hooks
+package core
 
 import (
 	"reflect"
@@ -148,33 +148,30 @@ func TestRegistrySetContext(t *testing.T) {
 
 func TestGlobalRegistry(t *testing.T) {
 	// Test that global registry functions work
-	keys := GetHookKeys()
+	_ = GetHookKeys() // Just test that it doesn't panic
 
-	// Should have built-in hooks
-	expectedHooks := []string{"security", "format", "debug", "audit"}
-	for _, expected := range expectedHooks {
-		found := false
-		for _, key := range keys {
-			if key == expected {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected built-in hook '%s' to be registered", expected)
-		}
+	// Test that we can register and retrieve hooks
+	testFactory := func(ctx *HookContext) Hook {
+		return newTestHook("test-global", "Test Global Hook", "Test hook", ctx)
 	}
 
-	// Test creating hooks
-	for _, key := range expectedHooks {
-		hook, err := CreateHook(key)
-		if err != nil {
-			t.Errorf("Failed to create hook '%s': %v", key, err)
-		}
-		if hook.Key() != key {
-			t.Errorf("Hook key mismatch: expected '%s', got '%s'", key, hook.Key())
-		}
+	// Register a test hook
+	err := globalRegistry.Register("test-global", testFactory)
+	if err != nil {
+		t.Errorf("Failed to register test hook: %v", err)
 	}
+
+	// Test creating the registered hook
+	hook, err := CreateHook("test-global")
+	if err != nil {
+		t.Errorf("Failed to create hook 'test-global': %v", err)
+	}
+	if hook.Key() != "test-global" {
+		t.Errorf("Hook key mismatch: expected 'test-global', got '%s'", hook.Key())
+	}
+
+	// Clean up
+	globalRegistry = NewRegistry(DefaultHookContext())
 }
 
 func TestRegistryList(t *testing.T) {

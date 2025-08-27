@@ -8,16 +8,17 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // VetHook implements Python type checking logic using ty
 type VetHook struct {
-	*BaseHook
+	*core.BaseHook
 }
 
 // NewVetHook creates a new vet hook instance
-func NewVetHook(ctx *HookContext) Hook {
-	base := NewBaseHook("vet", "Vet Hook", "Performs Python type checking using ty", ctx)
+func NewVetHook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("vet", "Vet Hook", "Performs Python type checking using ty", ctx)
 	return &VetHook{BaseHook: base}
 }
 

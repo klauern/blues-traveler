@@ -8,16 +8,17 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // FormatHook implements code formatting logic
 type FormatHook struct {
-	*BaseHook
+	*core.BaseHook
 }
 
 // NewFormatHook creates a new format hook instance
-func NewFormatHook(ctx *HookContext) Hook {
-	base := NewBaseHook("format", "Format Hook", "Enforces code formatting standards", ctx)
+func NewFormatHook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("format", "Format Hook", "Enforces code formatting standards", ctx)
 	return &FormatHook{BaseHook: base}
 }
 

@@ -1,9 +1,11 @@
-package hooks
+package core
 
 import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/klauern/klauer-hooks/internal/config"
 )
 
 // HookFactory is a function that creates a Hook instance
@@ -177,7 +179,7 @@ func SetGlobalLoggingConfig(enabled bool, logDir string, format string) {
 	if globalRegistry.context != nil {
 		globalRegistry.context.LoggingEnabled = enabled
 		globalRegistry.context.LoggingDir = logDir
-		if IsValidLoggingFormat(format) {
+		if config.IsValidLoggingFormat(format) {
 			globalRegistry.context.LoggingFormat = format
 		} else if format == "" {
 			// leave default
@@ -190,15 +192,7 @@ func GetGlobalRegistry() *Registry {
 	return globalRegistry
 }
 
-// init registers all built-in hooks using batch registration for better performance
-func init() {
-	builtinHooks := map[string]HookFactory{
-		"security": NewSecurityHook,
-		"format":   NewFormatHook,
-		"debug":    NewDebugHook,
-		"audit":    NewAuditHook,
-		"vet":      NewVetHook,
-		// "performance": NewPerformanceHook, // TODO: Enable when performance.go is properly integrated
-	}
-	globalRegistry.MustRegisterBatch(builtinHooks)
+// RegisterBuiltinHooks can be called by the hooks package to register all built-in hooks
+func RegisterBuiltinHooks(hooks map[string]HookFactory) {
+	globalRegistry.MustRegisterBatch(hooks)
 }

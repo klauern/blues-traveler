@@ -2,12 +2,14 @@ package hooks
 
 import (
 	"testing"
+
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 func TestVetHook(t *testing.T) {
-	ctx := &HookContext{
-		CommandExecutor: &MockCommandExecutor{},
-		RunnerFactory:   MockRunnerFactory,
+	ctx := &core.HookContext{
+		CommandExecutor: &core.MockCommandExecutor{},
+		RunnerFactory:   core.MockRunnerFactory,
 		LoggingEnabled:  false,
 	}
 
@@ -26,7 +28,7 @@ func TestVetHook(t *testing.T) {
 }
 
 func TestVetHookIsPythonFile(t *testing.T) {
-	ctx := DefaultHookContext()
+	ctx := core.DefaultHookContext()
 	hook := NewVetHook(ctx).(*VetHook)
 
 	tests := []struct {

@@ -7,16 +7,17 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // SecurityHook implements security blocking logic for dangerous commands
 type SecurityHook struct {
-	*BaseHook
+	*core.BaseHook
 }
 
 // NewSecurityHook creates a new security hook instance
-func NewSecurityHook(ctx *HookContext) Hook {
-	base := NewBaseHook("security", "Security Hook", "Blocks dangerous commands and provides security controls", ctx)
+func NewSecurityHook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("security", "Security Hook", "Blocks dangerous commands and provides security controls", ctx)
 	return &SecurityHook{BaseHook: base}
 }
 

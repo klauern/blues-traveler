@@ -1,13 +1,18 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/klauern/klauer-hooks/internal/compat"
+	"github.com/klauern/klauer-hooks/internal/config"
+)
 
 // Test that PluginKeys returns sorted keys and includes required built-ins.
 func TestPluginKeysSortedAndBuiltinPresence(t *testing.T) {
 	t.Attr("category", "registry")
 	t.Attr("component", "plugin-registry")
 
-	keys := PluginKeys()
+	keys := compat.PluginKeys()
 	if len(keys) == 0 {
 		t.Fatalf("expected at least one plugin key")
 	}
@@ -37,8 +42,8 @@ func TestSettingsIsPluginEnabled(t *testing.T) {
 	t.Attr("category", "settings")
 	t.Attr("component", "plugin-config")
 
-	s := &Settings{
-		Plugins: map[string]PluginConfig{},
+	s := &config.Settings{
+		Plugins: map[string]config.PluginConfig{},
 	}
 
 	// Default: absent plugin treated as enabled
@@ -48,14 +53,14 @@ func TestSettingsIsPluginEnabled(t *testing.T) {
 
 	// Explicitly enable
 	trueVal := true
-	s.Plugins["alpha"] = PluginConfig{Enabled: &trueVal}
+	s.Plugins["alpha"] = config.PluginConfig{Enabled: &trueVal}
 	if !s.IsPluginEnabled("alpha") {
 		t.Fatalf("expected explicitly enabled plugin to be enabled")
 	}
 
 	// Explicitly disable
 	falseVal := false
-	s.Plugins["beta"] = PluginConfig{Enabled: &falseVal}
+	s.Plugins["beta"] = config.PluginConfig{Enabled: &falseVal}
 	if s.IsPluginEnabled("beta") {
 		t.Fatalf("expected explicitly disabled plugin to be disabled")
 	}

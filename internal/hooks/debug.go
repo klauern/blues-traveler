@@ -7,18 +7,19 @@ import (
 	"os"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // DebugHook implements debug logging logic
 type DebugHook struct {
-	*BaseHook
+	*core.BaseHook
 	logger  *log.Logger
 	logFile *os.File
 }
 
 // NewDebugHook creates a new debug hook instance
-func NewDebugHook(ctx *HookContext) Hook {
-	base := NewBaseHook("debug", "Debug Hook", "Logs all tool usage for debugging purposes", ctx)
+func NewDebugHook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("debug", "Debug Hook", "Logs all tool usage for debugging purposes", ctx)
 	return &DebugHook{BaseHook: base}
 }
 

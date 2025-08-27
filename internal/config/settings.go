@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -45,7 +45,7 @@ type Settings struct {
 	Other        map[string]interface{}  `json:"-"`
 }
 
-func getSettingsPath(global bool) (string, error) {
+func GetSettingsPath(global bool) (string, error) {
 	if global {
 		// Global settings: ~/.claude/settings.json
 		homeDir, err := os.UserHomeDir()
@@ -63,7 +63,7 @@ func getSettingsPath(global bool) (string, error) {
 	}
 }
 
-func loadSettings(settingsPath string) (*Settings, error) {
+func LoadSettings(settingsPath string) (*Settings, error) {
 	settings := &Settings{
 		Other: make(map[string]interface{}),
 	}
@@ -104,7 +104,7 @@ func loadSettings(settingsPath string) (*Settings, error) {
 	return settings, nil
 }
 
-func saveSettings(settingsPath string, settings *Settings) error {
+func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -125,7 +125,7 @@ func saveSettings(settingsPath string, settings *Settings) error {
 	}
 
 	// Only add hooks if they're not empty
-	if !isHooksConfigEmpty(settings.Hooks) {
+	if !IsHooksConfigEmpty(settings.Hooks) {
 		output["hooks"] = settings.Hooks
 	}
 
@@ -146,7 +146,7 @@ func saveSettings(settingsPath string, settings *Settings) error {
 	return nil
 }
 
-func isHooksConfigEmpty(hooks HooksConfig) bool {
+func IsHooksConfigEmpty(hooks HooksConfig) bool {
 	return len(hooks.PreToolUse) == 0 &&
 		len(hooks.PostToolUse) == 0 &&
 		len(hooks.UserPromptSubmit) == 0 &&
@@ -174,7 +174,7 @@ func (s *Settings) IsPluginEnabled(key string) bool {
 	return *cfg.Enabled
 }
 
-func addHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
+func AddHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
 	hookCmd := HookCommand{
 		Type:    "command",
 		Command: command,
@@ -287,7 +287,7 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 	}
 }
 
-func removeHookFromSettings(settings *Settings, command string) bool {
+func RemoveHookFromSettings(settings *Settings, command string) bool {
 	removed := false
 
 	settings.Hooks.PreToolUse = removeHookFromMatchers(settings.Hooks.PreToolUse, command, &removed)
@@ -325,8 +325,8 @@ func removeHookFromMatchers(matchers []HookMatcher, command string, removed *boo
 	return result
 }
 
-// countKlauerHooksInSettings counts all klauer-hooks commands in the settings
-func countKlauerHooksInSettings(settings *Settings) int {
+// CountKlauerHooksInSettings counts all klauer-hooks commands in the settings
+func CountKlauerHooksInSettings(settings *Settings) int {
 	count := 0
 
 	// Define a helper function to count hooks in a slice of matchers
@@ -334,7 +334,7 @@ func countKlauerHooksInSettings(settings *Settings) int {
 		c := 0
 		for _, matcher := range matchers {
 			for _, hook := range matcher.Hooks {
-				if isKlauerHookCommand(hook.Command) {
+				if IsKlauerHookCommand(hook.Command) {
 					c++
 				}
 			}
@@ -354,19 +354,19 @@ func countKlauerHooksInSettings(settings *Settings) int {
 	return count
 }
 
-// isKlauerHookCommand checks if a command is from klauer-hooks
-func isKlauerHookCommand(command string) bool {
+// IsKlauerHookCommand checks if a command is from klauer-hooks
+func IsKlauerHookCommand(command string) bool {
 	return strings.Contains(command, "klauer-hooks run") || strings.Contains(command, "hooks run")
 }
 
-// printKlauerHooksToRemove shows which klauer-hooks will be removed
-func printKlauerHooksToRemove(settings *Settings) {
+// PrintKlauerHooksToRemove shows which klauer-hooks will be removed
+func PrintKlauerHooksToRemove(settings *Settings) {
 	// Define a helper function to print hooks from a slice of matchers
 	printFromMatchers := func(eventName string, matchers []HookMatcher) {
 		found := false
 		for _, matcher := range matchers {
 			for _, hook := range matcher.Hooks {
-				if isKlauerHookCommand(hook.Command) {
+				if IsKlauerHookCommand(hook.Command) {
 					if !found {
 						fmt.Printf("%s:\n", eventName)
 						found = true
@@ -391,8 +391,8 @@ func printKlauerHooksToRemove(settings *Settings) {
 	printFromMatchers("SessionStart", settings.Hooks.SessionStart)
 }
 
-// removeAllKlauerHooksFromSettings removes all klauer-hooks from settings and returns count removed
-func removeAllKlauerHooksFromSettings(settings *Settings) int {
+// RemoveAllKlauerHooksFromSettings removes all klauer-hooks from settings and returns count removed
+func RemoveAllKlauerHooksFromSettings(settings *Settings) int {
 	removed := 0
 
 	// Define a helper function to remove klauer-hooks from a slice of matchers
@@ -404,7 +404,7 @@ func removeAllKlauerHooksFromSettings(settings *Settings) int {
 
 			// Keep only non-klauer-hooks
 			for _, hook := range matcher.Hooks {
-				if !isKlauerHookCommand(hook.Command) {
+				if !IsKlauerHookCommand(hook.Command) {
 					filteredHooks = append(filteredHooks, hook)
 				} else {
 					removed++
@@ -433,20 +433,20 @@ func removeAllKlauerHooksFromSettings(settings *Settings) int {
 	return removed
 }
 
-// isPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.
+// IsPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.
 // Defaults to enabled if settings cannot be loaded or plugin key absent.
-func isPluginEnabled(pluginKey string) bool {
+func IsPluginEnabled(pluginKey string) bool {
 	// Project settings
-	if projectPath, err := getSettingsPath(false); err == nil {
-		if s, err := loadSettings(projectPath); err == nil {
+	if projectPath, err := GetSettingsPath(false); err == nil {
+		if s, err := LoadSettings(projectPath); err == nil {
 			if !s.IsPluginEnabled(pluginKey) {
 				return false
 			}
 		}
 	}
 	// Global settings fallback
-	if globalPath, err := getSettingsPath(true); err == nil {
-		if s, err := loadSettings(globalPath); err == nil {
+	if globalPath, err := GetSettingsPath(true); err == nil {
+		if s, err := LoadSettings(globalPath); err == nil {
 			if !s.IsPluginEnabled(pluginKey) {
 				return false
 			}

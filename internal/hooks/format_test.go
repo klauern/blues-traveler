@@ -2,10 +2,12 @@ package hooks
 
 import (
 	"testing"
+
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 func TestFormatHook(t *testing.T) {
-	ctx := TestHookContext(nil)
+	ctx := core.TestHookContext(nil)
 	hook := NewFormatHook(ctx)
 
 	// Test basic properties
@@ -30,11 +32,11 @@ func TestFormatHook(t *testing.T) {
 }
 
 func TestFormatHookGoFile(t *testing.T) {
-	mockCmd := NewMockCommandExecutor()
-	ctx := &HookContext{
-		FileSystem:      NewMockFileSystem(),
+	mockCmd := core.NewMockCommandExecutor()
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
 		CommandExecutor: mockCmd,
-		RunnerFactory:   MockRunnerFactory,
+		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
 	}
 
@@ -50,11 +52,11 @@ func TestFormatHookGoFile(t *testing.T) {
 }
 
 func TestFormatHookJavaScriptFile(t *testing.T) {
-	mockCmd := NewMockCommandExecutor()
-	ctx := &HookContext{
-		FileSystem:      NewMockFileSystem(),
+	mockCmd := core.NewMockCommandExecutor()
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
 		CommandExecutor: mockCmd,
-		RunnerFactory:   MockRunnerFactory,
+		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
 	}
 
@@ -76,11 +78,11 @@ func TestFormatHookJavaScriptFile(t *testing.T) {
 }
 
 func TestFormatHookPythonFile(t *testing.T) {
-	mockCmd := NewMockCommandExecutor()
-	ctx := &HookContext{
-		FileSystem:      NewMockFileSystem(),
+	mockCmd := core.NewMockCommandExecutor()
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
 		CommandExecutor: mockCmd,
-		RunnerFactory:   MockRunnerFactory,
+		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
 	}
 
@@ -96,11 +98,11 @@ func TestFormatHookPythonFile(t *testing.T) {
 }
 
 func TestFormatHookYAMLFile(t *testing.T) {
-	mockCmd := NewMockCommandExecutor()
-	ctx := &HookContext{
-		FileSystem:      NewMockFileSystem(),
+	mockCmd := core.NewMockCommandExecutor()
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
 		CommandExecutor: mockCmd,
-		RunnerFactory:   MockRunnerFactory,
+		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
 	}
 
@@ -122,11 +124,11 @@ func TestFormatHookYAMLFile(t *testing.T) {
 }
 
 func TestFormatHookUnsupportedFile(t *testing.T) {
-	mockCmd := NewMockCommandExecutor()
-	ctx := &HookContext{
-		FileSystem:      NewMockFileSystem(),
+	mockCmd := core.NewMockCommandExecutor()
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
 		CommandExecutor: mockCmd,
-		RunnerFactory:   MockRunnerFactory,
+		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
 	}
 

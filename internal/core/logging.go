@@ -1,4 +1,4 @@
-package hooks
+package core
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/klauern/klauer-hooks/internal/config"
 )
 
 // LogEntry represents a detailed log entry for hook inspection (moved from base.go)
@@ -49,7 +51,7 @@ func logHookEvent(ctx *HookContext, hookKey, event, toolName string,
 	// Marshal entry to JSON respecting format
 	var jsonData []byte
 	var err error
-	if ctx.LoggingFormat == LoggingFormatPretty {
+	if ctx.LoggingFormat == config.LoggingFormatPretty {
 		jsonData, err = json.MarshalIndent(entry, "", "  ")
 	} else {
 		jsonData, err = json.Marshal(entry)

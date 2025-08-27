@@ -1,4 +1,4 @@
-package hooks
+package core
 
 import (
 	"sync"
@@ -6,6 +6,23 @@ import (
 	// Note: testing/synctest may not be available in all Go 1.25 builds yet
 	// Using standard concurrent testing patterns for now
 )
+
+// Test hook implementations for testing
+func NewTestSecurityHook(ctx *HookContext) Hook {
+	return newTestHook("test-security", "Test Security Hook", "Test security hook", ctx)
+}
+
+func NewTestFormatHook(ctx *HookContext) Hook {
+	return newTestHook("test-format", "Test Format Hook", "Test format hook", ctx)
+}
+
+func NewTestDebugHook(ctx *HookContext) Hook {
+	return newTestHook("test-debug", "Test Debug Hook", "Test debug hook", ctx)
+}
+
+func NewTestAuditHook(ctx *HookContext) Hook {
+	return newTestHook("test-audit", "Test Audit Hook", "Test audit hook", ctx)
+}
 
 // TestRegistryConcurrentOperations tests concurrent access to the registry
 func TestRegistryConcurrentOperations(t *testing.T) {
@@ -21,7 +38,7 @@ func TestRegistryConcurrentOperations(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			key := "concurrent-test-hook"
-			factory := NewSecurityHook
+			factory := NewTestSecurityHook
 			if err := registry.Register(key, factory); err != nil {
 				errors <- err
 			}
@@ -67,8 +84,8 @@ func TestRegistryBatchOperations(t *testing.T) {
 
 	// Multiple goroutines trying to register the same batch
 	batch := map[string]HookFactory{
-		"batch-test-1": NewSecurityHook,
-		"batch-test-2": NewFormatHook,
+		"batch-test-1": NewTestSecurityHook,
+		"batch-test-2": NewTestFormatHook,
 	}
 
 	for i := 0; i < 5; i++ {
@@ -127,10 +144,10 @@ func TestRegistryConcurrentListAndCreate(t *testing.T) {
 
 	// Pre-populate registry
 	batch := map[string]HookFactory{
-		"read-test-1": NewSecurityHook,
-		"read-test-2": NewFormatHook,
-		"read-test-3": NewDebugHook,
-		"read-test-4": NewAuditHook,
+		"read-test-1": NewTestSecurityHook,
+		"read-test-2": NewTestFormatHook,
+		"read-test-3": NewTestDebugHook,
+		"read-test-4": NewTestAuditHook,
 	}
 	registry.MustRegisterBatch(batch)
 
@@ -188,7 +205,7 @@ func TestRegistryContextUpdate(t *testing.T) {
 	registry := NewRegistry(DefaultHookContext())
 
 	// Register a test hook
-	registry.MustRegister("context-test", NewSecurityHook)
+	registry.MustRegister("context-test", NewTestSecurityHook)
 
 	var wg sync.WaitGroup
 	contextUpdates := make(chan bool, 5)
@@ -248,9 +265,9 @@ func TestRegistryWaitGroupGo(t *testing.T) {
 
 	// Pre-populate with test hooks
 	batch := map[string]HookFactory{
-		"wg-test-1": NewSecurityHook,
-		"wg-test-2": NewFormatHook,
-		"wg-test-3": NewDebugHook,
+		"wg-test-1": NewTestSecurityHook,
+		"wg-test-2": NewTestFormatHook,
+		"wg-test-3": NewTestDebugHook,
 	}
 	registry.MustRegisterBatch(batch)
 

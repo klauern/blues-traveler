@@ -1,4 +1,4 @@
-package hooks
+package core
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/klauer-hooks/internal/config"
 )
 
 // Hook defines the interface that all hook implementations must satisfy
@@ -152,7 +153,7 @@ func DefaultHookContext() *HookContext {
 		SettingsChecker: defaultIsPluginEnabled,
 		LoggingEnabled:  false,
 		LoggingDir:      ".claude/hooks",
-		LoggingFormat:   LoggingFormatJSONL,
+		LoggingFormat:   config.LoggingFormatJSONL,
 	}
 }
 

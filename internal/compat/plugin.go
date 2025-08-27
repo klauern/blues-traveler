@@ -1,10 +1,11 @@
-package main
+package compat
 
 import (
 	"fmt"
 	"sort"
 
-	"github.com/klauern/klauer-hooks/internal/hooks"
+	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 // DEPRECATED REGISTRY SHIM
@@ -14,12 +15,12 @@ import (
 // new code should reference hooks.* functions instead of these shims.
 
 // Plugin alias retained for backward compatibility.
-type Plugin = hooks.Hook
+type Plugin = core.Hook
 
 // GetPlugin constructs a fresh hook instance by key using internal registry.
 // Returns (nil,false) if key not found.
 func GetPlugin(key string) (Plugin, bool) {
-	h, err := hooks.CreateHook(key)
+	h, err := core.CreateHook(key)
 	if err != nil || h == nil {
 		return nil, false
 	}
@@ -28,7 +29,7 @@ func GetPlugin(key string) (Plugin, bool) {
 
 // PluginKeys returns sorted hook keys from internal registry.
 func PluginKeys() []string {
-	keys := hooks.GetHookKeys()
+	keys := core.GetHookKeys()
 	sort.Strings(keys)
 	return keys
 }
@@ -36,8 +37,8 @@ func PluginKeys() []string {
 // ListPlugins returns fresh instances for all keys (legacy shape).
 func ListPlugins() map[string]Plugin {
 	out := map[string]Plugin{}
-	for _, k := range hooks.GetHookKeys() {
-		if h, err := hooks.CreateHook(k); err == nil {
+	for _, k := range core.GetHookKeys() {
+		if h, err := core.CreateHook(k); err == nil {
 			out[k] = h
 		}
 	}
@@ -58,12 +59,17 @@ func MustRegisterPlugin(key string, p Plugin) {
 	}
 }
 
+// IsPluginEnabled is a wrapper around config.IsPluginEnabled for compatibility
+func IsPluginEnabled(pluginKey string) bool {
+	return config.IsPluginEnabled(pluginKey)
+}
+
 // init: ensure HookContext has proper settings checker (previous behavior)
 func init() {
-	hooks.SetGlobalContext(&hooks.HookContext{
-		FileSystem:      &hooks.RealFileSystem{},
-		CommandExecutor: &hooks.RealCommandExecutor{},
-		RunnerFactory:   hooks.DefaultRunnerFactory,
-		SettingsChecker: isPluginEnabled,
+	core.SetGlobalContext(&core.HookContext{
+		FileSystem:      &core.RealFileSystem{},
+		CommandExecutor: &core.RealCommandExecutor{},
+		RunnerFactory:   core.DefaultRunnerFactory,
+		SettingsChecker: config.IsPluginEnabled,
 	})
 }

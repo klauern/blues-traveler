@@ -1,4 +1,4 @@
-package hooks
+package core
 
 import (
 	"bufio"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/klauern/klauer-hooks/internal/config"
 )
 
 // helper to read file lines trimming trailing newline
@@ -28,7 +30,7 @@ func TestLogHookEvent_JSONLFormat(t *testing.T) {
 	ctx := DefaultHookContext()
 	ctx.LoggingEnabled = true
 	ctx.LoggingDir = t.TempDir()
-	ctx.LoggingFormat = LoggingFormatJSONL
+	ctx.LoggingFormat = config.LoggingFormatJSONL
 
 	logHookEvent(ctx, "testhook", "test_event", "ToolX",
 		map[string]interface{}{"k": "v"},
@@ -61,7 +63,7 @@ func TestLogHookEvent_PrettyFormat(t *testing.T) {
 	ctx := DefaultHookContext()
 	ctx.LoggingEnabled = true
 	ctx.LoggingDir = t.TempDir()
-	ctx.LoggingFormat = LoggingFormatPretty
+	ctx.LoggingFormat = config.LoggingFormatPretty
 
 	logHookEvent(ctx, "prettyhook", "pretty_event", "ToolY",
 		map[string]interface{}{"a": "b"},

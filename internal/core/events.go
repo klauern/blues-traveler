@@ -1,4 +1,4 @@
-package main
+package core
 
 // EventType represents a Claude Code hook event
 type EventType string

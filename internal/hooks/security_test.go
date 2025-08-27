@@ -3,10 +3,12 @@ package hooks
 import (
 	"strings"
 	"testing"
+
+	"github.com/klauern/klauer-hooks/internal/core"
 )
 
 func TestSecurityHook(t *testing.T) {
-	ctx := TestHookContext(nil)
+	ctx := core.TestHookContext(nil)
 	hook := NewSecurityHook(ctx)
 
 	// Test basic properties
@@ -31,7 +33,7 @@ func TestSecurityHook(t *testing.T) {
 }
 
 func TestSecurityHookDisabled(t *testing.T) {
-	ctx := TestHookContext(func(string) bool { return false })
+	ctx := core.TestHookContext(func(string) bool { return false })
 	hook := NewSecurityHook(ctx)
 
 	// Test that hook is disabled
@@ -47,7 +49,7 @@ func TestSecurityHookDisabled(t *testing.T) {
 }
 
 func TestSecurityHookStaticPatterns(t *testing.T) {
-	ctx := TestHookContext(nil)
+	ctx := core.TestHookContext(nil)
 	hook := NewSecurityHook(ctx).(*SecurityHook)
 
 	testCases := []struct {
@@ -82,7 +84,7 @@ func TestSecurityHookStaticPatterns(t *testing.T) {
 }
 
 func TestSecurityHookDangerousRm(t *testing.T) {
-	ctx := TestHookContext(nil)
+	ctx := core.TestHookContext(nil)
 	hook := NewSecurityHook(ctx).(*SecurityHook)
 
 	testCases := []struct {
