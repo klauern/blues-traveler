@@ -46,8 +46,14 @@ func logHookEvent(ctx *HookContext, hookKey, event, toolName string,
 	// Create log file path
 	logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", hookKey))
 
-	// Marshal entry to JSON
-	jsonData, err := json.MarshalIndent(entry, "", "  ")
+	// Marshal entry to JSON respecting format
+	var jsonData []byte
+	var err error
+	if ctx.LoggingFormat == LoggingFormatPretty {
+		jsonData, err = json.MarshalIndent(entry, "", "  ")
+	} else {
+		jsonData, err = json.Marshal(entry)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to marshal log entry: %v\n", err)
 		return

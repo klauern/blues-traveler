@@ -50,8 +50,16 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		// Logging flag
+		// Logging flags
 		logEnabled, _ := cmd.Flags().GetBool("log")
+		logFormat, _ := cmd.Flags().GetString("log-format")
+		if logFormat == "" {
+			logFormat = hooks.LoggingFormatJSONL
+		}
+		if logEnabled && !hooks.IsValidLoggingFormat(logFormat) {
+			fmt.Fprintf(os.Stderr, "Error: Invalid --log-format '%s'. Valid: jsonl, pretty\n", logFormat)
+			os.Exit(1)
+		}
 		if logEnabled {
 			logConfig := getLogRotationConfigFromFile(false)
 			if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
@@ -61,7 +69,7 @@ var runCmd = &cobra.Command{
 			logPath := GetLogPath(key)
 			rotatingLogger := SetupLogRotation(logPath, logConfig)
 			if rotatingLogger != nil {
-				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
+				hooks.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
 				fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
 				fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
 					logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)
@@ -69,7 +77,7 @@ var runCmd = &cobra.Command{
 					fmt.Printf("Warning: Failed to cleanup old logs: %v\n", err)
 				}
 			} else {
-				hooks.SetGlobalLoggingConfig(true, ".claude/hooks")
+				hooks.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
 				fmt.Printf("Logging enabled - output will be written to %s\n", logPath)
 			}
 		}
@@ -104,6 +112,14 @@ This will automatically configure the hook to run for the specified events.`,
 		matcher, _ := cmd.Flags().GetString("matcher")
 		timeoutFlag, _ := cmd.Flags().GetInt("timeout")
 		logEnabled, _ := cmd.Flags().GetBool("log")
+		logFormat, _ := cmd.Flags().GetString("log-format")
+		if logFormat == "" {
+			logFormat = hooks.LoggingFormatJSONL
+		}
+		if logEnabled && !hooks.IsValidLoggingFormat(logFormat) {
+			fmt.Fprintf(os.Stderr, "Error: Invalid --log-format '%s'. Valid: jsonl, pretty\n", logFormat)
+			os.Exit(1)
+		}
 
 		// Validate event
 		if !IsValidEventType(event) {
@@ -124,6 +140,9 @@ This will automatically configure the hook to run for the specified events.`,
 		hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
 		if logEnabled {
 			hookCommand += " --log"
+			if logFormat != hooks.LoggingFormatJSONL {
+				hookCommand += fmt.Sprintf(" --log-format %s", logFormat)
+			}
 		}
 
 		// Get settings path

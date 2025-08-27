@@ -173,6 +173,34 @@ Retained:
 | Disabled hook still runs | Settings not reloaded / wrong scope | Verify project vs global settings and enable flag |
 | Formatting not applied | File types unsupported | Extend formatter logic / add hook |
 
+## Logging Formats
+
+Structured hook event logs written to per-hook log files support two formats controlled by the `--log-format` flag (default: `jsonl`) when combined with `--log`:
+
+- `jsonl` (default): Each event is a single compact JSON object on one line (JSON Lines). Easier to stream and parse (e.g. `jq -c`, `grep`).
+- `pretty`: Multi-line, indented JSON for human inspection.
+
+Example:
+
+```
+hooks run audit --log                      # jsonl (default)
+hooks run audit --log --log-format pretty  # pretty printed
+```
+
+The flag is also persisted when installing a hook if you specify `--log` and a non-default format:
+
+```
+hooks install audit --event PreToolUse --log --log-format pretty
+```
+
+(If you omit `--log-format` or use `jsonl`, nothing extra is stored.)
+
+Scope / limitations:
+
+- Affects only the structured hook event file logging (shared logger in [`internal/hooks/logging.go`](internal/hooks/logging.go:1)).
+- Audit hook stdout output is already compact single-line JSON (unchanged).
+- Debug hook continues emitting human-readable lines; `--log-format` does not alter its legacy text output (future unification possible).
+
 ## Summary
 
-The revised architecture favors explicit, static hook definitions for predictability and reduced surface area. A thin shim maintains backward compatibility for existing external tooling expecting the prior registry API while discouraging dynamic mutation.
+The revised architecture favors explicit, static hook definitions for predictability and reduced surface area. A thin shim maintains backward compatibility for existing external tooling expecting the prior registry API while discouraging dynamic mutation. The logging format flag introduces observability flexibility without breaking previous behavior (default now optimized for machine parsing).

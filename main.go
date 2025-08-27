@@ -29,12 +29,14 @@ func init() {
 	installCmd.Flags().StringP("matcher", "m", "*", "Tool matcher pattern (* for all tools)")
 	installCmd.Flags().IntP("timeout", "t", 0, "Command timeout in seconds (0 for no timeout)")
 	installCmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
+	installCmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
 
 	// Add flags for uninstall command
 	uninstallCmd.Flags().BoolP("global", "g", false, "Remove from global settings (~/.claude/settings.json)")
 
 	// Add flags for run command
 	runCmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
+	runCmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
 
 	// Add flags for list-installed command
 	listHooksCmd.Flags().BoolP("global", "g", false, "Show global settings (~/.claude/settings.json)")

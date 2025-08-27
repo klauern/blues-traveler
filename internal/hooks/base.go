@@ -140,6 +140,7 @@ type HookContext struct {
 	SettingsChecker func(string) bool
 	LoggingEnabled  bool
 	LoggingDir      string
+	LoggingFormat   string
 }
 
 // DefaultHookContext returns a context with real implementations
@@ -151,6 +152,7 @@ func DefaultHookContext() *HookContext {
 		SettingsChecker: defaultIsPluginEnabled,
 		LoggingEnabled:  false,
 		LoggingDir:      ".claude/hooks",
+		LoggingFormat:   LoggingFormatJSONL,
 	}
 }
 

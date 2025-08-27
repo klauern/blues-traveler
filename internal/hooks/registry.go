@@ -171,12 +171,17 @@ func SetGlobalContext(ctx *HookContext) {
 }
 
 // SetGlobalLoggingConfig updates the global registry's context with logging configuration
-func SetGlobalLoggingConfig(enabled bool, logDir string) {
+func SetGlobalLoggingConfig(enabled bool, logDir string, format string) {
 	globalRegistry.mu.Lock()
 	defer globalRegistry.mu.Unlock()
 	if globalRegistry.context != nil {
 		globalRegistry.context.LoggingEnabled = enabled
 		globalRegistry.context.LoggingDir = logDir
+		if IsValidLoggingFormat(format) {
+			globalRegistry.context.LoggingFormat = format
+		} else if format == "" {
+			// leave default
+		}
 	}
 }
 
