@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/klauern/klauer-hooks/internal/config"
@@ -90,20 +91,23 @@ This will automatically configure the hook to run for the specified events.`,
 			result := config.AddHookToSettings(settings, event, matcher, hookCommand, timeout)
 
 			// Check for duplicates or replacements
+			isDuplicateNoChange := false
 			if result.WasDuplicate {
 				if strings.Contains(result.DuplicateInfo, "Replaced existing") {
 					fmt.Printf("🔄 %s\n", result.DuplicateInfo)
 				} else {
 					fmt.Printf("⚠️  Hook already installed: %s\n", result.DuplicateInfo)
 					fmt.Printf("No changes made. The hook is already configured for this event.\n")
-					return
+					isDuplicateNoChange = true
 				}
 			}
 
-			// Save settings
-			if err := config.SaveSettings(settingsPath, settings); err != nil {
-				fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
-				os.Exit(1)
+			// Save settings (only if not a duplicate with no changes)
+			if !isDuplicateNoChange {
+				if err := config.SaveSettings(settingsPath, settings); err != nil {
+					fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
+					os.Exit(1)
+				}
 			}
 
 			scope := "project"
@@ -111,14 +115,26 @@ This will automatically configure the hook to run for the specified events.`,
 				scope = "global"
 			}
 
-			fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
-			fmt.Printf("   Event: %s\n", event)
-			fmt.Printf("   Matcher: %s\n", matcher)
-			fmt.Printf("   Command: %s\n", hookCommand)
-			fmt.Printf("   Settings: %s\n", settingsPath)
-			fmt.Println()
-			fmt.Println("The hook will be active in new Claude Code sessions.")
-			fmt.Println("Use 'claude /hooks' to verify the configuration.")
+			// Only show installation success message if not a duplicate
+			if !isDuplicateNoChange {
+				fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
+				fmt.Printf("   Event: %s\n", event)
+				fmt.Printf("   Matcher: %s\n", matcher)
+				fmt.Printf("   Command: %s\n", hookCommand)
+				fmt.Printf("   Settings: %s\n", settingsPath)
+				fmt.Println()
+			}
+
+			// Post-install actions for specific plugins (run even for duplicates)
+			if hookType == "fetch-blocker" {
+				createSampleBlockedUrlsFile(global)
+			}
+
+			// Only show the activation message if not a duplicate
+			if !isDuplicateNoChange {
+				fmt.Println("The hook will be active in new Claude Code sessions.")
+				fmt.Println("Use 'claude /hooks' to verify the configuration.")
+			}
 		},
 	}
 
@@ -268,4 +284,78 @@ func uninstallAllKlauerHooks(global bool) {
 		globalFlag = " --global"
 	}
 	fmt.Printf("\nUse 'hooks list-installed%s' to verify the changes.\n", globalFlag)
+}
+
+// createSampleBlockedUrlsFile creates a sample blocked-urls.txt file for the fetch-blocker hook
+func createSampleBlockedUrlsFile(global bool) {
+	// Determine the target directory
+	var targetDir string
+	var scope string
+
+	if global {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
+			return
+		}
+		targetDir = filepath.Join(homeDir, ".claude")
+		scope = "global"
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
+			return
+		}
+		targetDir = filepath.Join(cwd, ".claude")
+		scope = "project"
+	}
+
+	blockedUrlsPath := filepath.Join(targetDir, "blocked-urls.txt")
+
+	// Check if file already exists
+	if _, err := os.Stat(blockedUrlsPath); err == nil {
+		fmt.Printf("📄 Sample blocked-urls.txt already exists: %s\n", blockedUrlsPath)
+		return
+	}
+
+	// Ensure the .claude directory exists
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		fmt.Printf("⚠️  Could not create .claude directory: %v\n", err)
+		return
+	}
+
+	// Create the sample file content
+	sampleContent := `# Blocked URL prefixes for fetch-blocker hook
+# Format: prefix|suggestion (suggestion is optional)
+# Lines starting with # are comments
+
+# Private GitHub repos (use gh CLI instead)
+https://github.com/*/*/private/*|Use 'gh api' or 'gh repo view' instead for private repositories
+https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHub API access
+
+# Internal/VPN-only domains
+# https://company.internal.com/*|This domain requires VPN access
+# https://admin.internal/*|Admin panel requires authentication
+
+# Auth-required API endpoints
+# https://api.company.com/private/*|Private API endpoints require authentication tokens
+
+# Example: Zendesk secure backup domain (from your use case)
+https://atlantis-foundation-secure.backups.zendesk-dev.com/*|This domain requires VPN access and authentication
+
+# Add your own blocked prefixes here...
+# Format examples:
+# https://exact-domain.com/path|Alternative suggestion
+# https://example.com/*|Wildcard blocks all paths under domain
+# *.internal.company.com/*|Wildcard subdomain pattern
+`
+
+	// Write the sample file
+	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0644); err != nil {
+		fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
+		return
+	}
+
+	fmt.Printf("📄 Created sample blocked-urls.txt (%s): %s\n", scope, blockedUrlsPath)
+	fmt.Printf("   Edit this file to add your own blocked URL prefixes.\n")
 }
