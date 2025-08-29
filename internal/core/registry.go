@@ -181,9 +181,8 @@ func SetGlobalLoggingConfig(enabled bool, logDir string, format string) {
 		globalRegistry.context.LoggingDir = logDir
 		if config.IsValidLoggingFormat(format) {
 			globalRegistry.context.LoggingFormat = format
-		} else if format == "" {
-			// leave default
 		}
+		// else: leave default format when empty or invalid
 	}
 }
 
