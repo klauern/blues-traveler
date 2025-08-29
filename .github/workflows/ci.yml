@@ -112,3 +112,32 @@ jobs:
           git diff go.mod go.sum
           exit 1
         fi
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: '-severity medium ./...'
+
+    - name: Run govulncheck
+      uses: golang/govulncheck-action@v1
+      with:
+        go-version-input: '1.25.0'
+        go-package: './...'
