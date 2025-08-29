@@ -51,19 +51,18 @@ func (r *Registry) MustRegister(key string, factory HookFactory) {
 
 // RegisterBatch registers multiple hooks concurrently for better initialization performance
 func (r *Registry) RegisterBatch(hooks map[string]HookFactory) error {
-	// First, validate all keys don't exist to avoid partial registration
-	r.mu.RLock()
+	// Register all at once under write lock to avoid race conditions
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Check for duplicates under the write lock
 	for key := range hooks {
 		if _, exists := r.factories[key]; exists {
-			r.mu.RUnlock()
 			return fmt.Errorf("hook with key '%s' already registered", key)
 		}
 	}
-	r.mu.RUnlock()
 
-	// Now register all at once
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	// Register all hooks
 	for key, factory := range hooks {
 		r.factories[key] = factory
 	}
