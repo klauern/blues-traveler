@@ -4,12 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/brads3290/cchooks"
 	"github.com/klauern/blues-traveler/internal/core"
 )
+
+var (
+	// Cache command availability to avoid repeated PATH lookups
+	gofumptOnce     sync.Once
+	gofumptAvailable bool
+)
+
+// checkGofumptAvailable checks if gofumpt is available in PATH (cached)
+func checkGofumptAvailable() bool {
+	gofumptOnce.Do(func() {
+		_, err := exec.LookPath("gofumpt")
+		gofumptAvailable = err == nil
+	})
+	return gofumptAvailable
+}
 
 // FormatHook implements code formatting logic
 type FormatHook struct {
@@ -90,12 +107,24 @@ func (h *FormatHook) formatFile(filePath string) error {
 }
 
 func (h *FormatHook) formatGoFile(filePath string) error {
-	output, err := h.Context().CommandExecutor.ExecuteCommand("gofmt", "-w", filePath)
-	if err != nil {
-		log.Printf("gofmt error on %s: %s", filePath, output)
-		return fmt.Errorf("gofmt failed: %s", output)
+	var output []byte
+	var err error
+	var formatter string
+
+	// Prefer gofumpt over gofmt if available
+	if checkGofumptAvailable() {
+		output, err = h.Context().CommandExecutor.ExecuteCommand("gofumpt", "-w", filePath)
+		formatter = "gofumpt"
+	} else {
+		output, err = h.Context().CommandExecutor.ExecuteCommand("gofmt", "-w", filePath)
+		formatter = "gofmt"
 	}
-	fmt.Printf("Formatted Go file: %s\n", filePath)
+
+	if err != nil {
+		log.Printf("%s error on %s: %s", formatter, filePath, output)
+		return fmt.Errorf("%s failed: %s", formatter, output)
+	}
+	fmt.Printf("Formatted Go file with %s: %s\n", formatter, filePath)
 	return nil
 }
 

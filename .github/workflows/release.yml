@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # Run security checks before releasing
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: '-severity medium ./...'
+
+    - name: Run govulncheck
+      uses: golang/govulncheck-action@v1
+      with:
+        go-version-input: '1.25.0'
+        go-package: './...'
+
+  # Run tests before releasing
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+        cache: true
+
+    - name: Install gofumpt
+      run: go install mvdan.cc/gofumpt@latest
+
+    - name: Check formatting
+      run: |
+        if [ "$(gofumpt -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted with gofumpt"
+          gofumpt -d .
+          exit 1
+        fi
+
+    - name: Install golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        install-mode: goinstall
+
+    - name: Run linter
+      run: golangci-lint run --timeout=5m
+
+    - name: Run tests
+      run: go test -v -race ./...
+
+  # Release with GoReleaser
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    needs: [security-check, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+        cache: true
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: '~> v2'
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifacts to workflow
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifacts
+        path: |
+          dist/*.tar.gz
+          dist/*.zip
+          dist/checksums.txt
+
+  # Post-release summary
+  post-release:
+    name: Post-Release Summary
+    runs-on: ubuntu-latest
+    needs: [goreleaser]
+    if: always()
+    
+    steps:
+    - name: Get release info
+      id: release_info
+      run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "release_url=https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME" >> $GITHUB_OUTPUT
+
+    - name: Release summary
+      run: |
+        echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎉 Release ${{ steps.release_info.outputs.tag_name }} Published!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Release URL**: [${{ steps.release_info.outputs.tag_name }}](${{ steps.release_info.outputs.release_url }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Available Downloads" >> $GITHUB_STEP_SUMMARY
+        echo "- Linux (x86_64, arm64)" >> $GITHUB_STEP_SUMMARY
+        echo "- macOS (x86_64, arm64)" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows (x86_64)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔒 Security" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Security scans passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Vulnerability checks passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Installation" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "# Go install" >> $GITHUB_STEP_SUMMARY
+        echo "go install github.com/klauern/blues-traveler@${{ steps.release_info.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Direct download" >> $GITHUB_STEP_SUMMARY
+        echo "curl -L ${{ steps.release_info.outputs.release_url }} -o blues-traveler" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY

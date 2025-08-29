@@ -1,0 +1,124 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gosec:
+    name: Gosec Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+    - name: Upload SARIF file to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: results.sarif
+
+    - name: Upload Gosec scan results as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: gosec-results
+        path: results.sarif
+
+  govulncheck:
+    name: Go Vulnerability Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run govulncheck
+      uses: golang/govulncheck-action@v1
+      with:
+        go-version-input: '1.25.0'
+        go-package: './...'
+        output-format: sarif
+        output-file: govulncheck-results.sarif
+
+    - name: Upload govulncheck SARIF to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: govulncheck-results.sarif
+
+    - name: Upload govulncheck results as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: govulncheck-results
+        path: govulncheck-results.sarif
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [gosec, govulncheck]
+    if: always()
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Security scan summary
+      run: |
+        echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "### Gosec Results" >> $GITHUB_STEP_SUMMARY
+        if [ -f gosec-results/results.sarif ]; then
+          issues=$(jq '.runs[0].results | length' gosec-results/results.sarif 2>/dev/null || echo "0")
+          echo "- Issues found: $issues" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- No results file found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Govulncheck Results" >> $GITHUB_STEP_SUMMARY
+        if [ -f govulncheck-results/govulncheck-results.sarif ]; then
+          vulnerabilities=$(jq '.runs[0].results | length' govulncheck-results/govulncheck-results.sarif 2>/dev/null || echo "0")
+          echo "- Vulnerabilities found: $vulnerabilities" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- No results file found" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Recommendation" >> $GITHUB_STEP_SUMMARY
+        echo "Review the Security tab in your repository for detailed findings and recommendations." >> $GITHUB_STEP_SUMMARY

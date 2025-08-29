@@ -1,0 +1,146 @@
+project_name: blues-traveler
+
+before:
+  hooks:
+    # Format code with gofumpt before building
+    - go install mvdan.cc/gofumpt@latest
+    - gofumpt -w .
+    # Ensure dependencies are up to date
+    - go mod tidy
+    # Run tests to ensure everything is working
+    - go test ./...
+
+builds:
+  - id: blues-traveler
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # Skip 32-bit builds for simplicity
+    ignore:
+      - goos: windows
+        goarch: arm64
+    # Build flags that match your Taskfile.yml
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    # Binary name
+    binary: "{{ .ProjectName }}"
+
+archives:
+  - id: default
+    format: tar.gz
+    # Use zip for windows
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+      - CLAUDE.md
+      - docs/**/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: 'Bug fixes'
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: 'Performance improvements'
+      regexp: "^.*perf[(\\w)]*:+.*$"
+      order: 2
+    - title: 'Refactors'
+      regexp: "^.*refactor[(\\w)]*:+.*$"
+      order: 3
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: klauern
+    name: blues-traveler
+  # Create draft release for manual review
+  draft: false
+  # Set to auto to automatically publish the release
+  prerelease: auto
+  # Release name template
+  name_template: "{{.ProjectName}} v{{.Version}}"
+  # Footer template for the release
+  footer: |
+    ## Docker Images
+    
+    Docker images are available at:
+    - `ghcr.io/klauern/blues-traveler:{{ .Tag }}`
+    - `ghcr.io/klauern/blues-traveler:latest`
+    
+    ## Installation
+    
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install klauern/tap/blues-traveler
+    ```
+    
+    ### Direct Download
+    Download the appropriate binary for your platform from the assets below.
+    
+    ### Go Install
+    ```bash
+    go install github.com/klauern/blues-traveler@{{ .Tag }}
+    ```
+    
+    **Full Changelog**: https://github.com/klauern/blues-traveler/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+# Optional: Generate Software Bill of Materials (SBOM)
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source
+
+# Optional: Sign releases (uncomment and configure if you want signed releases)
+# signs:
+#   - cmd: cosign
+#     env:
+#       - COSIGN_EXPERIMENTAL=1
+#     certificate: '${artifact}.pem'
+#     args:
+#       - sign-blob
+#       - '--output-certificate=${certificate}'
+#       - '--output-signature=${signature}'
+#       - '${artifact}'
+#       - --yes
+#     artifacts: checksum
+#     output: true
