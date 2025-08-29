@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is `klauer-hooks`, a CLI tool for managing and running Claude Code hooks. It has evolved from a template generator to a direct hook runner with a plugin architecture. The tool integrates with Claude Code's hook system to provide security, formatting, debugging, and audit capabilities.
+This is `blues-traveler`, a CLI tool for managing and running Claude Code hooks. It has evolved from a template generator to a direct hook runner with a plugin architecture. The tool integrates with Claude Code's hook system to provide security, formatting, debugging, and audit capabilities.
 
 ## Architecture
 
@@ -59,16 +59,16 @@ task lint
 ### Running
 ```bash
 # List available plugins
-./hooks list
+./blues-traveler list
 
 # Run a specific plugin
-./hooks run <plugin-key>
+./blues-traveler run <plugin-key>
 
 # Install hook into Claude Code settings
-./hooks install <plugin-key> [flags]
+./blues-traveler install <plugin-key> [flags]
 
 # List installed hooks from settings
-./hooks list-installed
+./blues-traveler list-installed
 ```
 
 ## File Structure
@@ -89,7 +89,7 @@ task lint
 ## Settings Configuration
 
 Settings are managed in JSON format with two scopes:
-- Project: `./.claude/settings.json` 
+- Project: `./.claude/settings.json`
 - Global: `~/.claude/settings.json`
 
 The tool supports plugin-specific enable/disable configuration and preserves unknown JSON fields when reading/writing settings files.

@@ -6,13 +6,13 @@ The experimental unified multi-hook pipeline (single aggregated `cchooks.Runner`
 
 1. Actual usage only invoked a single hook per Claude Code event.
 2. Aggregation constructs (contributor type aliases, ordering, filtering wrappers) increased complexity without clear user benefit.
-3. Simpler operational model: `hooks run <plugin-key>` instantiates the hook via [`GetPlugin`](plugin.go:21) and calls its [`Run()`](internal/hooks/base.go:20) (internal concrete implementation lines vary per file).
+3. Simpler operational model: `blues-traveler run <plugin-key>` instantiates the hook via [`GetPlugin`](plugin.go:21) and calls its [`Run()`](internal/hooks/base.go:20) (internal concrete implementation lines vary per file).
 
 ## Current Behavior
 
 - Each hook (security, format, vet, debug, audit) builds a runner with just the handlers it implements (Pre / Post / Raw).
 - Logging enablement still toggled globally via [`SetGlobalLoggingConfig`](internal/hooks/registry.go:174).
-- Install / uninstall commands continue to write single-hook commands (e.g. `/path/to/hooks run security`) into Claude Code settings.
+- Install / uninstall commands continue to write single-hook commands (e.g. `/path/to/blues-traveler run security`) into Claude Code settings.
 - No implicit canonical ordering is applied between different hook types.
 
 ## Impact to Users
@@ -22,7 +22,7 @@ No migration steps required. Existing settings entries continue to function unch
 Example (still valid):
 
 ```
-/absolute/path/hooks run security
+/absolute/path/blues-traveler run security
 ```
 
 ## Removed / Deprecated Artifacts
@@ -60,7 +60,7 @@ If coordinated multi-hook sequencing is desired later:
 ## Changelog Entry (Draft)
 
 Removed: Unified multi-hook pipeline aggregation (`internal/hooks/pipeline.go` logic).
-Changed: `hooks run <plugin-key>` now directly invokes the hook’s `Run()`; help text updated.
+Changed: `blues-traveler run <plugin-key>` now directly invokes the hook's `Run()`; help text updated.
 Removed: Contributor helper exports and aggregation type aliases.
 
 (End of deprecation note.)

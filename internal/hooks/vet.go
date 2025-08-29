@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 // VetHook implements Python type checking logic using ty

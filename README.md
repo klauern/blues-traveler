@@ -1,10 +1,12 @@
-# klauer-hooks
+# Blues Traveler
 
 [![Go Version](https://img.shields.io/badge/go-1.25.0+-blue.svg)](https://golang.org/doc/go1.25)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/klauer-hooks)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities.
+> *"The hook brings you back"* - A Claude Code hooks management tool inspired by Blues Traveler
+
+A CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities. Just like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code every time.
 
 ## Features
 
@@ -21,24 +23,24 @@ A CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks 
 
 ```bash
 # Install from source
-go install github.com/klauern/klauer-hooks@latest
+go install github.com/klauern/blues-traveler@latest
 
 # Or build locally
-git clone https://github.com/klauern/klauer-hooks.git
-cd klauer-hooks
+git clone https://github.com/klauern/blues-traveler.git
+cd blues-traveler
 task build
 
 # List available hooks
-./hooks list
+./blues-traveler list
 
 # Install security hook for Claude Code
-./hooks install security --event PreToolUse
+./blues-traveler install security --event PreToolUse
 
 # Run a specific hook manually
-./hooks run security --log
+./blues-traveler run security --log
 
 # View installed hooks
-./hooks list-installed
+./blues-traveler list-installed
 ```
 
 ## Installation
@@ -47,15 +49,15 @@ task build
 
 ```bash
 # From source
-go install github.com/klauern/klauer-hooks@latest
+go install github.com/klauern/blues-traveler@latest
 
 # Build from source
-git clone https://github.com/klauern/klauer-hooks.git
-cd klauer-hooks
+git clone https://github.com/klauern/blues-traveler.git
+cd blues-traveler
 task build
 
 # Verify installation
-hooks list
+blues-traveler list
 ```
 
 ## Usage
@@ -64,47 +66,47 @@ hooks list
 
 ```bash
 # List all available hooks
-hooks list
+blues-traveler list
 
 # Run a specific hook
-hooks run <hook-name> [--log] [--log-format jsonl|pretty]
+blues-traveler run <hook-name> [--log] [--log-format jsonl|pretty]
 
 # Install hook in Claude Code settings
-hooks install <hook-name> [options]
+blues-traveler install <hook-name> [options]
 
-# Remove hook from Claude Code settings  
-hooks uninstall <hook-name|all> [--global]
+# Remove hook from Claude Code settings
+blues-traveler uninstall <hook-name|all> [--global]
 
 # List installed hooks
-hooks list-installed [--global]
+blues-traveler list-installed [--global]
 
 # List available Claude Code events
-hooks list-events
+blues-traveler list-events
 
 # Generate new hook from template
-hooks generate <hook-name> [options]
+blues-traveler generate <hook-name> [options]
 
 # Configure log rotation
-hooks config-log [options]
+blues-traveler config-log [options]
 ```
 
 ### Installation Options
 
 ```bash
 # Install to project settings (./.claude/settings.json)
-hooks install security
+blues-traveler install security
 
 # Install to global settings (~/.claude/settings.json)
-hooks install security --global
+blues-traveler install security --global
 
 # Install for specific event with custom matcher
-hooks install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler install format --event PostToolUse --matcher "Edit,Write"
 
 # Enable logging with custom format
-hooks install debug --log --log-format pretty
+blues-traveler install debug --log --log-format pretty
 
 # Set command timeout
-hooks install security --timeout 30
+blues-traveler install security --timeout 30
 ```
 
 ## Hook Types
@@ -123,7 +125,7 @@ Blocks dangerous commands and provides security controls to prevent accidental s
 **Best for:** PreToolUse events to intercept commands before execution
 
 ```bash
-hooks install security --event PreToolUse
+blues-traveler install security --event PreToolUse
 ```
 
 ### Format Hook (`format`)
@@ -139,7 +141,7 @@ Automatically formats code files after editing operations to maintain consistent
 **Best for:** PostToolUse events after Edit/Write operations
 
 ```bash
-hooks install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler install format --event PostToolUse --matcher "Edit,Write"
 ```
 
 ### Debug Hook (`debug`)
@@ -156,10 +158,10 @@ Comprehensive logging of all tool usage for debugging and troubleshooting Claude
 **Best for:** All events when debugging issues
 
 ```bash
-hooks install debug --event PreToolUse --log --log-format pretty
+blues-traveler install debug --event PreToolUse --log --log-format pretty
 ```
 
-### Audit Hook (`audit`) 
+### Audit Hook (`audit`)
 
 JSON audit logging for compliance, monitoring, and analysis of Claude Code usage.
 
@@ -173,8 +175,8 @@ JSON audit logging for compliance, monitoring, and analysis of Claude Code usage
 **Best for:** All events in production environments
 
 ```bash
-hooks install audit --event PreToolUse
-hooks install audit --event PostToolUse
+blues-traveler install audit --event PreToolUse
+blues-traveler install audit --event PostToolUse
 ```
 
 ### Vet Hook (`vet`)
@@ -191,7 +193,7 @@ Code quality and best practices enforcement to catch common issues and maintain 
 **Best for:** PostToolUse events after code modifications
 
 ```bash
-hooks install vet --event PostToolUse --matcher "Edit,Write"
+blues-traveler install vet --event PostToolUse --matcher "Edit,Write"
 ```
 
 ## Development
@@ -204,14 +206,14 @@ task dev
 task check
 
 # Generate new hook from template
-hooks generate my-hook --description "Custom hook for X" --type both
+blues-traveler generate my-hook --description "Custom hook for X" --type both
 ```
 
 ## Configuration
 
 ### Settings Files
 
-klauer-hooks supports hierarchical configuration:
+Blues Traveler supports hierarchical configuration:
 
 - **Project**: `./.claude/settings.json` (takes precedence)
 - **Global**: `~/.claude/settings.json` (fallback)
@@ -226,7 +228,7 @@ klauer-hooks supports hierarchical configuration:
         "matcher": "*",
         "hooks": [
           {
-            "command": "/path/to/hooks run security",
+            "command": "/path/to/blues-traveler run security",
             "timeout": 30
           }
         ]
@@ -237,7 +239,7 @@ klauer-hooks supports hierarchical configuration:
         "matcher": "Edit,Write",
         "hooks": [
           {
-            "command": "/path/to/hooks run format --log"
+            "command": "/path/to/blues-traveler run format --log"
           }
         ]
       }
@@ -250,13 +252,13 @@ klauer-hooks supports hierarchical configuration:
 
 ```bash
 # Configure log rotation settings
-hooks config-log --max-age 30 --max-size 10 --max-backups 5 --compress
+blues-traveler config-log --max-age 30 --max-size 10 --max-backups 5 --compress
 
 # View current settings
-hooks config-log --show
+blues-traveler config-log --show
 
 # Configure globally
-hooks config-log --global --max-age 7 --max-size 5
+blues-traveler config-log --global --max-age 7 --max-size 5
 ```
 
 ## Examples
@@ -265,19 +267,19 @@ hooks config-log --global --max-age 7 --max-size 5
 
 ```bash
 # Security + Format + Debug pipeline
-hooks install security --event PreToolUse
-hooks install format --event PostToolUse --matcher "Edit,Write"
-hooks install debug --event PreToolUse --log --log-format pretty
+blues-traveler install security --event PreToolUse
+blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler install debug --event PreToolUse --log --log-format pretty
 
 # Configure log rotation
-hooks config-log --max-age 7 --max-size 5 --compress
+blues-traveler config-log --max-age 7 --max-size 5 --compress
 ```
 
 ### Production Environment
 
 ```bash
 # Audit all operations with global configuration
-hooks install audit --event PreToolUse --global
-hooks install audit --event PostToolUse --global
-hooks install security --event PreToolUse --global
+blues-traveler install audit --event PreToolUse --global
+blues-traveler install audit --event PostToolUse --global
+blues-traveler install security --event PreToolUse --global
 ```

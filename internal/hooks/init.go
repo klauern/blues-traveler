@@ -1,6 +1,6 @@
 package hooks
 
-import "github.com/klauern/klauer-hooks/internal/core"
+import "github.com/klauern/blues-traveler/internal/core"
 
 // init registers all built-in hooks using batch registration for better performance
 func init() {

@@ -3,7 +3,7 @@ package hooks
 import (
 	"testing"
 
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 func TestFormatHook(t *testing.T) {

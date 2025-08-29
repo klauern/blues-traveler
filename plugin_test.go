@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/klauern/klauer-hooks/internal/compat"
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/compat"
+	"github.com/klauern/blues-traveler/internal/config"
 )
 
 // Test that PluginKeys returns sorted keys and includes required built-ins.

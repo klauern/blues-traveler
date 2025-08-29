@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 )
 
 // HookFactory is a function that creates a Hook instance

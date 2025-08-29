@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/spf13/cobra"
 )
 

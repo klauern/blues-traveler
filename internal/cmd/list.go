@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/spf13/cobra"
 )
 
 func NewListCmd(getPlugin func(string) (interface {
 	Run() error
 	Description() string
-}, bool), pluginKeys func() []string) *cobra.Command {
+}, bool), pluginKeys func() []string,
+) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List available hook plugins",
@@ -109,11 +110,11 @@ func NewListEventsCmd(allEvents func() []ClaudeCodeEvent) *cobra.Command {
 			}
 
 			fmt.Printf("Total: %d events available (%d supported by cchooks library)\n\n", len(events), ccHooksSupported)
-			fmt.Println("✓ Events marked with checkmark can be handled by klauer-hooks plugins")
+			fmt.Println("✓ Events marked with checkmark can be handled by blues-traveler plugins")
 			fmt.Println("⚠ Events marked with warning require custom hook implementations")
 			fmt.Println()
-			fmt.Println("Use 'hooks install <plugin-key> --event <event-name>' to install a hook for a specific event.")
-			fmt.Println("Use 'hooks list-installed' to see currently configured hooks.")
+			fmt.Println("Use 'blues-traveler install <plugin-key> --event <event-name>' to install a hook for a specific event.")
+			fmt.Println("Use 'blues-traveler list-installed' to see currently configured hooks.")
 		},
 	}
 }
@@ -152,12 +153,12 @@ func printUninstallExamples(global bool) {
 	fmt.Printf("📝 How to remove hooks:\n\n")
 
 	fmt.Printf("Remove a specific hook type (removes ALL instances):\n")
-	fmt.Printf("  hooks uninstall debug%s\n", globalFlag)
-	fmt.Printf("  hooks uninstall security%s\n", globalFlag)
-	fmt.Printf("  hooks uninstall audit%s\n\n", globalFlag)
+	fmt.Printf("  blues-traveler uninstall debug%s\n", globalFlag)
+	fmt.Printf("  blues-traveler uninstall security%s\n", globalFlag)
+	fmt.Printf("  blues-traveler uninstall audit%s\n\n", globalFlag)
 
-	fmt.Printf("Remove ALL klauer-hooks (preserves other hooks):\n")
-	fmt.Printf("  hooks uninstall all%s\n\n", globalFlag)
+	fmt.Printf("Remove ALL blues-traveler hooks (preserves other hooks):\n")
+	fmt.Printf("  blues-traveler uninstall all%s\n\n", globalFlag)
 
 	fmt.Printf("Remove ALL hooks from %s settings:\n", scope)
 	if global {

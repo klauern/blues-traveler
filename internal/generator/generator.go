@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 //go:embed templates/*
@@ -26,6 +28,7 @@ type TemplateData struct {
 	Name        string // PascalCase name (e.g., "MyCustom")
 	LowerName   string // snake_case name (e.g., "my_custom")
 	Description string // Human readable description
+	ModulePath  string // Module import path
 }
 
 // Generator handles hook code generation
@@ -36,7 +39,7 @@ type Generator struct {
 // NewGenerator creates a new generator instance
 func NewGenerator(outputDir string) *Generator {
 	if outputDir == "" {
-		outputDir = "internal/hooks"
+		outputDir = constants.InternalHooksDir
 	}
 	return &Generator{outputDir: outputDir}
 }
@@ -56,6 +59,7 @@ func (g *Generator) GenerateHook(name, description string, hookType HookType, in
 		Name:        toPascalCase(name),
 		LowerName:   toSnakeCase(name),
 		Description: description,
+		ModulePath:  constants.ModulePath,
 	}
 
 	// Generate main hook file
@@ -114,13 +118,13 @@ func (g *Generator) generateFile(templateName string, data TemplateData, outputF
 
 func (g *Generator) showRegistrationInstructions(data TemplateData) {
 	fmt.Println("\n📝 Registration Instructions:")
-	fmt.Println("Add the following line to internal/hooks/registry.go in the init() function:")
+	fmt.Printf("Add the following line to %s/init.go in the init() function:\n", constants.InternalHooksDir)
 	fmt.Printf("    MustRegisterHook(\"%s\", New%sHook)\n", data.LowerName, data.Name)
 	fmt.Println("\n🧪 Testing:")
-	fmt.Printf("    go test ./internal/hooks -run Test%sHook\n", data.Name)
+	fmt.Printf("    go test ./%s -run Test%sHook\n", constants.InternalHooksDir, data.Name)
 	fmt.Println("\n🔧 Usage:")
-	fmt.Printf("    ./hooks run %s\n", data.LowerName)
-	fmt.Printf("    ./hooks install %s\n", data.LowerName)
+	fmt.Printf("    ./%s run %s\n", constants.BinaryName, data.LowerName)
+	fmt.Printf("    ./%s install %s\n", constants.BinaryName, data.LowerName)
 }
 
 // ValidateHookName checks if a hook name is valid

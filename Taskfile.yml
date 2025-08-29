@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  BINARY_NAME: hooks
+  BINARY_NAME: blues-traveler
   MAIN_FILE: main.go
 
 tasks:

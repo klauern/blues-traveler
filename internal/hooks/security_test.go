@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 func TestSecurityHook(t *testing.T) {

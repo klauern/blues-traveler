@@ -5,16 +5,17 @@ import (
 	"fmt"
 
 	"github.com/brads3290/cchooks"
+	"{{.ModulePath}}/internal/core"
 )
 
 // {{.Name}}Hook implements {{.Description}}
 type {{.Name}}Hook struct {
-	*BaseHook
+	*core.BaseHook
 }
 
 // New{{.Name}}Hook creates a new {{.LowerName}} hook instance
-func New{{.Name}}Hook(ctx *HookContext) Hook {
-	base := NewBaseHook("{{.LowerName}}", "{{.Name}} Hook", "{{.Description}}", ctx)
+func New{{.Name}}Hook(ctx *core.HookContext) core.Hook {
+	base := core.NewBaseHook("{{.LowerName}}", "{{.Name}} Hook", "{{.Description}}", ctx)
 	return &{{.Name}}Hook{BaseHook: base}
 }
 
@@ -32,13 +33,13 @@ func (h *{{.Name}}Hook) Run() error {
 
 func (h *{{.Name}}Hook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	// TODO: Implement your pre-tool logic here
-	
+
 	if event.ToolName == "Bash" {
 		bash, err := event.AsBash()
 		if err != nil {
 			return cchooks.Block("failed to parse bash command")
 		}
-		
+
 		// TODO: Add your command validation logic here
 		fmt.Printf("{{.Name}} Hook PRE: Processing bash command: %s\n", bash.Command)
 	}
@@ -48,7 +49,7 @@ func (h *{{.Name}}Hook) preToolUseHandler(ctx context.Context, event *cchooks.Pr
 
 func (h *{{.Name}}Hook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// TODO: Implement your post-tool logic here
-	
+
 	fmt.Printf("{{.Name}} Hook POST: Tool %s completed\n", event.ToolName)
 
 	return cchooks.Allow()

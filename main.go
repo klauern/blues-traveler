@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/klauern/klauer-hooks/internal/cmd"
-	"github.com/klauern/klauer-hooks/internal/compat"
-	"github.com/klauern/klauer-hooks/internal/core"
-	_ "github.com/klauern/klauer-hooks/internal/hooks" // Import for init() registration
+	"github.com/klauern/blues-traveler/internal/cmd"
+	"github.com/klauern/blues-traveler/internal/compat"
+	"github.com/klauern/blues-traveler/internal/core"
+	_ "github.com/klauern/blues-traveler/internal/hooks" // Import for init() registration
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "hooks",
-	Short: "Claude Code hook runner and manager",
-	Long:  `A CLI tool that runs Claude Code hooks directly and manages hook installations.`,
+	Use:   "blues-traveler",
+	Short: "Claude Code hook runner and manager - 'The hook brings you back'",
+	Long: `A CLI tool that runs Claude Code hooks directly and manages hook installations.
+Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
 }
 
 func init() {

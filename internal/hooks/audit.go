@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/brads3290/cchooks"
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 // AuditHook implements comprehensive audit logging

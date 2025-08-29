@@ -1,4 +1,4 @@
-module github.com/klauern/klauer-hooks
+module github.com/klauern/blues-traveler
 
 go 1.25.0
 

@@ -223,11 +223,11 @@ type MergeResult struct {
 	DuplicateInfo string
 }
 
-// extractHookType extracts the hook type from a klauer-hooks command
-// Example: "/path/to/klauer-hooks run debug --log" -> "debug"
+// extractHookType extracts the hook type from a blues-traveler command
+// Example: "/path/to/blues-traveler run debug --log" -> "debug"
 func extractHookType(command string) string {
-	// Pattern to match "klauer-hooks run <hooktype>" with optional flags
-	re := regexp.MustCompile(`klauer-hooks\s+run\s+(\w+)`)
+	// Pattern to match "blues-traveler run <hooktype>" with optional flags
+	re := regexp.MustCompile(`blues-traveler\s+run\s+(\w+)`)
 	matches := re.FindStringSubmatch(command)
 	if len(matches) > 1 {
 		return matches[1]
@@ -235,16 +235,16 @@ func extractHookType(command string) string {
 	return ""
 }
 
-// isKlauerHooksCommand checks if a command is a klauer-hooks command
-func isKlauerHooksCommand(command string) bool {
-	return strings.Contains(command, "klauer-hooks run")
+// isBluesTravelerCommand checks if a command is a blues-traveler command
+func isBluesTravelerCommand(command string) bool {
+	return strings.Contains(command, "blues-traveler run")
 }
 
 func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 	// Look for existing matcher
 	for i, matcher := range existing {
 		if matcher.Matcher == new.Matcher {
-			// Check for klauer-hooks command conflicts within this matcher
+			// Check for blues-traveler command conflicts within this matcher
 			for j, existingHook := range existing[i].Hooks {
 				for _, newHook := range new.Hooks {
 					// Exact duplicate check
@@ -256,8 +256,8 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 						}
 					}
 
-					// Check if both are klauer-hooks commands with the same hook type
-					if isKlauerHooksCommand(existingHook.Command) && isKlauerHooksCommand(newHook.Command) {
+					// Check if both are blues-traveler commands with the same hook type
+					if isBluesTravelerCommand(existingHook.Command) && isBluesTravelerCommand(newHook.Command) {
 						existingType := extractHookType(existingHook.Command)
 						newType := extractHookType(newHook.Command)
 						if existingType != "" && existingType == newType {
@@ -325,8 +325,8 @@ func removeHookFromMatchers(matchers []HookMatcher, command string, removed *boo
 	return result
 }
 
-// CountKlauerHooksInSettings counts all klauer-hooks commands in the settings
-func CountKlauerHooksInSettings(settings *Settings) int {
+// CountBluesTravelerInSettings counts all blues-traveler commands in the settings
+func CountBluesTravelerInSettings(settings *Settings) int {
 	count := 0
 
 	// Define a helper function to count hooks in a slice of matchers
@@ -334,7 +334,7 @@ func CountKlauerHooksInSettings(settings *Settings) int {
 		c := 0
 		for _, matcher := range matchers {
 			for _, hook := range matcher.Hooks {
-				if IsKlauerHookCommand(hook.Command) {
+				if IsBluesTravelerCommand(hook.Command) {
 					c++
 				}
 			}
@@ -354,19 +354,19 @@ func CountKlauerHooksInSettings(settings *Settings) int {
 	return count
 }
 
-// IsKlauerHookCommand checks if a command is from klauer-hooks
-func IsKlauerHookCommand(command string) bool {
-	return strings.Contains(command, "klauer-hooks run") || strings.Contains(command, "hooks run")
+// IsBluesTravelerCommand checks if a command is from blues-traveler
+func IsBluesTravelerCommand(command string) bool {
+	return strings.Contains(command, "blues-traveler run") || strings.Contains(command, "hooks run")
 }
 
-// PrintKlauerHooksToRemove shows which klauer-hooks will be removed
-func PrintKlauerHooksToRemove(settings *Settings) {
+// PrintBluesTravelerToRemove shows which blues-traveler hooks will be removed
+func PrintBluesTravelerToRemove(settings *Settings) {
 	// Define a helper function to print hooks from a slice of matchers
 	printFromMatchers := func(eventName string, matchers []HookMatcher) {
 		found := false
 		for _, matcher := range matchers {
 			for _, hook := range matcher.Hooks {
-				if IsKlauerHookCommand(hook.Command) {
+				if IsBluesTravelerCommand(hook.Command) {
 					if !found {
 						fmt.Printf("%s:\n", eventName)
 						found = true
@@ -391,20 +391,20 @@ func PrintKlauerHooksToRemove(settings *Settings) {
 	printFromMatchers("SessionStart", settings.Hooks.SessionStart)
 }
 
-// RemoveAllKlauerHooksFromSettings removes all klauer-hooks from settings and returns count removed
-func RemoveAllKlauerHooksFromSettings(settings *Settings) int {
+// RemoveAllBluesTravelerFromSettings removes all blues-traveler hooks from settings and returns count removed
+func RemoveAllBluesTravelerFromSettings(settings *Settings) int {
 	removed := 0
 
-	// Define a helper function to remove klauer-hooks from a slice of matchers
+	// Define a helper function to remove blues-traveler hooks from a slice of matchers
 	removeFromMatchers := func(matchers []HookMatcher) []HookMatcher {
 		var result []HookMatcher
 
 		for _, matcher := range matchers {
 			var filteredHooks []HookCommand
 
-			// Keep only non-klauer-hooks
+			// Keep only non-blues-traveler hooks
 			for _, hook := range matcher.Hooks {
-				if !IsKlauerHookCommand(hook.Command) {
+				if !IsBluesTravelerCommand(hook.Command) {
 					filteredHooks = append(filteredHooks, hook)
 				} else {
 					removed++

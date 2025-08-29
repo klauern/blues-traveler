@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 )
 
 // helper to read file lines trimming trailing newline

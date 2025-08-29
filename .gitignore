@@ -9,9 +9,7 @@
 *.test
 
 # Output of the go build
-/hooks
-/klauer-hooks
-/*-hook
+/blues-traveler
 !/internal/hooks/
 test-*
 
@@ -26,8 +24,13 @@ go.work
 .DS_Store
 Thumbs.db
 
-# Claude settings (usually project-specific)
-.claude/
+# Claude settings and logs (user-specific)
+.claude/hooks/*.log
+.claude/hooks/*-config.json
+
+# Log files
+claude-hooks.log
+*.log
 
 # Coverage reports
 coverage.out

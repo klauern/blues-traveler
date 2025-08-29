@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 )
 
 // LogEntry represents a detailed log entry for hook inspection (moved from base.go)

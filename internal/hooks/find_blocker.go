@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 // FindBlockerHook implements logic to block find commands and suggest fd instead

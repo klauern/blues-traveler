@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 // FetchBlockerHook implements URL path prefix blocking logic for WebFetch calls

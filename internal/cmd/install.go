@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/spf13/cobra"
 )
 
 func NewInstallCmd(getPlugin func(string) (interface {
 	Run() error
 	Description() string
-}, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string) *cobra.Command {
+}, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install [hook-type] [options]",
 		Short: "Install a hook type into Claude Code settings",
@@ -153,7 +154,7 @@ func NewUninstallCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "uninstall [hook-type|all]",
 		Short: "Remove a hook type from Claude Code settings",
-		Long:  `Remove a hook type from your Claude Code settings.json file. Use 'all' to remove all klauer-hooks.`,
+		Long:  `Remove a hook type from your Claude Code settings.json file. Use 'all' to remove all blues-traveler hooks.`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			hookType := args[0]
@@ -238,21 +239,21 @@ func uninstallAllKlauerHooks(global bool) {
 		scope = "global"
 	}
 
-	// Count klauer-hooks before removal
-	totalHooksBefore := config.CountKlauerHooksInSettings(settings)
+	// Count blues-traveler hooks before removal
+	totalHooksBefore := config.CountBluesTravelerInSettings(settings)
 
 	if totalHooksBefore == 0 {
-		fmt.Printf("No klauer-hooks found in %s settings.\n", scope)
+		fmt.Printf("No blues-traveler hooks found in %s settings.\n", scope)
 		return
 	}
 
 	// Show what will be removed
-	fmt.Printf("Found %d klauer-hooks in %s settings:\n\n", totalHooksBefore, scope)
-	config.PrintKlauerHooksToRemove(settings)
+	fmt.Printf("Found %d blues-traveler hooks in %s settings:\n\n", totalHooksBefore, scope)
+	config.PrintBluesTravelerToRemove(settings)
 
 	// Confirmation prompt
-	fmt.Printf("\nThis will remove ALL klauer-hooks from %s settings.\n", scope)
-	fmt.Printf("Other hooks (not from klauer-hooks) will be preserved.\n")
+	fmt.Printf("\nThis will remove ALL blues-traveler hooks from %s settings.\n", scope)
+	fmt.Printf("Other hooks (not from blues-traveler) will be preserved.\n")
 	fmt.Printf("Continue? (y/N): ")
 
 	var response string
@@ -262,11 +263,11 @@ func uninstallAllKlauerHooks(global bool) {
 		return
 	}
 
-	// Remove all klauer-hooks
-	removed := config.RemoveAllKlauerHooksFromSettings(settings)
+	// Remove all blues-traveler hooks
+	removed := config.RemoveAllBluesTravelerFromSettings(settings)
 
 	if removed == 0 {
-		fmt.Printf("No klauer-hooks were found to remove.\n")
+		fmt.Printf("No blues-traveler hooks were found to remove.\n")
 		return
 	}
 
@@ -276,7 +277,7 @@ func uninstallAllKlauerHooks(global bool) {
 		os.Exit(1)
 	}
 
-	fmt.Printf("✅ Successfully removed %d klauer-hooks from %s settings\n", removed, scope)
+	fmt.Printf("✅ Successfully removed %d blues-traveler hooks from %s settings\n", removed, scope)
 	fmt.Printf("   Settings: %s\n", settingsPath)
 
 	globalFlag := ""
@@ -319,7 +320,7 @@ func createSampleBlockedUrlsFile(global bool) {
 	}
 
 	// Ensure the .claude directory exists
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		fmt.Printf("⚠️  Could not create .claude directory: %v\n", err)
 		return
 	}
@@ -340,8 +341,8 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 # Auth-required API endpoints
 # https://api.company.com/private/*|Private API endpoints require authentication tokens
 
-# Example: Zendesk secure backup domain (from your use case)
-https://atlantis-foundation-secure.backups.zendesk-dev.com/*|This domain requires VPN access and authentication
+# Example: Company secure backup domain
+# https://secure-backups.company-dev.com/*|This domain requires VPN access and authentication
 
 # Add your own blocked prefixes here...
 # Format examples:
@@ -351,7 +352,7 @@ https://atlantis-foundation-secure.backups.zendesk-dev.com/*|This domain require
 `
 
 	// Write the sample file
-	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0644); err != nil {
+	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0o644); err != nil {
 		fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
 		return
 	}

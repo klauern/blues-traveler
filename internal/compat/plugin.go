@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/klauern/klauer-hooks/internal/config"
-	"github.com/klauern/klauer-hooks/internal/core"
+	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/core"
 )
 
 // DEPRECATED REGISTRY SHIM

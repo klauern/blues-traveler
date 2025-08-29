@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/brads3290/cchooks"
-	"github.com/klauern/klauer-hooks/internal/config"
+	"github.com/klauern/blues-traveler/internal/config"
 )
 
 // Hook defines the interface that all hook implementations must satisfy

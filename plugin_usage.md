@@ -10,7 +10,7 @@ Dynamic runtime registration has been deprecated. The previous helper `NewFuncPl
 
 Key goals:
 
-- Simple discovery & execution (`hooks list`, `hooks run <key>`)
+- Simple discovery & execution (`blues-traveler list`, `blues-traveler run <key>`)
 - Per‑hook enable/disable controls via settings (`plugins` section)
 - Deterministic set of built‑ins with clear maintenance surface
 - Backwards compatibility layer (shim in [`plugin.go`](plugin.go)) for existing consumers calling `GetPlugin` / `PluginKeys`
@@ -97,12 +97,12 @@ func (h *myHook) Run() error {
 
 ## Execution Flow
 
-- List: `hooks list`
-- Run:  `hooks run <key>`
+- List: `blues-traveler list`
+- Run:  `blues-traveler run <key>`
 - Install into Claude settings:
 
   ```
-  hooks install security -e PreToolUse -m "*"
+  blues-traveler install security -e PreToolUse -m "*"
   ```
 
 Stored command resembles:
@@ -183,14 +183,14 @@ Structured hook event logs written to per-hook log files support two formats con
 Example:
 
 ```
-hooks run audit --log                      # jsonl (default)
-hooks run audit --log --log-format pretty  # pretty printed
+blues-traveler run audit --log                      # jsonl (default)
+blues-traveler run audit --log --log-format pretty  # pretty printed
 ```
 
 The flag is also persisted when installing a hook if you specify `--log` and a non-default format:
 
 ```
-hooks install audit --event PreToolUse --log --log-format pretty
+blues-traveler install audit --event PreToolUse --log --log-format pretty
 ```
 
 (If you omit `--log-format` or use `jsonl`, nothing extra is stored.)

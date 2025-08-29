@@ -1,26 +1,17 @@
 package hooks
 
 import (
+	"context"
 	"testing"
+
+	"github.com/brads3290/cchooks"
+	"{{.ModulePath}}/internal/core"
 )
 
 // Test{{.Name}}Hook tests the {{.LowerName}} hook functionality
 func Test{{.Name}}Hook(t *testing.T) {
 	// Setup mock context
-	mockFS := &MockFileSystem{}
-	mockCmd := &MockCommandExecutor{}
-	mockRunner := func(pre func(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface,
-		post func(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface) *cchooks.Runner {
-		// Return a mock runner for testing
-		return &cchooks.Runner{}
-	}
-	
-	ctx := &HookContext{
-		FileSystem:      mockFS,
-		CommandExecutor: mockCmd,
-		RunnerFactory:   mockRunner,
-		SettingsChecker: func(string) bool { return true },
-	}
+	ctx := core.TestHookContext(nil)
 
 	// Create hook instance
 	hook := New{{.Name}}Hook(ctx)
@@ -48,12 +39,9 @@ func Test{{.Name}}Hook(t *testing.T) {
 
 // Test{{.Name}}HookDisabled tests the hook when disabled
 func Test{{.Name}}HookDisabled(t *testing.T) {
-	ctx := &HookContext{
-		FileSystem:      &MockFileSystem{},
-		CommandExecutor: &MockCommandExecutor{},
-		RunnerFactory:   func(pre, post interface{}) *cchooks.Runner { return &cchooks.Runner{} },
-		SettingsChecker: func(string) bool { return false }, // Disabled
-	}
+	// Setup mock context with disabled setting
+	disabledSettings := map[string]bool{"{{.LowerName}}": false}
+	ctx := core.TestHookContext(disabledSettings)
 
 	hook := New{{.Name}}Hook(ctx)
 

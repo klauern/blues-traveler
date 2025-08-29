@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/klauern/blues-traveler/internal/constants"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -37,19 +38,19 @@ type LogConfig struct {
 // GetLogConfigPath returns the path to our log configuration file
 func GetLogConfigPath(global bool) (string, error) {
 	if global {
-		// Global config: ~/.claude/hooks/klauer-hooks-config.json
+		// Global config: ~/.claude/hooks/blues-traveler-config.json
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("failed to get home directory: %v", err)
 		}
-		return filepath.Join(homeDir, ".claude", "hooks", "klauer-hooks-config.json"), nil
+		return constants.GetConfigPath(homeDir), nil
 	} else {
-		// Project config: ./.claude/hooks/klauer-hooks-config.json
+		// Project config: ./.claude/hooks/blues-traveler-config.json
 		cwd, err := os.Getwd()
 		if err != nil {
 			return "", fmt.Errorf("failed to get current directory: %v", err)
 		}
-		return filepath.Join(cwd, ".claude", "hooks", "klauer-hooks-config.json"), nil
+		return constants.GetConfigPath(cwd), nil
 	}
 }
 
@@ -115,7 +116,7 @@ func GetLogRotationConfigFromFile(global bool) LogRotationConfig {
 // SetupLogRotation configures log rotation for a given log file path
 func SetupLogRotation(logPath string, config LogRotationConfig) *lumberjack.Logger {
 	// Ensure the directory exists
-	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		log.Printf("Failed to create log directory: %v", err)
 		return nil
 	}
