@@ -81,13 +81,14 @@ func (r *Registry) MustRegisterBatch(hooks map[string]HookFactory) {
 func (r *Registry) Create(key string) (Hook, error) {
 	r.mu.RLock()
 	factory, exists := r.factories[key]
+	context := r.context
 	r.mu.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("hook with key '%s' not found", key)
 	}
 
-	return factory(r.context), nil
+	return factory(context), nil
 }
 
 // Keys returns all registered hook keys in sorted order
