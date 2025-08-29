@@ -1,51 +1,66 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/core"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v3"
 )
 
 func NewRunCmd(getPlugin func(string) (interface {
 	Run() error
 	Description() string
-}, bool), isPluginEnabled func(string) bool, pluginKeys func() []string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "run [plugin-key]",
-		Short: "Run a specific hook plugin",
-		Long:  `Run a specific hook plugin. Executes only that hook's handlers (no unified pipeline).`,
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+}, bool), isPluginEnabled func(string) bool, pluginKeys func() []string,
+) *cli.Command {
+	return &cli.Command{
+		Name:        "run",
+		Usage:       "Run a specific hook plugin",
+		ArgsUsage:   "[plugin-key]",
+		Description: `Run a specific hook plugin. Executes only that hook's handlers (no unified pipeline).`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "log",
+				Aliases: []string{"l"},
+				Value:   false,
+				Usage:   "Enable detailed logging to .claude/hooks/<plugin-key>.log",
+			},
+			&cli.StringFlag{
+				Name:  "log-format",
+				Value: "jsonl",
+				Usage: "Log output format: jsonl or pretty (default jsonl)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			args := cmd.Args().Slice()
+			if len(args) != 1 {
+				return fmt.Errorf("exactly one argument required: [plugin-key]")
+			}
 			key := args[0]
 
 			// Validate plugin exists early
 			p, exists := getPlugin(key)
 			if !exists {
-				fmt.Fprintf(os.Stderr, "Error: Plugin '%s' not found.\n", key)
-				fmt.Fprintf(os.Stderr, "Available plugins: %s\n", strings.Join(pluginKeys(), ", "))
-				os.Exit(1)
+				return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", key, strings.Join(pluginKeys(), ", "))
 			}
 
 			// Enablement check before side effects
 			if !isPluginEnabled(key) {
 				fmt.Printf("Plugin '%s' is disabled via settings. Nothing to do.\n", key)
-				return
+				return nil
 			}
 
 			// Logging flags
-			logEnabled, _ := cmd.Flags().GetBool("log")
-			logFormat, _ := cmd.Flags().GetString("log-format")
+			logEnabled := cmd.Bool("log")
+			logFormat := cmd.String("log-format")
 			if logFormat == "" {
 				logFormat = config.LoggingFormatJSONL
 			}
 			if logEnabled && !config.IsValidLoggingFormat(logFormat) {
-				fmt.Fprintf(os.Stderr, "Error: Invalid --log-format '%s'. Valid: jsonl, pretty\n", logFormat)
-				os.Exit(1)
+				return fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", logFormat)
 			}
 			if logEnabled {
 				logConfig := config.GetLogRotationConfigFromFile(false)
@@ -71,17 +86,11 @@ func NewRunCmd(getPlugin func(string) (interface {
 
 			fmt.Printf("Running hook '%s'...\n", key)
 			if err := p.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "Hook '%s' failed: %v\n", key, err)
-				os.Exit(1)
+				return fmt.Errorf("hook '%s' failed: %v", key, err)
 			}
+			return nil
 		},
 	}
-
-	// Add flags for run command
-	cmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
-	cmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
-
-	return cmd
 }
 
 // Plugin interface for compatibility

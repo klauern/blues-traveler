@@ -1,64 +1,99 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v3"
 )
 
 func NewInstallCmd(getPlugin func(string) (interface {
 	Run() error
 	Description() string
 }, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
-) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "install [hook-type] [options]",
-		Short: "Install a hook type into Claude Code settings",
-		Long: `Install a hook type into your Claude Code settings.json file.
+) *cli.Command {
+	return &cli.Command{
+		Name:      "install",
+		Usage:     "Install a hook type into Claude Code settings",
+		ArgsUsage: "[hook-type]",
+		Description: `Install a hook type into your Claude Code settings.json file.
 This will automatically configure the hook to run for the specified events.`,
-		Args: cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "global",
+				Aliases: []string{"g"},
+				Value:   false,
+				Usage:   "Install to global settings (~/.claude/settings.json)",
+			},
+			&cli.StringFlag{
+				Name:    "event",
+				Aliases: []string{"e"},
+				Value:   "PreToolUse",
+				Usage:   "Hook event (PreToolUse, PostToolUse, UserPromptSubmit, etc.)",
+			},
+			&cli.StringFlag{
+				Name:    "matcher",
+				Aliases: []string{"m"},
+				Value:   "*",
+				Usage:   "Tool matcher pattern (* for all tools)",
+			},
+			&cli.IntFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Value:   0,
+				Usage:   "Command timeout in seconds (0 for no timeout)",
+			},
+			&cli.BoolFlag{
+				Name:    "log",
+				Aliases: []string{"l"},
+				Value:   false,
+				Usage:   "Enable detailed logging to .claude/hooks/<plugin-key>.log",
+			},
+			&cli.StringFlag{
+				Name:  "log-format",
+				Value: "jsonl",
+				Usage: "Log output format: jsonl or pretty (default jsonl)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			args := cmd.Args().Slice()
+			if len(args) != 1 {
+				return fmt.Errorf("exactly one argument required: [hook-type]")
+			}
 			hookType := args[0]
 
 			// Validate plugin exists
 			if _, exists := getPlugin(hookType); !exists {
-				fmt.Fprintf(os.Stderr, "Error: Plugin '%s' not found.\n", hookType)
-				fmt.Fprintf(os.Stderr, "Available plugins: %s\n", strings.Join(pluginKeys(), ", "))
-				os.Exit(1)
+				return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", hookType, strings.Join(pluginKeys(), ", "))
 			}
 
 			// Get flags
-			global, _ := cmd.Flags().GetBool("global")
-			event, _ := cmd.Flags().GetString("event")
-			matcher, _ := cmd.Flags().GetString("matcher")
-			timeoutFlag, _ := cmd.Flags().GetInt("timeout")
-			logEnabled, _ := cmd.Flags().GetBool("log")
-			logFormat, _ := cmd.Flags().GetString("log-format")
+			global := cmd.Bool("global")
+			event := cmd.String("event")
+			matcher := cmd.String("matcher")
+			timeoutFlag := cmd.Int("timeout")
+			logEnabled := cmd.Bool("log")
+			logFormat := cmd.String("log-format")
 			if logFormat == "" {
 				logFormat = config.LoggingFormatJSONL
 			}
 			if logEnabled && !config.IsValidLoggingFormat(logFormat) {
-				fmt.Fprintf(os.Stderr, "Error: Invalid --log-format '%s'. Valid: jsonl, pretty\n", logFormat)
-				os.Exit(1)
+				return fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", logFormat)
 			}
 
 			// Validate event
 			if !isValidEventType(event) {
-				fmt.Fprintf(os.Stderr, "Error: Invalid event '%s'.\n", event)
-				fmt.Fprintf(os.Stderr, "Valid events: %s\n", strings.Join(validEventTypes(), ", "))
-				fmt.Fprintf(os.Stderr, "Use 'hooks list-events' to see all available events with descriptions.\n")
-				os.Exit(1)
+				return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list-events' to see all available events with descriptions", event, strings.Join(validEventTypes(), ", "))
 			}
 
 			// Get path to this executable
 			execPath, err := os.Executable()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to get executable path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
 			// Create command: hooks run <type>
@@ -73,15 +108,13 @@ This will automatically configure the hook to run for the specified events.`,
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error getting settings path: %v", err)
 			}
 
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error loading settings: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error loading settings: %v", err)
 			}
 
 			// Add hook to settings
@@ -106,8 +139,7 @@ This will automatically configure the hook to run for the specified events.`,
 			// Save settings (only if not a duplicate with no changes)
 			if !isDuplicateNoChange {
 				if err := config.SaveSettings(settingsPath, settings); err != nil {
-					fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
-					os.Exit(1)
+					return fmt.Errorf("error saving settings: %v", err)
 				}
 			}
 
@@ -136,41 +168,43 @@ This will automatically configure the hook to run for the specified events.`,
 				fmt.Println("The hook will be active in new Claude Code sessions.")
 				fmt.Println("Use 'claude /hooks' to verify the configuration.")
 			}
+			return nil
 		},
 	}
-
-	// Add flags for install command
-	cmd.Flags().BoolP("global", "g", false, "Install to global settings (~/.claude/settings.json)")
-	cmd.Flags().StringP("event", "e", "PreToolUse", "Hook event (PreToolUse, PostToolUse, UserPromptSubmit, etc.)")
-	cmd.Flags().StringP("matcher", "m", "*", "Tool matcher pattern (* for all tools)")
-	cmd.Flags().IntP("timeout", "t", 0, "Command timeout in seconds (0 for no timeout)")
-	cmd.Flags().BoolP("log", "l", false, "Enable detailed logging to .claude/hooks/<plugin-key>.log")
-	cmd.Flags().String("log-format", "jsonl", "Log output format: jsonl or pretty (default jsonl)")
-
-	return cmd
 }
 
-func NewUninstallCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "uninstall [hook-type|all]",
-		Short: "Remove a hook type from Claude Code settings",
-		Long:  `Remove a hook type from your Claude Code settings.json file. Use 'all' to remove all blues-traveler hooks.`,
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+func NewUninstallCmd() *cli.Command {
+	return &cli.Command{
+		Name:        "uninstall",
+		Usage:       "Remove a hook type from Claude Code settings",
+		ArgsUsage:   "[hook-type|all]",
+		Description: `Remove a hook type from your Claude Code settings.json file. Use 'all' to remove all blues-traveler hooks.`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "global",
+				Aliases: []string{"g"},
+				Value:   false,
+				Usage:   "Remove from global settings (~/.claude/settings.json)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			args := cmd.Args().Slice()
+			if len(args) != 1 {
+				return fmt.Errorf("exactly one argument required: [hook-type|all]")
+			}
 			hookType := args[0]
-			global, _ := cmd.Flags().GetBool("global")
+			global := cmd.Bool("global")
 
 			// Handle 'all' case
 			if hookType == "all" {
 				uninstallAllKlauerHooks(global)
-				return
+				return nil
 			}
 
 			// Get path to this executable
 			execPath, err := os.Executable()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to get executable path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
 			// Create command pattern to match: hooks run <type>
@@ -179,29 +213,25 @@ func NewUninstallCmd() *cobra.Command {
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error getting settings path: %v", err)
 			}
 
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error loading settings: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error loading settings: %v", err)
 			}
 
 			// Remove hook from settings
 			removed := config.RemoveHookFromSettings(settings, hookCommand)
 
 			if !removed {
-				fmt.Printf("Hook type '%s' was not found in settings.\n", hookType)
-				os.Exit(1)
+				return fmt.Errorf("hook type '%s' was not found in settings", hookType)
 			}
 
 			// Save settings
 			if err := config.SaveSettings(settingsPath, settings); err != nil {
-				fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error saving settings: %v", err)
 			}
 
 			scope := "project"
@@ -212,11 +242,9 @@ func NewUninstallCmd() *cobra.Command {
 			fmt.Printf("✅ Successfully removed %s hook from %s settings\n", hookType, scope)
 			fmt.Printf("   Command: %s\n", hookCommand)
 			fmt.Printf("   Settings: %s\n", settingsPath)
+			return nil
 		},
 	}
-
-	cmd.Flags().BoolP("global", "g", false, "Remove from global settings (~/.claude/settings.json)")
-	return cmd
 }
 
 func uninstallAllKlauerHooks(global bool) {

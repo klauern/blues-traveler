@@ -1,36 +1,71 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"os"
 
 	"github.com/klauern/blues-traveler/internal/config"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v3"
 )
 
-func NewConfigLogCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "config-log",
-		Short: "Configure log rotation settings",
-		Long:  `Configure log rotation settings including maximum age, file size, and backup count.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			global, _ := cmd.Flags().GetBool("global")
-			maxAge, _ := cmd.Flags().GetInt("max-age")
-			maxSize, _ := cmd.Flags().GetInt("max-size")
-			maxBackups, _ := cmd.Flags().GetInt("max-backups")
-			compress, _ := cmd.Flags().GetBool("compress")
-			show, _ := cmd.Flags().GetBool("show")
+func NewConfigLogCmd() *cli.Command {
+	return &cli.Command{
+		Name:        "config-log",
+		Usage:       "Configure log rotation settings",
+		Description: `Configure log rotation settings including maximum age, file size, and backup count.`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "global",
+				Aliases: []string{"g"},
+				Value:   false,
+				Usage:   "Configure global settings (~/.claude/settings.json)",
+			},
+			&cli.IntFlag{
+				Name:    "max-age",
+				Aliases: []string{"a"},
+				Value:   0,
+				Usage:   "Maximum age in days to retain log files (default: 30)",
+			},
+			&cli.IntFlag{
+				Name:    "max-size",
+				Aliases: []string{"s"},
+				Value:   0,
+				Usage:   "Maximum size in MB per log file before rotation (default: 10)",
+			},
+			&cli.IntFlag{
+				Name:    "max-backups",
+				Aliases: []string{"b"},
+				Value:   0,
+				Usage:   "Maximum number of backup files to retain (default: 5)",
+			},
+			&cli.BoolFlag{
+				Name:    "compress",
+				Aliases: []string{"c"},
+				Value:   false,
+				Usage:   "Compress rotated log files",
+			},
+			&cli.BoolFlag{
+				Name:  "show",
+				Value: false,
+				Usage: "Show current log rotation settings",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			global := cmd.Bool("global")
+			maxAge := cmd.Int("max-age")
+			maxSize := cmd.Int("max-size")
+			maxBackups := cmd.Int("max-backups")
+			compress := cmd.Bool("compress")
+			show := cmd.Bool("show")
 
 			configPath, err := config.GetLogConfigPath(global)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting config path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error getting config path: %v", err)
 			}
 
 			logConfig, err := config.LoadLogConfig(configPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error loading config: %v", err)
 			}
 
 			if show {
@@ -44,7 +79,7 @@ func NewConfigLogCmd() *cobra.Command {
 				fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
 				fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
 				fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
-				return
+				return nil
 			}
 
 			// Only update non-zero values
@@ -57,13 +92,14 @@ func NewConfigLogCmd() *cobra.Command {
 			if maxBackups > 0 {
 				logConfig.LogRotation.MaxBackups = maxBackups
 			}
-			if cmd.Flags().Changed("compress") {
+			// Note: urfave/cli v3 doesn't have Changed() method, so we check compress directly
+			// This means compress will be set to false if not explicitly provided
+			if compress {
 				logConfig.LogRotation.Compress = compress
 			}
 
 			if err := config.SaveLogConfig(configPath, logConfig); err != nil {
-				fmt.Fprintf(os.Stderr, "Error saving config: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error saving config: %v", err)
 			}
 
 			scope := "project"
@@ -75,16 +111,7 @@ func NewConfigLogCmd() *cobra.Command {
 			fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
 			fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
 			fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
+			return nil
 		},
 	}
-
-	// Add flags for config-log command
-	cmd.Flags().BoolP("global", "g", false, "Configure global settings (~/.claude/settings.json)")
-	cmd.Flags().IntP("max-age", "a", 0, "Maximum age in days to retain log files (default: 30)")
-	cmd.Flags().IntP("max-size", "s", 0, "Maximum size in MB per log file before rotation (default: 10)")
-	cmd.Flags().IntP("max-backups", "b", 0, "Maximum number of backup files to retain (default: 5)")
-	cmd.Flags().BoolP("compress", "c", false, "Compress rotated log files")
-	cmd.Flags().BoolP("show", "", false, "Show current log rotation settings")
-
-	return cmd
 }

@@ -4,22 +4,25 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> *"The hook brings you back"* - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
+> *"The Hook brings you back"* - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
 
 A CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities. Just like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code every time.
 
-## Features
+## ✨ Features
 
-- **🛡️ Security Hook**: Blocks dangerous commands using pattern matching and regex detection
-- **🎨 Format Hook**: Automatically formats code files (Go, JavaScript/TypeScript, Python) after editing
-- **🐛 Debug Hook**: Comprehensive tool usage logging for troubleshooting
-- **📋 Audit Hook**: JSON audit logging for compliance and monitoring
-- **✅ Vet Hook**: Code quality and best practices enforcement
-- **🔌 Plugin Architecture**: Extensible system with thread-safe plugin registry
-- **⚙️ Settings Management**: Supports both project-local and global configuration
-- **📊 Log Rotation**: Configurable log rotation with cleanup and compression
+Blues Traveler provides **pre-built hooks** that integrate seamlessly with Claude Code:
 
-## Quick Start
+| Hook | Description | Best For |
+|------|-------------|----------|
+| **🛡️ Security** | Blocks dangerous commands (`rm -rf`, `sudo`, etc.) | `PreToolUse` events |
+| **🎨 Format** | Auto-formats code after editing (Go, JS/TS, Python) | `PostToolUse` with Edit/Write |
+| **🐛 Debug** | Logs all tool usage for troubleshooting | Any event type |
+| **📋 Audit** | JSON audit logging for compliance and monitoring | Production environments |
+| **✅ Vet** | Code quality and best practices enforcement | `PostToolUse` with code changes |
+| **🚫 Fetch Blocker** | Blocks web fetches requiring authentication | `PreToolUse` events |
+| **🔍 Find Blocker** | Suggests `fd` instead of `find` for better performance | `PreToolUse` events |
+
+## 🚀 Quick Start
 
 ```bash
 # Install from source
@@ -31,44 +34,24 @@ cd blues-traveler
 task build
 
 # List available hooks
-./blues-traveler list
+blues-traveler list
 
-# Install security hook for Claude Code
-./blues-traveler install security --event PreToolUse
-
-# Run a specific hook manually
-./blues-traveler run security --log
-
-# View installed hooks
-./blues-traveler list-installed
-```
-
-## Installation
-
-**Prerequisites:** Go 1.25.0 or later
-
-```bash
-# From source
-go install github.com/klauern/blues-traveler@latest
-
-# Build from source
-git clone https://github.com/klauern/blues-traveler.git
-cd blues-traveler
-task build
+# Install your first hook (security recommended)
+blues-traveler install security --event PreToolUse
 
 # Verify installation
-blues-traveler list
+blues-traveler list-installed
 ```
 
-## Usage
+## 📖 Core Commands
 
-### Core Commands
+### Basic Operations
 
 ```bash
 # List all available hooks
 blues-traveler list
 
-# Run a specific hook
+# Run a specific hook manually
 blues-traveler run <hook-name> [--log] [--log-format jsonl|pretty]
 
 # Install hook in Claude Code settings
@@ -82,141 +65,92 @@ blues-traveler list-installed [--global]
 
 # List available Claude Code events
 blues-traveler list-events
-
-# Generate new hook from template
-blues-traveler generate <hook-name> [options]
-
-# Configure log rotation
-blues-traveler config-log [options]
 ```
 
 ### Installation Options
 
 ```bash
-# Install to project settings (./.claude/settings.json)
-blues-traveler install security
+# Install to project settings (default)
+blues-traveler install <hook-name>
 
-# Install to global settings (~/.claude/settings.json)
-blues-traveler install security --global
+# Install globally for all projects
+blues-traveler install <hook-name> --global
 
-# Install for specific event with custom matcher
+# Install with specific event and matcher
 blues-traveler install format --event PostToolUse --matcher "Edit,Write"
 
 # Enable logging with custom format
 blues-traveler install debug --log --log-format pretty
 
-# Set command timeout
+# Set custom timeout (seconds)
 blues-traveler install security --timeout 30
 ```
 
-## Hook Types
+## 🎯 Common Usage Patterns
 
-### Security Hook (`security`)
+### Essential Security Setup
 
-Blocks dangerous commands and provides security controls to prevent accidental system damage.
-
-**Features:**
-
-- Pattern matching for dangerous commands (`rm -rf`, `sudo`, etc.)
-- Regex-based detection of risky operations
-- macOS-specific protections
-- Configurable blocking rules
-
-**Best for:** PreToolUse events to intercept commands before execution
+Protect against dangerous commands and risky operations:
 
 ```bash
+# Block dangerous commands
 blues-traveler install security --event PreToolUse
+
+# Block unauthorized web fetches
+blues-traveler install fetch-blocker --event PreToolUse
+
+# Suggest better alternatives to find
+blues-traveler install find-blocker --event PreToolUse
 ```
 
-### Format Hook (`format`)
+### Code Quality Pipeline
 
-Automatically formats code files after editing operations to maintain consistent code style.
-
-**Supported Languages:**
-
-- Go (`gofmt`, `goimports`)
-- JavaScript/TypeScript (`prettier`, `eslint --fix`)
-- Python (`black`, `autopep8`)
-
-**Best for:** PostToolUse events after Edit/Write operations
+Maintain consistent code quality and formatting:
 
 ```bash
+# Auto-format code after edits
 blues-traveler install format --event PostToolUse --matcher "Edit,Write"
-```
 
-### Debug Hook (`debug`)
+# Enforce code quality standards
+blues-traveler install vet --event PostToolUse --matcher "Edit,Write"
 
-Comprehensive logging of all tool usage for debugging and troubleshooting Claude Code operations.
-
-**Features:**
-
-- Detailed event logging to `.claude/hooks/debug.log`
-- Raw event capture and parsing
-- Configurable log formats (JSON Lines or pretty-printed)
-- Log rotation support
-
-**Best for:** All events when debugging issues
-
-```bash
+# Debug and monitor operations
 blues-traveler install debug --event PreToolUse --log --log-format pretty
 ```
 
-### Audit Hook (`audit`)
+### Production Monitoring
 
-JSON audit logging for compliance, monitoring, and analysis of Claude Code usage.
-
-**Features:**
-
-- Structured JSON output to stdout
-- Pre and post tool use event capture
-- Timestamped entries with detailed metadata
-- Suitable for log aggregation systems
-
-**Best for:** All events in production environments
+Comprehensive audit logging for production environments:
 
 ```bash
-blues-traveler install audit --event PreToolUse
-blues-traveler install audit --event PostToolUse
+# Global audit logging for all operations
+blues-traveler install audit --event PreToolUse --global
+blues-traveler install audit --event PostToolUse --global
+
+# Global security enforcement
+blues-traveler install security --event PreToolUse --global
 ```
 
-### Vet Hook (`vet`)
+### Developer Workflow
 
-Code quality and best practices enforcement to catch common issues and maintain code standards.
-
-**Features:**
-
-- Static analysis integration
-- Best practices checking
-- Custom rule configuration
-- Integration with language-specific linters
-
-**Best for:** PostToolUse events after code modifications
+Optimal setup for development:
 
 ```bash
-blues-traveler install vet --event PostToolUse --matcher "Edit,Write"
+# Security + formatting + debugging
+blues-traveler install security --event PreToolUse
+blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler install debug --event PreToolUse --log
+blues-traveler install find-blocker --event PreToolUse  # Use fd instead
 ```
 
-## Development
+## ⚙️ Configuration
 
-```bash
-# Development workflow (format, lint, test, build)
-task dev
+### Settings Hierarchy
 
-# Run all checks
-task check
+Blues Traveler uses a hierarchical configuration system:
 
-# Generate new hook from template
-blues-traveler generate my-hook --description "Custom hook for X" --type both
-```
-
-## Configuration
-
-### Settings Files
-
-Blues Traveler supports hierarchical configuration:
-
-- **Project**: `./.claude/settings.json` (takes precedence)
-- **Global**: `~/.claude/settings.json` (fallback)
+1. **Project Settings**: `./.claude/settings.json` (takes precedence)
+2. **Global Settings**: `~/.claude/settings.json` (fallback)
 
 ### Settings Structure
 
@@ -244,42 +178,131 @@ Blues Traveler supports hierarchical configuration:
         ]
       }
     ]
+  },
+  "plugins": {
+    "security": { "enabled": true },
+    "format": { "enabled": true },
+    "debug": { "enabled": false }
   }
 }
 ```
 
-### Log Rotation Configuration
+### Disabling Hooks
 
-```bash
-# Configure log rotation settings
-blues-traveler config-log --max-age 30 --max-size 10 --max-backups 5 --compress
+Hooks can be disabled without removing them from settings:
 
-# View current settings
-blues-traveler config-log --show
-
-# Configure globally
-blues-traveler config-log --global --max-age 7 --max-size 5
+```json
+{
+  "plugins": {
+    "security": { "enabled": false }
+  }
+}
 ```
 
-## Examples
+## 🛠️ Development
 
-### Complete Setup
-
-```bash
-# Security + Format + Debug pipeline
-blues-traveler install security --event PreToolUse
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
-blues-traveler install debug --event PreToolUse --log --log-format pretty
-
-# Configure log rotation
-blues-traveler config-log --max-age 7 --max-size 5 --compress
-```
-
-### Production Environment
+### Building from Source
 
 ```bash
-# Audit all operations with global configuration
-blues-traveler install audit --event PreToolUse --global
-blues-traveler install audit --event PostToolUse --global
-blues-traveler install security --event PreToolUse --global
+# Install dependencies
+task deps
+
+# Development workflow (format, lint, test, build)
+task dev
+
+# Run all checks
+task check
+
+# Build binary
+task build
+
+# Run tests with coverage
+task test-coverage
 ```
+
+### Adding Custom Hooks
+
+To create a new hook:
+
+1. **Create implementation** in `internal/hooks/myhook.go`
+2. **Implement the Hook interface** using `core.BaseHook`
+3. **Register** in `internal/hooks/init.go`
+4. **Add tests** in `internal/hooks/myhook_test.go`
+5. **Document** in README and docs
+
+Example hook structure:
+
+```go
+type MyHook struct {
+    *core.BaseHook
+}
+
+func NewMyHook(ctx *core.HookContext) core.Hook {
+    base := core.NewBaseHook("myhook", "MyHook", "Description", ctx)
+    return &MyHook{BaseHook: base}
+}
+
+func (h *MyHook) Run() error {
+    if !h.IsEnabled() {
+        return nil
+    }
+    // Hook logic here
+    return nil
+}
+```
+
+## 🏗️ Architecture
+
+Blues Traveler uses a **static hook registry** architecture:
+
+- ✅ **Static Registration**: Hooks registered at startup via `init()`
+- ✅ **Independent Execution**: Each hook runs in isolation
+- ✅ **Security First**: No dynamic plugin loading
+- ✅ **Configurable**: Enable/disable via settings
+- ✅ **Extensible**: Easy to add new hooks
+
+## 📚 Documentation
+
+For detailed documentation, see:
+
+- **[Quick Start Guide](docs/quick_start.md)** - Get up and running in minutes
+- **[Developer Guide](docs/developer_guide.md)** - Create custom hooks
+- **[Architecture Design](docs/unified_pipeline_design.md)** - Technical deep dive
+- **[Documentation Index](docs/index.md)** - All documentation
+
+## 🔧 Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Hook not found | Run `blues-traveler list` to see available hooks |
+| Hook not working | Check if enabled: `blues-traveler list-installed` |
+| Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
+| Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
+| Logs not appearing | Use `--log` flag and check `.claude/hooks/` directory |
+| Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass (`task test`)
+5. Submit a pull request
+
+See [Developer Guide](docs/developer_guide.md) for detailed contribution guidelines.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- [Claude Code](https://claude.ai/code) for the hooks system
+- [cchooks](https://github.com/brads3290/cchooks) library for event handling
+- [Blues Traveler](https://en.wikipedia.org/wiki/Blues_Traveler) for the inspiration
+
+---
+
+*"It doesn't matter what I say, as long as I sing with inflection"* - Hook by Blues Traveler

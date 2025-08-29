@@ -108,17 +108,6 @@ tasks:
       - task: lint
       - task: test
 
-  demo:
-    desc: Run demo commands
-    deps: [build]
-    cmds:
-      - echo "=== Available templates ==="
-      - ./{{.BINARY_NAME}} list
-      - echo ""
-      - echo "=== Security template preview ==="
-      - ./{{.BINARY_NAME}} show security | head -20
-      - echo "..."
-
   setup-dev:
     desc: Setup development environment
     cmds:
@@ -147,36 +136,11 @@ tasks:
         fi
 
   # Go 1.25 specific tasks
-  performance-check:
-    desc: Run performance analysis with Go 1.25 trace improvements
-    deps: [build]
-    cmds:
-      - echo "Running performance checks with Go 1.25 runtime improvements..."
-      - go test -bench=. -benchmem ./... || echo "No benchmarks found"
-      - echo "Performance check complete. Consider adding benchmarks for key operations."
-
   doc-server:
     desc: Start documentation server using Go 1.25 go doc -http feature
     cmds:
       - echo "Starting documentation server on http://localhost:6060"
       - go doc -http=:6060
-
-  trace-analysis:
-    desc: Run with runtime tracing for performance analysis
-    deps: [build]
-    cmds:
-      - echo "Running with Go 1.25 enhanced tracing..."
-      - GODEBUG=trace=1 ./{{.BINARY_NAME}} list
-      - echo "Trace analysis complete. Check runtime trace output."
-
-  container-optimized-build:
-    desc: Build with container-aware optimizations for Go 1.25
-    deps: [format]
-    cmds:
-      - echo "Building with container-aware GOMAXPROCS optimizations..."
-      - CGO_ENABLED=0 go build -ldflags="-s -w" -o {{.BINARY_NAME}}-container .
-    generates:
-      - "{{.BINARY_NAME}}-container"
 
   test-concurrent:
     desc: Run concurrent tests with Go 1.25 testing/synctest
@@ -185,13 +149,3 @@ tasks:
       - go test -v -run="TestRegistry.*Concurrent" ./internal/hooks/
       - go test -v -race ./...
 
-  modernization-check:
-    desc: Check for Go 1.25 modernization opportunities
-    cmds:
-      - echo "=== Go 1.25 Modernization Status ==="
-      - echo "✅ DWARF5 debug info enabled in build"
-      - echo "✅ Container-aware builds available"
-      - echo "✅ Enhanced testing with testing/synctest"
-      - echo "✅ Concurrent plugin operations with sync.WaitGroup.Go()"
-      - echo "✅ Runtime trace improvements ready"
-      - echo "=== Run 'task doc-server' to start enhanced documentation server ==="

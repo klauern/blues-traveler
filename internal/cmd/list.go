@@ -1,23 +1,23 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"os"
 
 	"github.com/klauern/blues-traveler/internal/config"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v3"
 )
 
 func NewListCmd(getPlugin func(string) (interface {
 	Run() error
 	Description() string
 }, bool), pluginKeys func() []string,
-) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List available hook plugins",
-		Long:  `List all registered hook plugins that can be run.`,
-		Run: func(cmd *cobra.Command, args []string) {
+) *cli.Command {
+	return &cli.Command{
+		Name:        "list",
+		Usage:       "List available hook plugins",
+		Description: `List all registered hook plugins that can be run.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println("Available hook plugins:")
 			fmt.Println()
 			for _, key := range pluginKeys() {
@@ -25,32 +25,39 @@ func NewListCmd(getPlugin func(string) (interface {
 				fmt.Printf("  %s - %s\n", key, p.Description())
 			}
 			fmt.Println()
-			fmt.Println("Use 'hooks run <key>' to run a plugin.")
-			fmt.Println("Use 'hooks install <key>' to install a plugin in Claude Code settings.")
+			fmt.Println("Use 'blues-traveler run <key>' to run a hook.")
+			fmt.Println("Use 'blues-traveler install <key>' to install a hook in Claude Code settings.")
+			return nil
 		},
 	}
 }
 
-func NewListInstalledCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "list-installed",
-		Short: "List installed hooks from settings",
-		Long:  `List all hooks currently configured in Claude Code settings.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			global, _ := cmd.Flags().GetBool("global")
+func NewListInstalledCmd() *cli.Command {
+	return &cli.Command{
+		Name:        "list-installed",
+		Usage:       "List installed hooks from settings",
+		Description: `List all hooks currently configured in Claude Code settings.`,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "global",
+				Aliases: []string{"g"},
+				Value:   false,
+				Usage:   "Show global settings (~/.claude/settings.json)",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			global := cmd.Bool("global")
 
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error getting settings path: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error getting settings path: %v", err)
 			}
 
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error loading settings: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("error loading settings: %v", err)
 			}
 
 			scope := "project"
@@ -77,19 +84,17 @@ func NewListInstalledCmd() *cobra.Command {
 
 			// Add examples section
 			printUninstallExamples(global)
+			return nil
 		},
 	}
-
-	cmd.Flags().BoolP("global", "g", false, "Show global settings (~/.claude/settings.json)")
-	return cmd
 }
 
-func NewListEventsCmd(allEvents func() []ClaudeCodeEvent) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list-events",
-		Short: "List all available Claude Code hook events",
-		Long:  `List all Claude Code hook events that can be configured in settings.json, including their descriptions and when they trigger.`,
-		Run: func(cmd *cobra.Command, args []string) {
+func NewListEventsCmd(allEvents func() []ClaudeCodeEvent) *cli.Command {
+	return &cli.Command{
+		Name:        "list-events",
+		Usage:       "List all available Claude Code hook events",
+		Description: `List all Claude Code hook events that can be configured in settings.json, including their descriptions and when they trigger.`,
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println("Available Claude Code Hook Events:")
 			fmt.Println()
 
@@ -115,6 +120,7 @@ func NewListEventsCmd(allEvents func() []ClaudeCodeEvent) *cobra.Command {
 			fmt.Println()
 			fmt.Println("Use 'blues-traveler install <plugin-key> --event <event-name>' to install a hook for a specific event.")
 			fmt.Println("Use 'blues-traveler list-installed' to see currently configured hooks.")
+			return nil
 		},
 	}
 }

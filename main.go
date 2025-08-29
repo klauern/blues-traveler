@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -8,22 +9,16 @@ import (
 	"github.com/klauern/blues-traveler/internal/compat"
 	"github.com/klauern/blues-traveler/internal/core"
 	_ "github.com/klauern/blues-traveler/internal/hooks" // Import for init() registration
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v3"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "blues-traveler",
-	Short: "Claude Code hook runner and manager - 'The hook brings you back'",
-	Long: `A CLI tool that runs Claude Code hooks directly and manages hook installations.
-Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
-}
-
-func init() {
+func main() {
 	// Create wrapper functions for compatibility
 	getPluginWrapper := func(key string) (interface {
 		Run() error
 		Description() string
-	}, bool) {
+	}, bool,
+	) {
 		p, exists := compat.GetPlugin(key)
 		if !exists {
 			return nil, false
@@ -45,19 +40,25 @@ func init() {
 		return result
 	}
 
-	// Create command instances with dependency injection
-	rootCmd.AddCommand(cmd.NewListCmd(getPluginWrapper, compat.PluginKeys))
-	rootCmd.AddCommand(cmd.NewRunCmd(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys))
-	rootCmd.AddCommand(cmd.NewInstallCmd(getPluginWrapper, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes))
-	rootCmd.AddCommand(cmd.NewUninstallCmd())
-	rootCmd.AddCommand(cmd.NewListInstalledCmd())
-	rootCmd.AddCommand(cmd.NewListEventsCmd(eventsWrapper))
-	rootCmd.AddCommand(cmd.NewGenerateCmd())
-	rootCmd.AddCommand(cmd.NewConfigLogCmd())
-}
+	// Create the root command with urfave/cli v3
+	app := &cli.Command{
+		Name:  "blues-traveler",
+		Usage: "Claude Code hook runner and manager - 'The hook brings you back'",
+		Description: `A CLI tool that runs Claude Code hooks directly and manages hook installations.
+Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
+		Commands: []*cli.Command{
+			cmd.NewListCmd(getPluginWrapper, compat.PluginKeys),
+			cmd.NewRunCmd(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys),
+			cmd.NewInstallCmd(getPluginWrapper, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes),
+			cmd.NewUninstallCmd(),
+			cmd.NewListInstalledCmd(),
+			cmd.NewListEventsCmd(eventsWrapper),
+			cmd.NewGenerateCmd(),
+			cmd.NewConfigLogCmd(),
+		},
+	}
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error executing command: %v\n", err)
 		os.Exit(1)
 	}
