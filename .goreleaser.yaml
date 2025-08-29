@@ -94,6 +94,8 @@ brews:
     repository:
       owner: klauern
       name: homebrew-blues-traveler
+      git:
+        url: 'git@github.com:klauern/homebrew-blues-traveler.git'
     homepage: "https://github.com/klauern/blues-traveler"
     description: "Claude Code hooks management tool - 'The hook brings you back'"
     license: "MIT"

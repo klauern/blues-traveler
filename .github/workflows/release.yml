@@ -136,6 +136,11 @@ jobs:
         go-version: '1.25.0'
         cache: true
 
+    - name: Setup SSH for Homebrew
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.HOMEBREW_DEPLOY_KEY }}
+
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v6
       with:
