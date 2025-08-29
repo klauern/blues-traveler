@@ -4,7 +4,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> *"The hook brings you back"* - A Claude Code hooks management tool inspired by Blues Traveler
+> *"The hook brings you back"* - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
 
 A CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities. Just like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code every time.
 
