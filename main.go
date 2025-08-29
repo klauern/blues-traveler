@@ -4,12 +4,20 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/klauern/blues-traveler/internal/cmd"
 	"github.com/klauern/blues-traveler/internal/compat"
 	"github.com/klauern/blues-traveler/internal/core"
 	_ "github.com/klauern/blues-traveler/internal/hooks" // Import for init() registration
 	"github.com/urfave/cli/v3"
+)
+
+// Version information injected at build time
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
 )
 
 func main() {
@@ -40,6 +48,14 @@ func main() {
 		return result
 	}
 
+	// Create version info
+	versionInfo := cmd.VersionInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+		GoVer:   fmt.Sprintf("%s %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH),
+	}
+
 	// Create the root command with urfave/cli v3
 	app := &cli.Command{
 		Name:  "blues-traveler",
@@ -55,6 +71,7 @@ Like the classic Blues Traveler song, our hooks will bring you back to clean, se
 			cmd.NewListEventsCmd(eventsWrapper),
 			cmd.NewGenerateCmd(),
 			cmd.NewConfigLogCmd(),
+			cmd.NewVersionCmd(versionInfo),
 		},
 	}
 

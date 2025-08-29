@@ -15,7 +15,7 @@ import (
 
 var (
 	// Cache command availability to avoid repeated PATH lookups
-	gofumptOnce     sync.Once
+	gofumptOnce      sync.Once
 	gofumptAvailable bool
 )
 

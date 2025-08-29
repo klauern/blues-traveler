@@ -48,7 +48,7 @@ func TestFormatHookGoFile(t *testing.T) {
 	// Check that either gofumpt or gofmt was called (prefers gofumpt when available)
 	gofumptCalled := mockCmd.WasCommandExecuted("gofumpt", "-w", "test.go")
 	gofmtCalled := mockCmd.WasCommandExecuted("gofmt", "-w", "test.go")
-	
+
 	if !gofumptCalled && !gofmtCalled {
 		t.Error("Expected either gofumpt or gofmt to be executed for Go file")
 	}

@@ -219,8 +219,8 @@ func (m *MockRunner) Run() {
 // MockRunnerFactory creates MockRunner instances
 func MockRunnerFactory(preHook func(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface,
 	postHook func(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface,
-	rawHook func(context.Context, string) *cchooks.RawResponse) Runner {
-
+	rawHook func(context.Context, string) *cchooks.RawResponse,
+) Runner {
 	// Create a mock runner that doesn't actually read from stdin
 	// This prevents the "failed to decode stdin" error in tests
 	return &MockRunner{

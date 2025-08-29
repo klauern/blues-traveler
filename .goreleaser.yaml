@@ -101,12 +101,6 @@ release:
   name_template: "{{.ProjectName}} v{{.Version}}"
   # Footer template for the release
   footer: |
-    ## Docker Images
-    
-    Docker images are available at:
-    - `ghcr.io/klauern/blues-traveler:{{ .Tag }}`
-    - `ghcr.io/klauern/blues-traveler:latest`
-    
     ## Installation
     
     ### Homebrew (macOS/Linux)
