@@ -1,3 +1,5 @@
+version: 2
+
 project_name: blues-traveler
 
 before:
@@ -36,8 +38,7 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
-    # Use zip for windows
+    # Use zip for windows, tar.gz for others
     format_overrides:
       - goos: windows
         format: zip
@@ -51,14 +52,13 @@ archives:
     files:
       - README.md
       - LICENSE
-      - CLAUDE.md
       - docs/**/*
 
 checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
@@ -131,11 +131,11 @@ release:
     
     **Full Changelog**: https://github.com/klauern/blues-traveler/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-# Optional: Generate Software Bill of Materials (SBOM)
-sboms:
-  - artifacts: archive
-  - id: source
-    artifacts: source
+# Optional: Generate Software Bill of Materials (SBOM) - disabled for now
+# sboms:
+#   - artifacts: archive
+#   - id: source
+#     artifacts: source
 
 # Optional: Sign releases (uncomment and configure if you want signed releases)
 # signs:
