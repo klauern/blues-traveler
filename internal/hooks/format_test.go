@@ -45,9 +45,12 @@ func TestFormatHookGoFile(t *testing.T) {
 	// Test formatting Go file
 	_ = hook.formatFile("test.go")
 
-	// Check that gofmt was called
-	if !mockCmd.WasCommandExecuted("gofmt", "-w", "test.go") {
-		t.Error("Expected gofmt to be executed for Go file")
+	// Check that either gofumpt or gofmt was called (prefers gofumpt when available)
+	gofumptCalled := mockCmd.WasCommandExecuted("gofumpt", "-w", "test.go")
+	gofmtCalled := mockCmd.WasCommandExecuted("gofmt", "-w", "test.go")
+	
+	if !gofumptCalled && !gofmtCalled {
+		t.Error("Expected either gofumpt or gofmt to be executed for Go file")
 	}
 }
 
