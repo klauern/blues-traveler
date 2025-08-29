@@ -139,7 +139,7 @@ jobs:
     - name: Setup SSH for Homebrew
       uses: webfactory/ssh-agent@v0.9.0
       with:
-        ssh-private-key: ${{ secrets.HOMEBREW_DEPLOY_KEY }}
+        ssh-private-key: ${{ secrets.HOMEBREW_DEPLOY_SECRET }}
 
     - name: Run GoReleaser
       uses: goreleaser/goreleaser-action@v6
