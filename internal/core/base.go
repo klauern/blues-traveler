@@ -85,7 +85,7 @@ func (fs *RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMo
 }
 
 func (fs *RealFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	return os.OpenFile(name, flag, perm)
+	return os.OpenFile(name, flag, perm) // #nosec G304 - filesystem interface, paths controlled by caller
 }
 
 func (fs *RealFileSystem) Stat(name string) (os.FileInfo, error) {

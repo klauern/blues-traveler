@@ -170,3 +170,45 @@ tasks:
       - go test -v -run="TestRegistry.*Concurrent" ./internal/hooks/
       - go test -v -race ./...
 
+  security:
+    desc: Run security scanners (gosec + govulncheck) matching CI workflow
+    deps: [security-install]
+    cmds:
+      - task: security-gosec
+      - task: security-govulncheck
+  
+  security-install:
+    desc: Install security scanning tools
+    cmds:
+      - |
+        echo "Installing security tools..."
+        echo "Installing gosec..."
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        echo "Installing govulncheck (rebuilding for Go 1.25)..."
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+    status:
+      - command -v gosec >/dev/null 2>&1
+      - command -v govulncheck >/dev/null 2>&1
+
+  security-gosec:
+    desc: Run gosec security scanner
+    cmds:
+      - |
+        echo "📊 Running gosec security scanner..."
+        gosec -severity medium ./...
+        echo "✅ No security issues found by gosec"
+
+  security-govulncheck:
+    desc: Run govulncheck vulnerability scanner  
+    cmds:
+      - |
+        echo "🔍 Running govulncheck vulnerability scanner..."
+        if govulncheck ./... 2>&1 | grep -q "Loading packages failed"; then
+          echo "⚠️  govulncheck compatibility issue with Go 1.25 - see CI for authoritative vulnerability checks"
+          echo "ℹ️  This is a known issue with govulncheck and Go 1.25's new language features"
+          exit 1
+        else
+          govulncheck ./...
+          echo "✅ No vulnerabilities found"
+        fi
+

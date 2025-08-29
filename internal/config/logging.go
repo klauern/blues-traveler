@@ -66,7 +66,7 @@ func LoadLogConfig(configPath string) (*LogConfig, error) {
 		return config, nil
 	}
 
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 - controlled config paths
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
@@ -82,7 +82,7 @@ func LoadLogConfig(configPath string) (*LogConfig, error) {
 func SaveLogConfig(configPath string, config *LogConfig) error {
 	// Ensure directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
@@ -91,7 +91,7 @@ func SaveLogConfig(configPath string, config *LogConfig) error {
 		return fmt.Errorf("failed to marshal config: %v", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
@@ -116,7 +116,7 @@ func GetLogRotationConfigFromFile(global bool) LogRotationConfig {
 // SetupLogRotation configures log rotation for a given log file path
 func SetupLogRotation(logPath string, config LogRotationConfig) *lumberjack.Logger {
 	// Ensure the directory exists
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
 		log.Printf("Failed to create log directory: %v", err)
 		return nil
 	}

@@ -40,7 +40,7 @@ func logHookEvent(ctx *HookContext, hookKey, event, toolName string,
 
 	// Ensure logging directory exists
 	logDir := ctx.LoggingDir
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create log directory %s: %v\n", logDir, err)
 		return
 	}
@@ -62,7 +62,7 @@ func logHookEvent(ctx *HookContext, hookKey, event, toolName string,
 	}
 
 	// Append to log file
-	file, err := ctx.FileSystem.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	file, err := ctx.FileSystem.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open log file %s: %v\n", logFile, err)
 		return

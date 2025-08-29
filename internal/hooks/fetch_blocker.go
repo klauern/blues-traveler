@@ -130,7 +130,7 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 			continue
 		}
 
-		file, err := os.Open(filePath)
+		file, err := os.Open(filePath) // #nosec G304 - controlled config file paths
 		if err != nil {
 			continue
 		}

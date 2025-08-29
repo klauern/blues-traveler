@@ -95,13 +95,13 @@ func (g *Generator) generateFile(templateName string, data TemplateData, outputF
 	}
 
 	// Ensure output directory exists
-	if err := os.MkdirAll(g.outputDir, 0o755); err != nil {
+	if err := os.MkdirAll(g.outputDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory: %v", err)
 	}
 
 	// Create output file
 	outputPath := filepath.Join(g.outputDir, outputFileName)
-	file, err := os.Create(outputPath)
+	file, err := os.Create(outputPath) // #nosec G304 - controlled output directory
 	if err != nil {
 		return fmt.Errorf("failed to create output file %s: %v", outputPath, err)
 	}

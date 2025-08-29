@@ -74,7 +74,7 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 		return settings, nil
 	}
 
-	data, err := os.ReadFile(settingsPath)
+	data, err := os.ReadFile(settingsPath) // #nosec G304 - controlled settings paths
 	if err != nil {
 		return nil, fmt.Errorf("failed to read settings file: %v", err)
 	}
@@ -107,7 +107,7 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
@@ -139,7 +139,7 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 		return fmt.Errorf("failed to marshal settings: %v", err)
 	}
 
-	if err := os.WriteFile(settingsPath, data, 0o644); err != nil {
+	if err := os.WriteFile(settingsPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write settings file: %v", err)
 	}
 

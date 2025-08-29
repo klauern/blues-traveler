@@ -348,7 +348,7 @@ func createSampleBlockedUrlsFile(global bool) {
 	}
 
 	// Ensure the .claude directory exists
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o750); err != nil {
 		fmt.Printf("⚠️  Could not create .claude directory: %v\n", err)
 		return
 	}
@@ -380,7 +380,7 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 `
 
 	// Write the sample file
-	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0o644); err != nil {
+	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0o600); err != nil {
 		fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
 		return
 	}
