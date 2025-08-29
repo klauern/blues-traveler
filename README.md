@@ -24,11 +24,17 @@ Blues Traveler provides **pre-built hooks** that integrate seamlessly with Claud
 
 ## 🚀 Quick Start
 
+### Installation
+
 ```bash
-# Install from source
+# Homebrew (macOS/Linux)
+brew tap klauern/blues-traveler
+brew install blues-traveler
+
+# Go install
 go install github.com/klauern/blues-traveler@latest
 
-# Or build locally
+# Build from source
 git clone https://github.com/klauern/blues-traveler.git
 cd blues-traveler
 task build

@@ -89,6 +89,18 @@ changelog:
     - title: Others
       order: 999
 
+brews:
+  - name: blues-traveler
+    repository:
+      owner: klauern
+      name: homebrew-blues-traveler
+    homepage: "https://github.com/klauern/blues-traveler"
+    description: "Claude Code hooks management tool - 'The hook brings you back'"
+    license: "MIT"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@blues-traveler.dev
+
 release:
   github:
     owner: klauern
@@ -105,7 +117,8 @@ release:
     
     ### Homebrew (macOS/Linux)
     ```bash
-    brew install klauern/tap/blues-traveler
+    brew tap klauern/blues-traveler
+    brew install blues-traveler
     ```
     
     ### Direct Download
