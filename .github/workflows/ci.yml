@@ -49,9 +49,16 @@ jobs:
       run: golangci-lint run --timeout=5m
 
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
+      run: |
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          go test -v -race -coverprofile=coverage.out ./...
+        else
+          go test -v -race ./...
+        fi
+      shell: bash
 
     - name: Generate coverage report
+      if: matrix.os == 'ubuntu-latest'
       run: go tool cover -html=coverage.out -o coverage.html
 
     - name: Upload coverage to artifacts
