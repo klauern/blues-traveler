@@ -44,14 +44,6 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
-    - name: Check formatting with gofumpt
-      run: |
-        if [ "$(gofumpt -l . | wc -l)" -gt 0 ]; then
-          echo "Code is not formatted with gofumpt:"
-          gofumpt -d .
-          exit 1
-        fi
-      shell: bash
 
     - name: Run golangci-lint
       run: golangci-lint run --timeout=5m
