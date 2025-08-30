@@ -95,6 +95,9 @@ homebrew_casks:
       owner: klauern
       name: homebrew-blues-traveler
       branch: main
+      git:
+        url: "git@github.com:klauern/homebrew-blues-traveler.git"
+        private_key: "{{ .Env.HOMEBREW_DEPLOY_SECRET }}"
     homepage: "https://github.com/klauern/blues-traveler"
     description: "Claude Code hooks management tool - 'The hook brings you back'"
     commit_author:
