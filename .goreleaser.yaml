@@ -4,8 +4,13 @@ project_name: blues-traveler
 
 before:
   hooks:
-    # Prepare environment without building (GoReleaser handles building)
-    - task release-prep
+    # Format code with gofumpt before building
+    - go install mvdan.cc/gofumpt@latest
+    - gofumpt -w .
+    # Ensure dependencies are up to date
+    - go mod tidy
+    # Run tests to ensure everything is working
+    - go test ./...
 
 builds:
   - id: blues-traveler
@@ -33,10 +38,9 @@ builds:
 
 archives:
   - id: default
-    # Use zip for windows, tar.gz for others
     format_overrides:
       - goos: windows
-        format: zip
+        formats: ["zip"]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -84,16 +88,15 @@ changelog:
     - title: Others
       order: 999
 
-brews:
+homebrew_casks:
   - name: blues-traveler
+    binary: blues-traveler
     repository:
       owner: klauern
       name: homebrew-blues-traveler
-      git:
-        url: 'git@github.com:klauern/homebrew-blues-traveler.git'
+      branch: main
     homepage: "https://github.com/klauern/blues-traveler"
     description: "Claude Code hooks management tool - 'The hook brings you back'"
-    license: "MIT"
     commit_author:
       name: goreleaserbot
       email: goreleaser@blues-traveler.dev
