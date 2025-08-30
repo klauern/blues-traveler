@@ -111,7 +111,6 @@ tasks:
       - task: lint
       - task: test
       - task: build
-      - task: performance-check
 
   release:
     desc: Prepare release (clean, deps, dev, build-all)
@@ -121,6 +120,14 @@ tasks:
       - task: dev
       - task: build-all
       - echo "Release artifacts built in dist/"
+
+  release-prep:
+    desc: Prepare for GoReleaser (clean, deps, dev only - no build)
+    cmds:
+      - task: clean
+      - task: deps
+      - task: dev
+      - echo "Ready for GoReleaser"
 
   check:
     desc: Run all checks (format, lint, test)

@@ -4,13 +4,8 @@ project_name: blues-traveler
 
 before:
   hooks:
-    # Format code with gofumpt before building
-    - go install mvdan.cc/gofumpt@latest
-    - gofumpt -w .
-    # Ensure dependencies are up to date
-    - go mod tidy
-    # Run tests to ensure everything is working
-    - go test ./...
+    # Prepare environment without building (GoReleaser handles building)
+    - task release-prep
 
 builds:
   - id: blues-traveler
