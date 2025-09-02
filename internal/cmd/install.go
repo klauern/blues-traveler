@@ -1,28 +1,29 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+    "context"
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
 
-	"github.com/klauern/blues-traveler/internal/config"
-	"github.com/urfave/cli/v3"
+    btconfig "github.com/klauern/blues-traveler/internal/config"
+    "github.com/klauern/blues-traveler/internal/config"
+    "github.com/urfave/cli/v3"
 )
 
 func NewInstallCmd(getPlugin func(string) (interface {
-	Run() error
-	Description() string
+    Run() error
+    Description() string
 }, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
 ) *cli.Command {
-	return &cli.Command{
-		Name:      "install",
-		Usage:     "Install a hook type into Claude Code settings",
-		ArgsUsage: "[hook-type]",
-		Description: `Install a hook type into your Claude Code settings.json file.
+    return &cli.Command{
+        Name:      "install",
+        Usage:     "Install a hook type into Claude Code settings",
+        ArgsUsage: "[hook-type]",
+        Description: `Install a hook type into your Claude Code settings.json file.
 This will automatically configure the hook to run for the specified events.`,
-		Flags: []cli.Flag{
+        Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "global",
 				Aliases: []string{"g"},
@@ -58,13 +59,13 @@ This will automatically configure the hook to run for the specified events.`,
 				Value: "jsonl",
 				Usage: "Log output format: jsonl or pretty (default jsonl)",
 			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			args := cmd.Args().Slice()
-			if len(args) != 1 {
-				return fmt.Errorf("exactly one argument required: [hook-type]")
-			}
-			hookType := args[0]
+        },
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+            args := cmd.Args().Slice()
+            if len(args) != 1 {
+                return fmt.Errorf("exactly one argument required: [hook-type]")
+            }
+            hookType := args[0]
 
 			// Validate plugin exists
 			if _, exists := getPlugin(hookType); !exists {
@@ -168,9 +169,155 @@ This will automatically configure the hook to run for the specified events.`,
 				fmt.Println("The hook will be active in new Claude Code sessions.")
 				fmt.Println("Use 'claude /hooks' to verify the configuration.")
 			}
-			return nil
-		},
-	}
+            return nil
+        },
+        Commands: []*cli.Command{
+            newInstallCustomCmd(isValidEventType, validEventTypes),
+        },
+    }
+}
+
+// newInstallCustomCmd adds `install custom` subcommand for named groups from hooks.yml
+func newInstallCustomCmd(isValidEventType func(string) bool, validEventTypes func() []string) *cli.Command {
+    return &cli.Command{
+        Name:  "custom",
+        Usage: "Install hooks from a named group defined in hooks.yml",
+        Flags: []cli.Flag{
+            &cli.BoolFlag{Name: "global", Aliases: []string{"g"}, Usage: "Install to global settings"},
+            &cli.StringFlag{Name: "event", Aliases: []string{"e"}, Usage: "Filter to a single event"},
+            &cli.StringFlag{Name: "matcher", Aliases: []string{"m"}, Value: "*", Usage: "Tool matcher pattern"},
+            &cli.BoolFlag{Name: "list", Usage: "List available groups"},
+            &cli.IntFlag{Name: "timeout", Aliases: []string{"t"}, Usage: "Override timeout in seconds for installed commands"},
+            &cli.BoolFlag{Name: "init", Usage: "If group not found, create a sample group stub in hooks.yml"},
+        },
+        ArgsUsage: "<group-name>",
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+            list := cmd.Bool("list")
+            if list {
+                cfg, err := btconfig.LoadHooksConfig()
+                if err != nil {
+                    return fmt.Errorf("failed to load hooks config: %v", err)
+                }
+                groups := btconfig.ListHookGroups(cfg)
+                if len(groups) == 0 {
+                    fmt.Println("No custom hook groups found. Create .claude/hooks.yml to define groups.")
+                    return nil
+                }
+                fmt.Println("Available custom hook groups:")
+                for _, g := range groups {
+                    fmt.Printf("- %s\n", g)
+                }
+                return nil
+            }
+
+            args := cmd.Args().Slice()
+            if len(args) != 1 {
+                return fmt.Errorf("exactly one argument required: <group-name>")
+            }
+            groupName := args[0]
+            global := cmd.Bool("global")
+            matcher := cmd.String("matcher")
+            eventFilter := strings.TrimSpace(cmd.String("event"))
+            timeoutOverride := cmd.Int("timeout")
+
+            if eventFilter != "" && !isValidEventType(eventFilter) {
+                return fmt.Errorf("invalid --event '%s'. Valid events: %s", eventFilter, strings.Join(validEventTypes(), ", "))
+            }
+
+            cfg, err := btconfig.LoadHooksConfig()
+            if err != nil {
+                return fmt.Errorf("failed to load hooks config: %v", err)
+            }
+            if cfg == nil || (*cfg)[groupName] == nil {
+                if cmd.Bool("init") {
+                    // Create a stub group embedded in main config
+                    sample := fmt.Sprintf(`%s:
+  PreToolUse:
+    jobs:
+      - name: example-check
+        run: echo "TOOL=${TOOL_NAME} FILES=${FILES_CHANGED}"
+        glob: ["*"]
+  PostToolUse:
+    jobs:
+      - name: example-post
+        run: echo "Post ${EVENT_NAME} on ${TOOL_NAME}"
+        glob: ["*"]
+`, groupName)
+                    // Merge sample into main config under customHooks
+                    if _, err := btconfig.WriteSampleHooksConfig(global, sample, false); err != nil {
+                        return fmt.Errorf("write hooks sample: %v", err)
+                    }
+                    // Reload after creating stub (embedded)
+                    cfg, err = btconfig.LoadHooksConfig()
+                    if err != nil {
+                        return fmt.Errorf("reload hooks config: %v", err)
+                    }
+                    if cfg == nil || (*cfg)[groupName] == nil {
+                        return fmt.Errorf("failed to create group '%s' in hooks.yml", groupName)
+                    }
+                } else {
+                    return fmt.Errorf("group '%s' not found in hooks config (use --init to stub one)", groupName)
+                }
+            }
+
+            // Resolve settings path and load
+            settingsPath, err := config.GetSettingsPath(global)
+            if err != nil {
+                return fmt.Errorf("error getting settings path: %v", err)
+            }
+            settings, err := config.LoadSettings(settingsPath)
+            if err != nil {
+                return fmt.Errorf("error loading settings: %v", err)
+            }
+
+            // Build commands per event
+            group := (*cfg)[groupName]
+            installed := 0
+            for eventName, ev := range group {
+                if eventFilter != "" && eventFilter != eventName {
+                    continue
+                }
+                for _, job := range ev.Jobs {
+                    if job.Name == "" {
+                        continue
+                    }
+                    execPath, err := os.Executable()
+                    if err != nil {
+                        return fmt.Errorf("failed to get executable path: %v", err)
+                    }
+                    hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
+
+                    // Timeout selection: CLI override > job.Timeout > none
+                    var timeout *int
+                    if timeoutOverride > 0 {
+                        timeout = &timeoutOverride
+                    } else if job.Timeout > 0 {
+                        t := job.Timeout
+                        timeout = &t
+                    }
+
+                    // Use tool matcher for settings (Edit,Write,*, etc.).
+                    // File globs are evaluated at runtime inside the hook.
+                    res := config.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
+                    _ = res
+                    installed++
+                }
+            }
+
+            // Save once after all additions
+            if err := config.SaveSettings(settingsPath, settings); err != nil {
+                return fmt.Errorf("error saving settings: %v", err)
+            }
+
+            scope := "project"
+            if global {
+                scope = "global"
+            }
+            fmt.Printf("✅ Installed custom group '%s' to %s settings (%d entries)\n", groupName, scope, installed)
+            fmt.Printf("   Settings: %s\n", settingsPath)
+            return nil
+        },
+    }
 }
 
 func NewUninstallCmd() *cli.Command {

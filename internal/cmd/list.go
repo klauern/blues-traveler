@@ -1,11 +1,14 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
+    "sort"
+    "strings"
 
-	"github.com/klauern/blues-traveler/internal/config"
-	"github.com/urfave/cli/v3"
+    btconfig "github.com/klauern/blues-traveler/internal/config"
+    "github.com/klauern/blues-traveler/internal/config"
+    "github.com/urfave/cli/v3"
 )
 
 func NewListCmd(getPlugin func(string) (interface {
@@ -17,19 +20,65 @@ func NewListCmd(getPlugin func(string) (interface {
 		Name:        "list",
 		Usage:       "List available hook plugins",
 		Description: `List all registered hook plugins that can be run.`,
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			fmt.Println("Available hook plugins:")
-			fmt.Println()
-			for _, key := range pluginKeys() {
-				p, _ := getPlugin(key)
-				fmt.Printf("  %s - %s\n", key, p.Description())
-			}
-			fmt.Println()
-			fmt.Println("Use 'blues-traveler run <key>' to run a hook.")
-			fmt.Println("Use 'blues-traveler install <key>' to install a hook in Claude Code settings.")
-			return nil
-		},
-	}
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+            keys := pluginKeys()
+            var builtin, custom []string
+            groupSet := map[string]struct{}{}
+            for _, k := range keys {
+                if strings.HasPrefix(k, "config:") {
+                    custom = append(custom, k)
+                    parts := strings.SplitN(k, ":", 3)
+                    if len(parts) == 3 {
+                        groupSet[parts[1]] = struct{}{}
+                    }
+                } else {
+                    builtin = append(builtin, k)
+                }
+            }
+            sort.Strings(builtin)
+            sort.Strings(custom)
+
+            fmt.Println("Available hook plugins:")
+            fmt.Println()
+            if len(builtin) > 0 {
+                fmt.Println("Built-in hooks:")
+                for _, key := range builtin {
+                    p, _ := getPlugin(key)
+                    fmt.Printf("  %s - %s\n", key, p.Description())
+                }
+                fmt.Println()
+            }
+            if len(custom) > 0 {
+                fmt.Println("Custom config hooks (from hooks.yml):")
+                for _, key := range custom {
+                    p, _ := getPlugin(key)
+                    fmt.Printf("  %s - %s\n", key, p.Description())
+                }
+                // Show groups summary
+                groups := make([]string, 0, len(groupSet))
+                for g := range groupSet {
+                    groups = append(groups, g)
+                }
+                sort.Strings(groups)
+                if len(groups) > 0 {
+                    fmt.Printf("\nGroups: %s\n", strings.Join(groups, ", "))
+                }
+                fmt.Println()
+            } else {
+                // Suggest how to create custom hooks if none present
+                if cfg, err := btconfig.LoadHooksConfig(); err == nil && cfg != nil {
+                    // loaded but no hooks registered likely means no groups/jobs defined
+                }
+                fmt.Println("No custom hooks found. Create .claude/hooks.yml and use 'blues-traveler install custom --list'.")
+                fmt.Println()
+            }
+
+            fmt.Println("Use 'blues-traveler run <key>' to run a hook.")
+            fmt.Println("Use 'blues-traveler install <key>' to install a built-in hook.")
+            fmt.Println("Use 'blues-traveler install custom <group>' to install a group from hooks.yml.")
+            return nil
+        },
+    }
 }
 
 func NewListInstalledCmd() *cli.Command {
