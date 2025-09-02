@@ -7,3 +7,5 @@ require (
 	github.com/urfave/cli/v3 v3.4.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+require gopkg.in/yaml.v3 v3.0.1
