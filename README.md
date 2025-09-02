@@ -71,6 +71,19 @@ blues-traveler list-installed [--global]
 
 # List available Claude Code events
 blues-traveler list-events
+
+# Custom hooks (embedded config)
+blues-traveler config init [--group NAME] [--name FILE] [--global] [--overwrite]
+blues-traveler config validate
+blues-traveler config groups
+blues-traveler config show
+blues-traveler install custom <group> [--event E] [--matcher GLOB] [--timeout S]
+
+# Blocked URLs management (fetch-blocker)
+blues-traveler config blocked list [--global]
+blues-traveler config blocked add <prefix> [--suggestion TEXT] [--global]
+blues-traveler config blocked remove <prefix> [--global]
+blues-traveler config blocked clear [--global]
 ```
 
 ### Installation Options
@@ -157,6 +170,37 @@ Blues Traveler uses a hierarchical configuration system:
 
 1. **Project Settings**: `./.claude/settings.json` (takes precedence)
 2. **Global Settings**: `~/.claude/settings.json` (fallback)
+
+### Blues Traveler Config (embedded)
+
+Project and global Blues Traveler configuration is stored at:
+
+- Project: `./.claude/hooks/blues-traveler-config.json`
+- Global: `~/.claude/hooks/blues-traveler-config.json`
+
+Key sections:
+
+- `logRotation`: Log rotation settings used by `--log` mode.
+- `customHooks`: Custom hook groups (by name) with events and jobs.
+- `blockedUrls`: URL prefixes used by the `fetch-blocker` hook.
+
+Example:
+
+```json
+{
+  "logRotation": { "maxAge": 30, "maxSize": 10, "maxBackups": 5, "compress": true },
+  "customHooks": {
+    "ruby": {
+      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
+      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    }
+  },
+  "blockedUrls": [
+    { "prefix": "https://github.com/*/*/private/*", "suggestion": "Use 'gh api' for private repos" },
+    { "prefix": "https://api.company.com/private/*" }
+  ]
+}
+```
 
 ### Settings Structure
 
