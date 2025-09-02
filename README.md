@@ -184,6 +184,35 @@ Key sections:
 - `customHooks`: Custom hook groups (by name) with events and jobs.
 - `blockedUrls`: URL prefixes used by the `fetch-blocker` hook.
 
+Custom hooks support environment variables and simple expressions to control when jobs run:
+
+- Env vars:
+  - `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`
+  - `FILES_CHANGED` (space-separated list)
+  - `TOOL_FILE`, `TOOL_OUTPUT_FILE` (for `PostToolUse` on `Edit`/`Write`)
+  - `USER_PROMPT` (for `UserPromptSubmit`)
+- Expressions in `only`/`skip`:
+  - Boolean ops: `&&`, `||`, unary `!`
+  - Comparisons: `==`, `!=`
+  - Glob: `matches` (right side is a glob). When `FILES_CHANGED` contains multiple tokens, any match passes.
+  - Regex: `regex` (right side is a Go regex). Matches any token when multiple files are present.
+
+Examples:
+
+```yaml
+mygroup:
+  PostToolUse:
+    jobs:
+      - name: format-py
+        run: ruff format --fix ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+
+      - name: controller-tests
+        run: ./scripts/run-tests.sh
+        only: ${FILES_CHANGED} regex ".*controller.*\\.rb$"
+```
+
 Example:
 
 ```json

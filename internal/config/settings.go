@@ -226,8 +226,9 @@ type MergeResult struct {
 // extractHookType extracts the hook type from a blues-traveler command
 // Example: "/path/to/blues-traveler run debug --log" -> "debug"
 func extractHookType(command string) string {
-	// Pattern to match "blues-traveler run <hooktype>" with optional flags
-	re := regexp.MustCompile(`blues-traveler\s+run\s+(\w+)`)
+	// Match full hook key after 'blues-traveler run ', capturing non-space sequence.
+	// This correctly captures config hooks like 'config:python:post-sample'.
+	re := regexp.MustCompile(`blues-traveler\s+run\s+([^\s]+)`) // capture until whitespace
 	matches := re.FindStringSubmatch(command)
 	if len(matches) > 1 {
 		return matches[1]
@@ -429,6 +430,70 @@ func RemoveAllBluesTravelerFromSettings(settings *Settings) int {
 	settings.Hooks.SubagentStop = removeFromMatchers(settings.Hooks.SubagentStop)
 	settings.Hooks.PreCompact = removeFromMatchers(settings.Hooks.PreCompact)
 	settings.Hooks.SessionStart = removeFromMatchers(settings.Hooks.SessionStart)
+
+	return removed
+}
+
+// RemoveConfigGroupFromSettings removes all blues-traveler config:<group>:* commands
+// from the specified event (or from all events if event == ""). Returns count removed.
+func RemoveConfigGroupFromSettings(settings *Settings, group string, event string) int {
+	if settings == nil || group == "" {
+		return 0
+	}
+	match := "config:" + group + ":"
+	removed := 0
+
+	// helper to filter a slice of matchers
+	filter := func(matchers []HookMatcher) []HookMatcher {
+		var result []HookMatcher
+		for _, m := range matchers {
+			var hooks []HookCommand
+			for _, h := range m.Hooks {
+				if IsBluesTravelerCommand(h.Command) && strings.Contains(h.Command, match) {
+					removed++
+					continue
+				}
+				hooks = append(hooks, h)
+			}
+			if len(hooks) > 0 {
+				m.Hooks = hooks
+				result = append(result, m)
+			}
+		}
+		return result
+	}
+
+	// If event provided, only remove within that event; otherwise across all
+	switch event {
+	case "PreToolUse":
+		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
+	case "PostToolUse":
+		settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
+	case "UserPromptSubmit":
+		settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
+	case "Notification":
+		settings.Hooks.Notification = filter(settings.Hooks.Notification)
+	case "Stop":
+		settings.Hooks.Stop = filter(settings.Hooks.Stop)
+	case "SubagentStop":
+		settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
+	case "PreCompact":
+		settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
+	case "SessionStart":
+		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
+	case "SessionEnd":
+		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
+	default:
+		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
+		settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
+		settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
+		settings.Hooks.Notification = filter(settings.Hooks.Notification)
+		settings.Hooks.Stop = filter(settings.Hooks.Stop)
+		settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
+		settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
+		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
+		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
+	}
 
 	return removed
 }

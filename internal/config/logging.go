@@ -32,16 +32,16 @@ func DefaultLogRotationConfig() LogRotationConfig {
 
 // LogConfig represents our application's logging configuration
 type LogConfig struct {
-    LogRotation LogRotationConfig  `json:"logRotation"`
-    CustomHooks CustomHooksConfig  `json:"customHooks,omitempty"`
-    BlockedURLs []BlockedURL       `json:"blockedUrls,omitempty"`
-    Other       map[string]interface{} `json:"-"`
+	LogRotation LogRotationConfig      `json:"logRotation"`
+	CustomHooks CustomHooksConfig      `json:"customHooks,omitempty"`
+	BlockedURLs []BlockedURL           `json:"blockedUrls,omitempty"`
+	Other       map[string]interface{} `json:"-"`
 }
 
 // BlockedURL represents a blocked URL prefix + optional suggestion
 type BlockedURL struct {
-    Prefix     string `json:"prefix"`
-    Suggestion string `json:"suggestion,omitempty"`
+	Prefix     string `json:"prefix"`
+	Suggestion string `json:"suggestion,omitempty"`
 }
 
 // GetLogConfigPath returns the path to our log configuration file
@@ -65,7 +65,7 @@ func GetLogConfigPath(global bool) (string, error) {
 
 // LoadLogConfig loads the log configuration, returning defaults if file doesn't exist
 func LoadLogConfig(configPath string) (*LogConfig, error) {
-    config := &LogConfig{LogRotation: DefaultLogRotationConfig(), Other: map[string]interface{}{}}
+	config := &LogConfig{LogRotation: DefaultLogRotationConfig(), Other: map[string]interface{}{}}
 
 	// Check if file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -73,24 +73,24 @@ func LoadLogConfig(configPath string) (*LogConfig, error) {
 		return config, nil
 	}
 
-    data, err := os.ReadFile(configPath) // #nosec G304 - controlled config paths
-    if err != nil {
-        return nil, fmt.Errorf("failed to read config file: %v", err)
-    }
+	data, err := os.ReadFile(configPath) // #nosec G304 - controlled config paths
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
 
-    // Preserve unknown fields
-    var raw map[string]interface{}
-    if err := json.Unmarshal(data, &raw); err != nil {
-        return nil, fmt.Errorf("failed to parse config JSON: %v", err)
-    }
-    if err := json.Unmarshal(data, config); err != nil {
-        return nil, fmt.Errorf("failed to parse config JSON: %v", err)
-    }
-    // Remove known
-    delete(raw, "logRotation")
-    delete(raw, "customHooks")
-    delete(raw, "blockedUrls")
-    config.Other = raw
+	// Preserve unknown fields
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse config JSON: %v", err)
+	}
+	if err := json.Unmarshal(data, config); err != nil {
+		return nil, fmt.Errorf("failed to parse config JSON: %v", err)
+	}
+	// Remove known
+	delete(raw, "logRotation")
+	delete(raw, "customHooks")
+	delete(raw, "blockedUrls")
+	config.Other = raw
 
 	return config, nil
 }
@@ -103,20 +103,20 @@ func SaveLogConfig(configPath string, config *LogConfig) error {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
-    // Merge known and unknown
-    out := map[string]interface{}{}
-    for k, v := range config.Other {
-        out[k] = v
-    }
-    out["logRotation"] = config.LogRotation
-    if config.CustomHooks != nil && len(config.CustomHooks) > 0 {
-        out["customHooks"] = config.CustomHooks
-    }
-    if len(config.BlockedURLs) > 0 {
-        out["blockedUrls"] = config.BlockedURLs
-    }
+	// Merge known and unknown
+	out := map[string]interface{}{}
+	for k, v := range config.Other {
+		out[k] = v
+	}
+	out["logRotation"] = config.LogRotation
+	if config.CustomHooks != nil && len(config.CustomHooks) > 0 {
+		out["customHooks"] = config.CustomHooks
+	}
+	if len(config.BlockedURLs) > 0 {
+		out["blockedUrls"] = config.BlockedURLs
+	}
 
-    data, err := json.MarshalIndent(out, "", "  ")
+	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %v", err)
 	}
