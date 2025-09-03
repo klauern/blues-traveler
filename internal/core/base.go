@@ -164,13 +164,7 @@ func defaultIsPluginEnabled(pluginKey string) bool {
 }
 
 // SetDefaultSettingsChecker allows the main package to set the real settings checker
-func SetDefaultSettingsChecker(checker func(string) bool) {
-	if checker != nil {
-		// Update the default context's checker
-		defaultContext := DefaultHookContext()
-		defaultContext.SettingsChecker = checker
-	}
-}
+// (removed) SetDefaultSettingsChecker unused; settings checker is injected via global context.
 
 // LogHookEvent delegates to shared logging utility (see logging.go)
 func (h *BaseHook) LogHookEvent(event string, toolName string, rawData map[string]interface{}, details map[string]interface{}) {

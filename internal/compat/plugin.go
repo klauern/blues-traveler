@@ -50,7 +50,7 @@ func ListPlugins() map[string]Plugin {
 // In future major version, remove these.
 func RegisterPlugin(key string, p Plugin) error {
 	// No dynamic registration path; advise migration.
-	return fmt.Errorf("dynamic plugin registration deprecated; add hook in internal/hooks/registry.go")
+	return fmt.Errorf("dynamic plugin registration deprecated; add hook in internal/hooks/init.go")
 }
 
 func MustRegisterPlugin(key string, p Plugin) {

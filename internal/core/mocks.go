@@ -71,28 +71,7 @@ func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	return nil, os.ErrNotExist
 }
 
-// GetWrittenFile returns the content written to a file
-func (m *MockFileSystem) GetWrittenFile(filename string) ([]byte, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	data, exists := m.Files[filename]
-	if !exists {
-		return nil, false
-	}
-
-	result := make([]byte, len(data))
-	copy(result, data)
-	return result, true
-}
-
-// HasDirectory checks if a directory was created
-func (m *MockFileSystem) HasDirectory(dir string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return m.Dirs[dir]
-}
+// (helpers removed) GetWrittenFile and HasDirectory were unused by tests.
 
 type mockFileInfo struct {
 	name string
@@ -166,14 +145,14 @@ func (m *MockCommandExecutor) SetResponse(command string, output []byte, err err
 	}
 }
 
-// GetExecutedCommands returns all executed commands
+// GetExecutedCommands returns all executed commands (used in tests)
 func (m *MockCommandExecutor) GetExecutedCommands() []MockCommand {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+    m.mu.RLock()
+    defer m.mu.RUnlock()
 
-	result := make([]MockCommand, len(m.Commands))
-	copy(result, m.Commands)
-	return result
+    result := make([]MockCommand, len(m.Commands))
+    copy(result, m.Commands)
+    return result
 }
 
 // WasCommandExecuted checks if a command was executed

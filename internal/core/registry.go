@@ -162,10 +162,7 @@ func GetHookKeys() []string {
 	return globalRegistry.Keys()
 }
 
-// ListHooks returns all hooks from the global registry
-func ListHooks() map[string]Hook {
-	return globalRegistry.List()
-}
+// (removed) ListHooks unused externally; avoid exporting broader surface.
 
 // SetGlobalContext updates the global registry's context
 func SetGlobalContext(ctx *HookContext) {
@@ -186,10 +183,7 @@ func SetGlobalLoggingConfig(enabled bool, logDir string, format string) {
 	}
 }
 
-// GetGlobalRegistry returns the global registry instance
-func GetGlobalRegistry() *Registry {
-	return globalRegistry
-}
+// (removed) GetGlobalRegistry unused; keep internal-only access.
 
 // RegisterBuiltinHooks can be called by the hooks package to register all built-in hooks
 func RegisterBuiltinHooks(hooks map[string]HookFactory) {
