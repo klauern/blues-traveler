@@ -16,6 +16,245 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
+// generateHooksREADME creates comprehensive documentation for the hooks directory
+func generateHooksREADME() string {
+	return `# Custom Hooks Configuration
+
+This directory contains your Blues Traveler custom hooks configuration. Custom hooks allow you to run scripts and commands in response to Claude Code events.
+
+## Quick Start
+
+1. **Create a hooks configuration file** (hooks.yml or blues-traveler-config.json)
+2. **Define hook groups and jobs** for specific Claude Code events
+3. **Test your hooks** with ` + "`blues-traveler run config:group:job`" + `
+4. **Install into Claude Code** with ` + "`blues-traveler config sync`" + `
+
+## Configuration Format
+
+### YAML Format (hooks.yml)
+` + "```yaml" + `
+my-group:
+  PreToolUse:
+    jobs:
+      - name: security-check
+        run: ./scripts/security-check.sh
+        glob: ["*.sh", "*.py"]
+        only: ${TOOL_NAME} == "Bash"
+  PostToolUse:
+    jobs:
+      - name: format-code
+        run: gofmt -w ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+` + "```" + `
+
+### JSON Format (blues-traveler-config.json)
+` + "```json" + `
+{
+  "customHooks": {
+    "my-group": {
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "security-check",
+            "run": "./scripts/security-check.sh",
+            "glob": ["*.sh", "*.py"],
+            "only": "${TOOL_NAME} == \"Bash\""
+          }
+        ]
+      }
+    }
+  }
+}
+` + "```" + `
+
+## Available Events
+
+| Event | Description | Best Use Cases |
+|-------|-------------|----------------|
+| **PreToolUse** | Before Claude Code runs a tool | Security checks, validation |
+| **PostToolUse** | After Claude Code runs a tool | Formatting, testing, cleanup |
+| **UserPromptSubmit** | When user submits a prompt | Logging, preprocessing |
+| **Notification** | System notifications | Alerts, monitoring |
+| **Stop** | When Claude Code stops | Cleanup, reporting |
+| **SubagentStop** | When a subagent stops | Subagent-specific cleanup |
+| **PreCompact** | Before context compaction | Data preservation |
+| **SessionStart** | Session begins | Initialization, setup |
+| **SessionEnd** | Session ends | Teardown, reporting |
+
+## Environment Variables
+
+These variables are available in your hook scripts:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| ` + "`TOOL_NAME`" + ` | Name of the tool being used | Bash, Edit, Write |
+| ` + "`TOOL_OUTPUT_FILE`" + ` | File path for Edit/Write tools | /path/to/file.go |
+| ` + "`FILES_CHANGED`" + ` | Files modified (comma-separated) | file1.py,file2.js |
+| ` + "`USER_PROMPT`" + ` | User's prompt text | "Fix this bug" |
+| ` + "`EVENT_NAME`" + ` | Current event name | PreToolUse |
+
+## Job Properties
+
+### Required
+- **name**: Unique identifier for the job
+- **run**: Command to execute
+
+### Optional
+- **glob**: File patterns to match (` + "`[\"*.py\", \"*.js\"]`" + `)
+- **only**: Condition for when to run (` + "`${TOOL_NAME} == \"Edit\"`" + `)
+- **skip**: Condition for when to skip (` + "`${FILES_CHANGED} regex \"test\"`" + `)
+- **timeout**: Timeout in seconds (default: 30)
+- **env**: Environment variables (` + "`{\"VAR\": \"value\"}`" + `)
+- **workdir**: Working directory for the command
+
+## Filtering Examples
+
+### Tool-based Filtering
+` + "```yaml" + `
+# Only run on Bash commands
+only: ${TOOL_NAME} == "Bash"
+
+# Run on Edit or Write operations
+only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+` + "```" + `
+
+### File-based Filtering  
+` + "```yaml" + `
+# Only Python files
+glob: ["*.py"]
+
+# Multiple file types
+glob: ["*.go", "*.mod", "*.sum"]
+
+# Regex on changed files
+only: ${FILES_CHANGED} regex ".*\\.py$"
+` + "```" + `
+
+## Real-World Examples
+
+### Code Formatting
+` + "```yaml" + `
+format-group:
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofmt -w ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+      - name: format-python
+        run: black ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+` + "```" + `
+
+### Security Checks
+` + "```yaml" + `
+security-group:
+  PreToolUse:
+    jobs:
+      - name: dangerous-commands
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|sudo|curl.*\\|.*sh)"; then
+            echo "❌ Dangerous command detected!"
+            exit 1
+          fi
+        only: ${TOOL_NAME} == "Bash"
+` + "```" + `
+
+### Testing
+` + "```yaml" + `
+test-group:
+  PostToolUse:
+    jobs:
+      - name: run-tests
+        run: go test ./...
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+        skip: ${FILES_CHANGED} regex ".*_test\\.go$"
+` + "```" + `
+
+## Built-in Hooks vs Custom Hooks
+
+**Built-in Hooks** (via ` + "`blues-traveler install`" + `):
+- Pre-built, tested functionality
+- Security, formatting, debugging, audit
+- Installed directly into Claude Code settings
+
+**Custom Hooks** (this configuration):
+- Your own scripts and commands
+- Project or personal automation
+- Requires ` + "`blues-traveler config sync`" + ` to install
+
+## Commands
+
+` + "```bash" + `
+# Initialize configuration
+blues-traveler config init [--global]
+
+# Validate configuration
+blues-traveler config validate
+
+# Show current configuration  
+blues-traveler config show
+
+# Test a specific hook
+blues-traveler run config:group:job
+
+# Install hooks into Claude Code
+blues-traveler config sync [--global]
+
+# List hook groups
+blues-traveler config groups
+` + "```" + `
+
+## Troubleshooting
+
+### Hook Not Running
+1. Check ` + "`blues-traveler config validate`" + ` for syntax errors
+2. Verify the event type matches your use case
+3. Test conditions with ` + "`only`" + ` and ` + "`skip`" + ` filters
+4. Check file glob patterns match your files
+
+### Permission Errors
+1. Ensure script files are executable (` + "`chmod +x script.sh`" + `)
+2. Use absolute paths for commands
+3. Check working directory with ` + "`workdir`" + ` property
+
+### Environment Variables
+1. Use ` + "`echo $TOOL_NAME`" + ` in your script to debug
+2. Variables are only available during hook execution
+3. Empty variables mean the event doesn't provide that data
+
+## Best Practices
+
+### Security
+- ✅ Validate input from environment variables
+- ✅ Use absolute paths for scripts
+- ✅ Limit file permissions on hook scripts
+- ❌ Don't trust user input blindly
+
+### Performance
+- ✅ Use specific glob patterns to reduce overhead
+- ✅ Set reasonable timeouts
+- ✅ Use ` + "`skip`" + ` conditions to avoid unnecessary work
+- ❌ Don't run expensive operations on every event
+
+### Maintainability
+- ✅ Use descriptive job names
+- ✅ Comment your hook configurations
+- ✅ Test hooks before deploying
+- ✅ Version control your hook configurations
+
+## Getting Help
+
+- **Documentation**: [Blues Traveler GitHub](https://github.com/klauern/blues-traveler)
+- **Built-in Help**: ` + "`blues-traveler --help`" + `
+- **Validation**: ` + "`blues-traveler config validate`" + `
+- **Testing**: ` + "`blues-traveler run config:group:job`" + `
+`
+}
+
 // NewHooksConfigCmd provides `config`-like helpers for hooks.yml management
 func NewHooksConfigCmd() *cli.Command {
 	return &cli.Command{
@@ -36,7 +275,25 @@ func NewHooksConfigCmd() *cli.Command {
 					overwrite := cmd.Bool("overwrite")
 					group := cmd.String("group")
 					fileName := cmd.String("name")
-					sample := fmt.Sprintf(`# Sample hooks configuration for group '%s'
+					
+					var sample string
+					if global {
+						// Minimal global config - no example hooks to avoid accidental installation
+						sample = fmt.Sprintf(`# Global hooks configuration for group '%s'
+# This is your personal global configuration. Add real hooks here.
+# See README.md in this directory for documentation and examples.
+%s:
+  # Add your custom hooks here
+  # Example structure:
+  # PreToolUse:
+  #   jobs:
+  #     - name: my-security-check
+  #       run: ./my-script.sh
+  #       glob: ["*.go"]
+`, group, group)
+					} else {
+						// Project config with comprehensive examples for learning
+						sample = fmt.Sprintf(`# Sample hooks configuration for group '%s'
 %s:
   PreToolUse:
     jobs:
@@ -83,6 +340,7 @@ func NewHooksConfigCmd() *cli.Command {
       - name: session-end-sample
         run: echo "SessionEnd EVENT=${EVENT_NAME}"
 `, group, group)
+					}
 					// If --name provided, create .claude/hooks/<name>.yml; else .claude/hooks.yml
 					var path string
 					if fileName != "" {
@@ -111,16 +369,74 @@ func NewHooksConfigCmd() *cli.Command {
 						}
 						path = target
 					} else {
-						var werr error
-						path, werr = btconfig.WriteSampleHooksConfig(global, sample, overwrite)
-						if errors.Is(werr, fs.ErrExist) {
-							fmt.Printf("File already exists: %s (use --overwrite to replace)\n", path)
-							return nil
-						}
-						if werr != nil {
-							return werr
+						if global {
+							// For global configs, create minimal config directly
+							configPath, err := btconfig.GetLogConfigPath(global)
+							if err != nil {
+								return err
+							}
+							
+							// Load existing config or create default
+							logCfg, err := btconfig.LoadLogConfig(configPath)
+							if err != nil {
+								return err
+							}
+							
+							// Check for existing config without overwrite
+							if !overwrite && logCfg.CustomHooks != nil && len(logCfg.CustomHooks) > 0 {
+								fmt.Printf("File already exists: %s (use --overwrite to replace)\n", configPath)
+								return nil
+							}
+							
+							// Create minimal hooks structure (empty)
+							logCfg.CustomHooks = btconfig.CustomHooksConfig{}
+							
+							// Ensure directory exists
+							if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
+								return err
+							}
+							
+							// Save the minimal config
+							if err := btconfig.SaveLogConfig(configPath, logCfg); err != nil {
+								return err
+							}
+							path = configPath
+						} else {
+							// For project configs, use existing sample logic
+							var werr error
+							path, werr = btconfig.WriteSampleHooksConfig(global, sample, overwrite)
+							if errors.Is(werr, fs.ErrExist) {
+								fmt.Printf("File already exists: %s (use --overwrite to replace)\n", path)
+								return nil
+							}
+							if werr != nil {
+								return werr
+							}
 						}
 					}
+					
+					// Create README.md in the hooks directory
+					hooksDir := filepath.Dir(path)
+					readmePath := filepath.Join(hooksDir, "README.md")
+					
+					// Check if README.md already exists
+					if !overwrite {
+						if _, err := os.Stat(readmePath); err == nil {
+							fmt.Printf("Created sample hooks config at %s\n", path)
+							fmt.Printf("README.md already exists at %s\n", readmePath)
+							return nil
+						}
+					}
+					
+					// Write README.md
+					readmeContent := generateHooksREADME()
+					if err := os.WriteFile(readmePath, []byte(readmeContent), 0o644); err != nil {
+						// Don't fail the whole operation if README creation fails
+						fmt.Printf("Warning: Could not create README.md: %v\n", err)
+					} else {
+						fmt.Printf("Created hooks documentation at %s\n", readmePath)
+					}
+					
 					fmt.Printf("Created sample hooks config at %s\n", path)
 					return nil
 				},
