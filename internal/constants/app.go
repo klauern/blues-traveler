@@ -40,12 +40,3 @@ func GetConfigPath(baseDir string) string {
 	return baseDir + "/" + ClaudeDir + "/" + HooksSubDir + "/" + ConfigFileName
 }
 
-// GetSettingsPath returns the full settings file path
-func GetSettingsPath(baseDir string) string {
-	return baseDir + "/" + ClaudeDir + "/" + SettingsFileName
-}
-
-// GetBlockedUrlsPath returns the full blocked URLs file path
-func GetBlockedUrlsPath(baseDir string) string {
-	return baseDir + "/" + ClaudeDir + "/" + HooksSubDir + "/" + BlockedUrlsFile
-}

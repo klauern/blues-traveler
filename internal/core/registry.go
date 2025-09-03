@@ -29,7 +29,7 @@ func NewRegistry(ctx *HookContext) *Registry {
 	}
 }
 
-// Register registers a hook factory with the given key
+// Register registers a hook factory with the given key (used by tests)
 func (r *Registry) Register(key string, factory HookFactory) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -42,12 +42,13 @@ func (r *Registry) Register(key string, factory HookFactory) error {
 	return nil
 }
 
-// MustRegister is like Register but panics on error
+// MustRegister is like Register but panics on error (used by tests)
 func (r *Registry) MustRegister(key string, factory HookFactory) {
 	if err := r.Register(key, factory); err != nil {
 		panic(err)
 	}
 }
+
 
 // RegisterBatch registers multiple hooks concurrently for better initialization performance
 func (r *Registry) RegisterBatch(hooks map[string]HookFactory) error {
@@ -103,7 +104,7 @@ func (r *Registry) Keys() []string {
 	return keys
 }
 
-// List returns a map of all hooks (key -> hook instance)
+// List returns a map of all hooks (key -> hook instance) (used by tests)
 func (r *Registry) List() map[string]Hook {
 	r.mu.RLock()
 	factories := make(map[string]HookFactory, len(r.factories))
@@ -132,6 +133,7 @@ func (r *Registry) List() map[string]Hook {
 	return result
 }
 
+
 // SetContext updates the context used for creating hook instances
 func (r *Registry) SetContext(ctx *HookContext) {
 	r.mu.Lock()
@@ -142,15 +144,6 @@ func (r *Registry) SetContext(ctx *HookContext) {
 // Global registry instance
 var globalRegistry = NewRegistry(nil)
 
-// RegisterHook registers a hook factory globally
-func RegisterHook(key string, factory HookFactory) error {
-	return globalRegistry.Register(key, factory)
-}
-
-// MustRegisterHook registers a hook factory globally, panics on error
-func MustRegisterHook(key string, factory HookFactory) {
-	globalRegistry.MustRegister(key, factory)
-}
 
 // CreateHook creates a hook instance by key from the global registry
 func CreateHook(key string) (Hook, error) {

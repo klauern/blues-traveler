@@ -38,23 +38,6 @@ type HookGroup map[string]*EventConfig
 // HooksConfig is the root structure: GroupName -> HookGroup
 type CustomHooksConfig map[string]HookGroup
 
-// GetHooksConfigPath returns the canonical hooks.yml path for the given scope.
-// This is primarily used by "config init" routines to pick a default write path.
-func GetHooksConfigPath(global bool) (string, error) {
-	// Canonical hooks config file under the Blues Traveler config directory
-	if global {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %v", err)
-		}
-		return filepath.Join(homeDir, constants.ClaudeDir, constants.HooksSubDir, "hooks.yml"), nil
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %v", err)
-	}
-	return filepath.Join(cwd, constants.ClaudeDir, constants.HooksSubDir, "hooks.yml"), nil
-}
 
 // candidateConfigPaths returns the list of possible config file locations in
 // priority order (earlier paths have higher precedence).
