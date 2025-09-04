@@ -98,7 +98,7 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 	}
 
 	// Build command
-	cmd := exec.Command("bash", "-lc", h.job.Run) //nolint:gosec // command is user-configured; we set env and timeout
+	cmd := exec.Command("bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
 	// If we have the original raw JSON for this event, pass it to child stdin so
 	// nested blues-traveler invocations can consume it.
 	if h.lastRaw != "" {
