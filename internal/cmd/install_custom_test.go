@@ -13,7 +13,7 @@ import (
 func TestInstallCustom_WritesSettings(t *testing.T) {
 	// Setup temp project with .claude
 	cwd, _ := os.Getwd()
-	t.Cleanup(func() { 
+	t.Cleanup(func() {
 		_ = os.Chdir(cwd)
 		// On Windows, give a moment for file handles to be released
 		if runtime.GOOS == "windows" {
@@ -44,7 +44,7 @@ func TestInstallCustom_WritesSettings(t *testing.T) {
 	if err := btconfig.ValidateHooksConfig(cfg); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
-	
+
 	// Ensure we're back in original directory before cleanup
 	// This helps avoid Windows file locking issues
 	_ = os.Chdir(cwd)
