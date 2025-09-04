@@ -147,12 +147,12 @@ func (m *MockCommandExecutor) SetResponse(command string, output []byte, err err
 
 // GetExecutedCommands returns all executed commands (used in tests)
 func (m *MockCommandExecutor) GetExecutedCommands() []MockCommand {
-    m.mu.RLock()
-    defer m.mu.RUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-    result := make([]MockCommand, len(m.Commands))
-    copy(result, m.Commands)
-    return result
+	result := make([]MockCommand, len(m.Commands))
+	copy(result, m.Commands)
+	return result
 }
 
 // WasCommandExecuted checks if a command was executed

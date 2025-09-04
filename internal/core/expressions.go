@@ -58,8 +58,13 @@ func evalSimple(s string) (bool, error) {
 		return true, nil
 	}
 	// Handle unary !
+	negated := false
 	for strings.HasPrefix(s, "!") {
-		inner, err := evalSimple(strings.TrimPrefix(s, "!"))
+		negated = !negated
+		s = strings.TrimPrefix(s, "!")
+	}
+	if negated {
+		inner, err := evalSimple(s)
 		if err != nil {
 			return false, err
 		}

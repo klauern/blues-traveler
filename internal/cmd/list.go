@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
-	btconfig "github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/urfave/cli/v3"
 )
@@ -67,9 +66,6 @@ func NewListCmd(getPlugin func(string) (interface {
 				fmt.Println()
 			} else {
 				// Suggest how to create custom hooks if none present
-				if cfg, err := btconfig.LoadHooksConfig(); err == nil && cfg != nil {
-					// loaded but no hooks registered likely means no groups/jobs defined
-				}
 				fmt.Println("No custom hooks found. Create .claude/hooks.yml and use 'blues-traveler install custom --list'.")
 				fmt.Println()
 			}

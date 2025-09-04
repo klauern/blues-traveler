@@ -275,7 +275,7 @@ func NewHooksConfigCmd() *cli.Command {
 					overwrite := cmd.Bool("overwrite")
 					group := cmd.String("group")
 					fileName := cmd.String("name")
-					
+
 					var sample string
 					if global {
 						// Minimal global config - no example hooks to avoid accidental installation
@@ -375,27 +375,27 @@ func NewHooksConfigCmd() *cli.Command {
 							if err != nil {
 								return err
 							}
-							
+
 							// Load existing config or create default
 							logCfg, err := btconfig.LoadLogConfig(configPath)
 							if err != nil {
 								return err
 							}
-							
+
 							// Check for existing config without overwrite
 							if !overwrite && logCfg.CustomHooks != nil && len(logCfg.CustomHooks) > 0 {
 								fmt.Printf("File already exists: %s (use --overwrite to replace)\n", configPath)
 								return nil
 							}
-							
+
 							// Create minimal hooks structure (empty)
 							logCfg.CustomHooks = btconfig.CustomHooksConfig{}
-							
+
 							// Ensure directory exists
 							if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
 								return err
 							}
-							
+
 							// Save the minimal config
 							if err := btconfig.SaveLogConfig(configPath, logCfg); err != nil {
 								return err
@@ -414,11 +414,11 @@ func NewHooksConfigCmd() *cli.Command {
 							}
 						}
 					}
-					
+
 					// Create README.md in the hooks directory
 					hooksDir := filepath.Dir(path)
 					readmePath := filepath.Join(hooksDir, "README.md")
-					
+
 					// Check if README.md already exists
 					if !overwrite {
 						if _, err := os.Stat(readmePath); err == nil {
@@ -427,7 +427,7 @@ func NewHooksConfigCmd() *cli.Command {
 							return nil
 						}
 					}
-					
+
 					// Write README.md
 					readmeContent := generateHooksREADME()
 					if err := os.WriteFile(readmePath, []byte(readmeContent), 0o644); err != nil {
@@ -436,7 +436,7 @@ func NewHooksConfigCmd() *cli.Command {
 					} else {
 						fmt.Printf("Created hooks documentation at %s\n", readmePath)
 					}
-					
+
 					fmt.Printf("Created sample hooks config at %s\n", path)
 					return nil
 				},

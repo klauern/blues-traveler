@@ -49,7 +49,6 @@ func (r *Registry) MustRegister(key string, factory HookFactory) {
 	}
 }
 
-
 // RegisterBatch registers multiple hooks concurrently for better initialization performance
 func (r *Registry) RegisterBatch(hooks map[string]HookFactory) error {
 	// Register all at once under write lock to avoid race conditions
@@ -133,7 +132,6 @@ func (r *Registry) List() map[string]Hook {
 	return result
 }
 
-
 // SetContext updates the context used for creating hook instances
 func (r *Registry) SetContext(ctx *HookContext) {
 	r.mu.Lock()
@@ -143,7 +141,6 @@ func (r *Registry) SetContext(ctx *HookContext) {
 
 // Global registry instance
 var globalRegistry = NewRegistry(nil)
-
 
 // CreateHook creates a hook instance by key from the global registry
 func CreateHook(key string) (Hook, error) {

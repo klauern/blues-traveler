@@ -187,7 +187,7 @@ func loadEmbeddedHooksConfig() *CustomHooksConfig {
 		if err != nil || cfg == nil {
 			continue
 		}
-		if cfg.CustomHooks != nil && len(cfg.CustomHooks) > 0 {
+		if len(cfg.CustomHooks) > 0 {
 			cp := cloneHooksConfig(cfg.CustomHooks)
 			return &cp
 		}

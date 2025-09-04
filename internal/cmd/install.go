@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
-	btconfig "github.com/klauern/blues-traveler/internal/config"
 	"github.com/urfave/cli/v3"
 )
 
@@ -195,11 +194,11 @@ func newInstallCustomCmd(isValidEventType func(string) bool, validEventTypes fun
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			list := cmd.Bool("list")
 			if list {
-				cfg, err := btconfig.LoadHooksConfig()
+				cfg, err := config.LoadHooksConfig()
 				if err != nil {
 					return fmt.Errorf("failed to load hooks config: %v", err)
 				}
-				groups := btconfig.ListHookGroups(cfg)
+				groups := config.ListHookGroups(cfg)
 				if len(groups) == 0 {
 					fmt.Println("No custom hook groups found. Create .claude/hooks.yml to define groups.")
 					return nil
@@ -225,7 +224,7 @@ func newInstallCustomCmd(isValidEventType func(string) bool, validEventTypes fun
 				return fmt.Errorf("invalid --event '%s'. Valid events: %s", eventFilter, strings.Join(validEventTypes(), ", "))
 			}
 
-			cfg, err := btconfig.LoadHooksConfig()
+			cfg, err := config.LoadHooksConfig()
 			if err != nil {
 				return fmt.Errorf("failed to load hooks config: %v", err)
 			}
@@ -245,11 +244,11 @@ func newInstallCustomCmd(isValidEventType func(string) bool, validEventTypes fun
         glob: ["*"]
 `, groupName)
 					// Merge sample into main config under customHooks
-					if _, err := btconfig.WriteSampleHooksConfig(global, sample, false); err != nil {
+					if _, err := config.WriteSampleHooksConfig(global, sample, false); err != nil {
 						return fmt.Errorf("write hooks sample: %v", err)
 					}
 					// Reload after creating stub (embedded)
-					cfg, err = btconfig.LoadHooksConfig()
+					cfg, err = config.LoadHooksConfig()
 					if err != nil {
 						return fmt.Errorf("reload hooks config: %v", err)
 					}

@@ -146,7 +146,6 @@ func ValidateHookName(name string) error {
 	return nil
 }
 
-
 // Helper functions for name conversion
 
 func toPascalCase(s string) string {

@@ -33,7 +33,6 @@ func PluginKeys() []string {
 	return keys
 }
 
-
 // IsPluginEnabled is a wrapper around config.IsPluginEnabled for compatibility
 func IsPluginEnabled(pluginKey string) bool {
 	return config.IsPluginEnabled(pluginKey)

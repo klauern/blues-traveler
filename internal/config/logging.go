@@ -109,7 +109,7 @@ func SaveLogConfig(configPath string, config *LogConfig) error {
 		out[k] = v
 	}
 	out["logRotation"] = config.LogRotation
-	if config.CustomHooks != nil && len(config.CustomHooks) > 0 {
+	if len(config.CustomHooks) > 0 {
 		out["customHooks"] = config.CustomHooks
 	}
 	if len(config.BlockedURLs) > 0 {
