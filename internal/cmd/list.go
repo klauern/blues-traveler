@@ -8,6 +8,7 @@ import (
 
 	"github.com/klauern/blues-traveler/internal/config"
 	btconfig "github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/urfave/cli/v3"
 )
 
@@ -225,7 +226,7 @@ func printUninstallExamples(global bool) {
 	}
 
 	fmt.Printf("View this list again:\n")
-	fmt.Printf("  hooks list-installed%s\n\n", globalFlag)
+	fmt.Printf("  %s list-installed%s\n\n", constants.BinaryName, globalFlag)
 
 	fmt.Printf("💡 Note: The 'uninstall' command removes ALL instances of a hook type\n")
 	fmt.Printf("   from ALL events (PreToolUse, PostToolUse, etc.)\n")

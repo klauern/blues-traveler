@@ -34,7 +34,7 @@ func (h *DebugHook) Run() error {
 		return fmt.Errorf("failed to initialize logger")
 	}
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	fmt.Println("Debug hook started - logging to claude-hooks.log")
+	fmt.Println("Debug hook started - logging to blues-traveler.log")
 	runner.Run()
 	return nil
 }
@@ -44,7 +44,7 @@ func (h *DebugHook) ensureLogger() {
 		return
 	}
 	var err error
-	h.logFile, err = h.Context().FileSystem.OpenFile("claude-hooks.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+	h.logFile, err = h.Context().FileSystem.OpenFile(".claude/hooks/debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		// Fallback: leave logger nil
 		return

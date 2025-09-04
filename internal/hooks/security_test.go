@@ -61,7 +61,7 @@ func TestSecurityHookStaticPatterns(t *testing.T) {
 		{"mkfs.ext4 /dev/sda1", true, "mkfs"},
 		{"echo hello > /dev/null", true, "> /dev/"},
 		{"sudo rm -rf /", true, "sudo rm"},
-		{"chmod -R 777 /", true, "chmod -r 777 /"},
+		{"chmod -R 777 /", true, "recursive chmod"},
 		{"shutdown -h now", true, "shutdown -h now"},
 		{"nvram -c", true, "nvram -c"},
 		{"ls -la", false, ""},
@@ -70,7 +70,16 @@ func TestSecurityHookStaticPatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.command, func(t *testing.T) {
-			blocked, reason := hook.checkStaticPatterns(strings.ToLower(tc.command))
+			var blocked bool
+			var reason string
+
+			// Special case for chmod -R which is now handled by recursive detection
+			if strings.Contains(tc.command, "chmod -R") {
+				tokens := strings.Fields(tc.command)
+				blocked, reason = hook.detectRecursiveOwnershipOrPerm(tokens)
+			} else {
+				blocked, reason = hook.checkStaticPatterns(strings.ToLower(tc.command))
+			}
 
 			if blocked != tc.blocked {
 				t.Errorf("Command '%s': expected blocked=%v, got blocked=%v", tc.command, tc.blocked, blocked)

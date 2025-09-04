@@ -501,19 +501,19 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 // IsPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.
 // Defaults to enabled if settings cannot be loaded or plugin key absent.
 func IsPluginEnabled(pluginKey string) bool {
-	// Project settings
+	// Project settings - if explicit value is set, use it
 	if projectPath, err := GetSettingsPath(false); err == nil {
 		if s, err := LoadSettings(projectPath); err == nil {
-			if !s.IsPluginEnabled(pluginKey) {
-				return false
+			if cfg, ok := s.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+				return *cfg.Enabled
 			}
 		}
 	}
-	// Global settings fallback
+	// Global settings fallback - if explicit value is set, use it
 	if globalPath, err := GetSettingsPath(true); err == nil {
 		if s, err := LoadSettings(globalPath); err == nil {
-			if !s.IsPluginEnabled(pluginKey) {
-				return false
+			if cfg, ok := s.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+				return *cfg.Enabled
 			}
 		}
 	}

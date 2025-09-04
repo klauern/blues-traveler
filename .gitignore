@@ -29,7 +29,7 @@ Thumbs.db
 .claude/hooks/*-config.json
 
 # Log files
-claude-hooks.log
+blues-traveler.log
 *.log
 
 # Coverage reports

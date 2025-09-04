@@ -38,7 +38,6 @@ type HookGroup map[string]*EventConfig
 // HooksConfig is the root structure: GroupName -> HookGroup
 type CustomHooksConfig map[string]HookGroup
 
-
 // candidateConfigPaths returns the list of possible config file locations in
 // priority order (earlier paths have higher precedence).
 // The loader will merge from lowest to highest priority so earlier entries win.
@@ -73,7 +72,7 @@ func candidateConfigPaths() ([]string, error) {
 			}
 			name := e.Name()
 			low := strings.ToLower(name)
-			if name == constants.ConfigFileName || name == constants.LegacyConfigFile {
+			if name == constants.ConfigFileName {
 				continue // skip app config files
 			}
 			if strings.HasSuffix(low, ".yml") || strings.HasSuffix(low, ".yaml") {
@@ -114,7 +113,7 @@ func candidateConfigPaths() ([]string, error) {
 			}
 			name := e.Name()
 			low := strings.ToLower(name)
-			if name == constants.ConfigFileName || name == constants.LegacyConfigFile {
+			if name == constants.ConfigFileName {
 				continue
 			}
 			if strings.HasSuffix(low, ".yml") || strings.HasSuffix(low, ".yaml") {

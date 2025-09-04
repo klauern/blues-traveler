@@ -149,8 +149,6 @@ func (h *SecurityHook) checkStaticPatterns(cmdLower string) (bool, string) {
 		"mkfs",            // filesystem creation
 		"> /dev/",         // redirect into device nodes
 		"sudo rm",         // elevated deletion
-		"chmod -r 777 /",  // broad perms at root
-		"chown -r",        // recursive ownership change
 		"shutdown -h now", // immediate shutdown
 		"shutdown -r now",
 		"nvram -c", // clearing NVRAM (EFI vars)

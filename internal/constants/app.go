@@ -17,7 +17,7 @@ const (
 	BlockedUrlsFile  = "blocked-urls.txt"
 
 	// Log files
-	DefaultLogFile = "claude-hooks.log" // TODO: Consider renaming to blues-traveler.log
+	DefaultLogFile = "blues-traveler.log"
 	DebugLogFile   = "debug.log"
 	FormatLogFile  = "format.log"
 
@@ -28,15 +28,9 @@ const (
 
 	// Command patterns for settings
 	CommandPattern = BinaryName + " run"
-
-	// Legacy names for backward compatibility checks
-	LegacyBinaryName     = "klauer-hooks"
-	LegacyConfigFile     = "klauer-hooks-config.json"
-	LegacyCommandPattern = "klauer-hooks run"
 )
 
 // GetConfigPath returns the full config file path
 func GetConfigPath(baseDir string) string {
 	return baseDir + "/" + ClaudeDir + "/" + HooksSubDir + "/" + ConfigFileName
 }
-

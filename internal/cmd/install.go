@@ -97,7 +97,7 @@ This will automatically configure the hook to run for the specified events.`,
 				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
-			// Create command: hooks run <type>
+			// Create command: blues-traveler run <type>
 			hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
 			if logEnabled {
 				hookCommand += " --log"
@@ -347,6 +347,12 @@ func NewUninstallCmd() *cli.Command {
 				Value:   false,
 				Usage:   "Remove from global settings (~/.claude/settings.json)",
 			},
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Value:   false,
+				Usage:   "Skip interactive confirmation for 'uninstall all'",
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
@@ -358,7 +364,7 @@ func NewUninstallCmd() *cli.Command {
 
 			// Handle 'all' case
 			if hookType == "all" {
-				uninstallAllKlauerHooks(global)
+				uninstallAllKlauerHooks(global, cmd.Bool("yes"))
 				return nil
 			}
 
@@ -368,7 +374,7 @@ func NewUninstallCmd() *cli.Command {
 				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
-			// Create command pattern to match: hooks run <type>
+			// Create command pattern to match: blues-traveler run <type>
 			hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
 
 			// Get settings path
@@ -408,7 +414,7 @@ func NewUninstallCmd() *cli.Command {
 	}
 }
 
-func uninstallAllKlauerHooks(global bool) {
+func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
 	if err != nil {
@@ -443,13 +449,15 @@ func uninstallAllKlauerHooks(global bool) {
 	// Confirmation prompt
 	fmt.Printf("\nThis will remove ALL blues-traveler hooks from %s settings.\n", scope)
 	fmt.Printf("Other hooks (not from blues-traveler) will be preserved.\n")
-	fmt.Printf("Continue? (y/N): ")
 
-	var response string
-	_, _ = fmt.Scanln(&response)
-	if response != "y" && response != "Y" && response != "yes" {
-		fmt.Println("Operation cancelled.")
-		return
+	if !skipConfirmation {
+		fmt.Printf("Continue? (y/N): ")
+		var response string
+		_, _ = fmt.Scanln(&response)
+		if response != "y" && response != "Y" && response != "yes" {
+			fmt.Println("Operation cancelled.")
+			return
+		}
 	}
 
 	// Remove all blues-traveler hooks
