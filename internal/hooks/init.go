@@ -1,6 +1,11 @@
 package hooks
 
-import "github.com/klauern/blues-traveler/internal/core"
+import (
+	"fmt"
+
+	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/core"
+)
 
 // init registers all built-in hooks using batch registration for better performance
 func init() {
@@ -15,4 +20,31 @@ func init() {
 		// "performance": NewPerformanceHook, // TODO: Enable when performance.go is properly integrated
 	}
 	core.RegisterBuiltinHooks(builtinHooks)
+
+	// Attempt to load and register config-based hooks.
+	// Errors are non-fatal and will be surfaced at runtime via logs.
+	if cfg, err := config.LoadHooksConfig(); err == nil && cfg != nil {
+		factories := map[string]core.HookFactory{}
+		for groupName, group := range *cfg {
+			for eventName, eventCfg := range group {
+				if eventCfg == nil {
+					continue
+				}
+				for _, job := range eventCfg.Jobs {
+					jobName := job.Name
+					if jobName == "" {
+						continue
+					}
+					key := fmt.Sprintf("config:%s:%s", groupName, jobName)
+					g, j, e := groupName, job, eventName
+					factories[key] = func(ctx *core.HookContext) core.Hook {
+						return NewConfigHook(g, j.Name, j, e, ctx)
+					}
+				}
+			}
+		}
+		if len(factories) > 0 {
+			core.RegisterBuiltinHooks(factories)
+		}
+	}
 }

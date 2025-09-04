@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -65,8 +66,12 @@ func (h *FetchBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks
 		return cchooks.Block("failed to parse WebFetch command")
 	}
 
-	// Load blocked URL prefixes from file
-	blockedPrefixes, err := h.loadBlockedPrefixes()
+	// Load blocked URL prefixes from embedded config first, then files
+	blockedPrefixes, err := h.loadBlockedFromConfig()
+	if err == nil && len(blockedPrefixes) == 0 {
+		// Fallback to files if not configured in JSON
+		blockedPrefixes, err = h.loadBlockedPrefixes()
+	}
 	if err != nil {
 		if h.Context().LoggingEnabled {
 			h.LogHookEvent("fetch_blocker_error", event.ToolName, map[string]interface{}{
@@ -166,6 +171,29 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 	}
 
 	// No file found, return empty list (allow all)
+	return []BlockedPrefix{}, nil
+}
+
+func (h *FetchBlockerHook) loadBlockedFromConfig() ([]BlockedPrefix, error) {
+	// Project then global
+	for _, global := range []bool{false, true} {
+		cfgPath, err := config.GetLogConfigPath(global)
+		if err != nil {
+			continue
+		}
+		lc, err := config.LoadLogConfig(cfgPath)
+		if err != nil || lc == nil {
+			continue
+		}
+		if len(lc.BlockedURLs) == 0 {
+			continue
+		}
+		out := make([]BlockedPrefix, 0, len(lc.BlockedURLs))
+		for _, b := range lc.BlockedURLs {
+			out = append(out, BlockedPrefix{Prefix: b.Prefix, Suggestion: b.Suggestion})
+		}
+		return out, nil
+	}
 	return []BlockedPrefix{}, nil
 }
 

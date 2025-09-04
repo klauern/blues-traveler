@@ -71,6 +71,19 @@ blues-traveler list-installed [--global]
 
 # List available Claude Code events
 blues-traveler list-events
+
+# Custom hooks (embedded config)
+blues-traveler config init [--group NAME] [--name FILE] [--global] [--overwrite]
+blues-traveler config validate
+blues-traveler config groups
+blues-traveler config show
+blues-traveler install custom <group> [--event E] [--matcher GLOB] [--timeout S]
+
+# Blocked URLs management (fetch-blocker)
+blues-traveler config blocked list [--global]
+blues-traveler config blocked add <prefix> [--suggestion TEXT] [--global]
+blues-traveler config blocked remove <prefix> [--global]
+blues-traveler config blocked clear [--global]
 ```
 
 ### Installation Options
@@ -157,6 +170,66 @@ Blues Traveler uses a hierarchical configuration system:
 
 1. **Project Settings**: `./.claude/settings.json` (takes precedence)
 2. **Global Settings**: `~/.claude/settings.json` (fallback)
+
+### Blues Traveler Config (embedded)
+
+Project and global Blues Traveler configuration is stored at:
+
+- Project: `./.claude/hooks/blues-traveler-config.json`
+- Global: `~/.claude/hooks/blues-traveler-config.json`
+
+Key sections:
+
+- `logRotation`: Log rotation settings used by `--log` mode.
+- `customHooks`: Custom hook groups (by name) with events and jobs.
+- `blockedUrls`: URL prefixes used by the `fetch-blocker` hook.
+
+Custom hooks support environment variables and simple expressions to control when jobs run:
+
+- Env vars:
+  - `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`
+  - `FILES_CHANGED` (space-separated list)
+  - `TOOL_FILE`, `TOOL_OUTPUT_FILE` (for `PostToolUse` on `Edit`/`Write`)
+  - `USER_PROMPT` (for `UserPromptSubmit`)
+- Expressions in `only`/`skip`:
+  - Boolean ops: `&&`, `||`, unary `!`
+  - Comparisons: `==`, `!=`
+  - Glob: `matches` (right side is a glob). When `FILES_CHANGED` contains multiple tokens, any match passes.
+  - Regex: `regex` (right side is a Go regex). Matches any token when multiple files are present.
+
+Examples:
+
+```yaml
+mygroup:
+  PostToolUse:
+    jobs:
+      - name: format-py
+        run: ruff format --fix ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+
+      - name: controller-tests
+        run: ./scripts/run-tests.sh
+        only: ${FILES_CHANGED} regex ".*controller.*\\.rb$"
+```
+
+Example:
+
+```json
+{
+  "logRotation": { "maxAge": 30, "maxSize": 10, "maxBackups": 5, "compress": true },
+  "customHooks": {
+    "ruby": {
+      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
+      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    }
+  },
+  "blockedUrls": [
+    { "prefix": "https://github.com/*/*/private/*", "suggestion": "Use 'gh api' for private repos" },
+    { "prefix": "https://api.company.com/private/*" }
+  ]
+}
+```
 
 ### Settings Structure
 

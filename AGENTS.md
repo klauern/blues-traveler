@@ -26,6 +26,7 @@ This is `blues-traveler`, a CLI tool for managing and running Claude Code hooks.
 ### Hook System
 
 The application uses a **static hook registry** where:
+
 - Built-in hooks register themselves via `init()` functions in `internal/hooks/init.go`
 - Each hook implements the `core.Hook` interface with `Key()`, `Name()`, `Description()`, `Run()`, and `IsEnabled()` methods
 - Hooks can be enabled/disabled via settings configuration
@@ -37,7 +38,7 @@ The application uses a **static hook registry** where:
 |-----|---------|------------|
 | `security` | Blocks dangerous commands using pattern matching and regex detection | `PreToolUse` |
 | `format` | Auto-formats code files after Edit/Write operations (Go, JS/TS, Python) | `PostToolUse` |
-| `debug` | Logs all tool usage to `claude-hooks.log` | Any event |
+| `debug` | Logs all tool usage to `blues-traveler.log` | Any event |
 | `audit` | Comprehensive JSON audit logging to stdout | Any event |
 | `vet` | Code quality and best practices enforcement | `PostToolUse` |
 | `fetch-blocker` | Blocks fetch requests for security | `PreToolUse` |
@@ -46,6 +47,7 @@ The application uses a **static hook registry** where:
 ## Development Commands
 
 ### Build and Test
+
 ```bash
 # Build the binary
 task build
@@ -61,6 +63,7 @@ task test-coverage
 ```
 
 ### Linting and Formatting
+
 ```bash
 # Format Go code
 task format
@@ -70,6 +73,7 @@ task lint
 ```
 
 ### Running
+
 ```bash
 # List available hooks
 ./blues-traveler list
@@ -103,6 +107,7 @@ task lint
 ## Settings Configuration
 
 Settings are managed in JSON format with two scopes:
+
 - **Project**: `./.claude/settings.json` (takes precedence)
 - **Global**: `~/.claude/settings.json` (fallback)
 
@@ -138,12 +143,14 @@ func (h *MyHook) Run() error {
 ## Important Notes for AI Assistants
 
 ### What NOT to Do
+
 - Don't suggest dynamic plugin loading or runtime registration
 - Don't reference the old pipeline system (it's been removed)
 - Don't suggest modifying the registry at runtime
 - Don't reference Cobra (the project now uses urfave/cli v3)
 
 ### What TO Do
+
 - Suggest adding hooks to the static registry in `init.go`
 - Recommend implementing the `core.Hook` interface (use `core.BaseHook` for common functionality)
 - Suggest using the existing settings system for configuration
@@ -151,6 +158,7 @@ func (h *MyHook) Run() error {
 - Reference urfave/cli v3 for CLI-related functionality
 
 ### Common Patterns
+
 - Hooks are stateless and created fresh for each execution
 - Use `core.LogHookEvent()` for logging within hooks
 - Check `h.IsEnabled()` for configuration-based behavior
@@ -160,6 +168,7 @@ func (h *MyHook) Run() error {
 ## Migration Notes
 
 The current architecture is simpler and more secure than previous versions:
+
 - **Removed**: Complex pipeline aggregation logic
 - **Simplified**: Direct hook execution model
 - **Improved**: Better security and reliability

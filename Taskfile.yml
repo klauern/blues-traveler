@@ -219,3 +219,20 @@ tasks:
           echo "✅ No vulnerabilities found"
         fi
 
+  deadcode:
+    desc: Find and report unreachable Go code using golang.org/x/tools/cmd/deadcode
+    deps: [deadcode-install]
+    cmds:
+      - |
+        echo "🔍 Running deadcode analysis..."
+        deadcode . || echo "📋 Found unreachable code (see output above)"
+
+  deadcode-install:
+    desc: Install deadcode analysis tool
+    cmds:
+      - |
+        echo "Installing deadcode tool..."
+        go install golang.org/x/tools/cmd/deadcode@latest
+    status:
+      - command -v deadcode >/dev/null 2>&1
+

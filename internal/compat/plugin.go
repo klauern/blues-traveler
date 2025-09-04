@@ -1,7 +1,6 @@
 package compat
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/klauern/blues-traveler/internal/config"
@@ -32,31 +31,6 @@ func PluginKeys() []string {
 	keys := core.GetHookKeys()
 	sort.Strings(keys)
 	return keys
-}
-
-// ListPlugins returns fresh instances for all keys (legacy shape).
-func ListPlugins() map[string]Plugin {
-	out := map[string]Plugin{}
-	for _, k := range core.GetHookKeys() {
-		if h, err := core.CreateHook(k); err == nil {
-			out[k] = h
-		}
-	}
-	return out
-}
-
-// RegisterPlugin / MustRegisterPlugin kept as no-ops to avoid compile breakage
-// for external code that might still attempt dynamic registration.
-// In future major version, remove these.
-func RegisterPlugin(key string, p Plugin) error {
-	// No dynamic registration path; advise migration.
-	return fmt.Errorf("dynamic plugin registration deprecated; add hook in internal/hooks/registry.go")
-}
-
-func MustRegisterPlugin(key string, p Plugin) {
-	if err := RegisterPlugin(key, p); err != nil {
-		panic(err)
-	}
 }
 
 // IsPluginEnabled is a wrapper around config.IsPluginEnabled for compatibility

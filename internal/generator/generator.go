@@ -146,11 +146,6 @@ func ValidateHookName(name string) error {
 	return nil
 }
 
-// ListAvailableTypes returns available hook types
-func ListAvailableTypes() []HookType {
-	return []HookType{PreToolHook, PostToolHook, BothHooks}
-}
-
 // Helper functions for name conversion
 
 func toPascalCase(s string) string {
