@@ -430,7 +430,7 @@ func NewHooksConfigCmd() *cli.Command {
 
 					// Write README.md
 					readmeContent := generateHooksREADME()
-					if err := os.WriteFile(readmePath, []byte(readmeContent), 0o644); err != nil {
+					if err := os.WriteFile(readmePath, []byte(readmeContent), 0o600); err != nil {
 						// Don't fail the whole operation if README creation fails
 						fmt.Printf("Warning: Could not create README.md: %v\n", err)
 					} else {
