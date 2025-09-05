@@ -77,6 +77,7 @@ blues-traveler config init [--group NAME] [--name FILE] [--global] [--overwrite]
 blues-traveler config validate
 blues-traveler config groups
 blues-traveler config show
+blues-traveler config sync [group] [--global] [--dry-run] [--event E]
 blues-traveler install custom <group> [--event E] [--matcher GLOB] [--timeout S]
 
 # Blocked URLs management (fetch-blocker)
@@ -161,6 +162,36 @@ blues-traveler install format --event PostToolUse --matcher "Edit,Write"
 blues-traveler install debug --event PreToolUse --log
 blues-traveler install find-blocker --event PreToolUse  # Use fd instead
 ```
+
+### Custom Hooks Sync
+
+Sync custom hooks from your configuration into Claude Code settings:
+
+```bash
+# Sync all custom hooks from config to settings
+blues-traveler config sync
+
+# Sync only a specific group
+blues-traveler config sync my-python-group
+
+# Preview changes without applying them
+blues-traveler config sync --dry-run
+
+# Sync to global settings instead of project
+blues-traveler config sync --global
+
+# Sync only hooks for a specific event
+blues-traveler config sync --event PostToolUse
+```
+
+**Key Benefits:**
+- **Smart Cleanup**: Automatically removes hooks from settings when they're removed from config
+- **Group Management**: Sync specific groups or all at once
+- **Safe Preview**: Use `--dry-run` to see what changes will be made
+- **Event Filtering**: Sync only hooks for specific Claude Code events
+- **Stale Detection**: Identifies and cleans up outdated hook entries
+
+The sync command ensures your Claude Code settings stay perfectly aligned with your configuration files, automatically handling additions, updates, and removals.
 
 ## ⚙️ Configuration
 
@@ -359,6 +390,8 @@ For detailed documentation, see:
 | Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
 | Logs not appearing | Use `--log` flag and check `.claude/hooks/` directory |
 | Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
+| Config sync issues | Use `--dry-run` to preview changes, check config with `config validate` |
+| Stale hook entries | Run `config sync` - it automatically cleans up removed groups |
 
 ## 🤝 Contributing
 
