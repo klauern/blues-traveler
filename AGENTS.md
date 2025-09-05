@@ -21,6 +21,7 @@ This is `blues-traveler`, a CLI tool for managing and running Claude Code hooks.
 - **Registry** (`internal/core/registry.go`): Static hook registration and management
 - **Hooks** (`internal/hooks/`): Concrete hook implementations
 - **Settings** (`internal/config/`): Configuration management
+- **Custom Hooks** (`internal/config/hooks_config.go`, `internal/cmd/hooks_config.go`): YAML/JSON-driven hooks synced into Claude Code
 - **Core** (`internal/core/`): Event handling and execution
 
 ### Hook System
@@ -43,6 +44,8 @@ The application uses a **static hook registry** where:
 | `vet` | Code quality and best practices enforcement | `PostToolUse` |
 | `fetch-blocker` | Blocks fetch requests for security | `PreToolUse` |
 | `find-blocker` | Blocks find commands for security | `PreToolUse` |
+
+Note: Custom hooks can implement similar behavior using your own scripts. Prefer custom hooks for project-specific security, formatting, testing, and workflows; use built-ins for quick starts.
 
 ## Development Commands
 

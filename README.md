@@ -22,7 +22,44 @@ Blues Traveler provides **pre-built hooks** that integrate seamlessly with Claud
 | **🚫 Fetch Blocker** | Blocks web fetches requiring authentication | `PreToolUse` events |
 | **🔍 Find Blocker** | Suggests `fd` instead of `find` for better performance | `PreToolUse` events |
 
+Note: Custom hooks can implement all of the above (and more) using your own scripts. Built-ins are provided for quick setup; custom hooks are recommended for most workflows.
+
 ## 🚀 Quick Start
+
+### Custom Hooks (Recommended)
+
+Define your own security and formatting with custom hooks:
+
+```yaml
+# ./.claude/hooks/hooks.yml
+my-project:
+  PreToolUse:
+    jobs:
+      - name: security-check
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|sudo|curl.*\\|.*sh)"; then
+            echo "Dangerous command detected"; exit 1; fi
+        only: ${TOOL_NAME} == "Bash"
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofmt -w ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+```
+
+Then sync into Claude Code settings:
+
+```bash
+blues-traveler config validate
+blues-traveler config sync
+```
+
+You can test a single job locally:
+
+```bash
+blues-traveler run config:my-project:format-go
+```
 
 ### Installation
 

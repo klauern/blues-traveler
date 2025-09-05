@@ -25,6 +25,38 @@ task build
 
 ## First Steps
 
+### Use Custom Hooks (Recommended)
+
+Define project-specific automation with custom hooks, then sync them into Claude Code settings:
+
+```yaml
+# ./.claude/hooks/hooks.yml
+my-project:
+  PreToolUse:
+    jobs:
+      - name: security-check
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|sudo|curl.*\\|.*sh)"; then
+            echo "Dangerous command detected"; exit 1; fi
+        only: ${TOOL_NAME} == "Bash"
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofmt -w ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+```
+
+Sync and test:
+
+```bash
+blues-traveler config validate
+blues-traveler config sync
+blues-traveler run config:my-project:format-go
+```
+
+Built-in hooks remain available for quick setup, but custom hooks can replace or extend them to fit your workflow.
+
 ### 1. Verify Installation
 
 ```bash
