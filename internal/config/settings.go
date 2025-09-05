@@ -498,6 +498,45 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 	return removed
 }
 
+// GetConfigGroupsInSettings returns a set of all config group names found in settings
+func GetConfigGroupsInSettings(settings *Settings) map[string]bool {
+	groups := make(map[string]bool)
+	if settings == nil {
+		return groups
+	}
+
+	// Helper to extract group names from matchers
+	extractGroups := func(matchers []HookMatcher) {
+		for _, matcher := range matchers {
+			for _, hook := range matcher.Hooks {
+				if IsBluesTravelerCommand(hook.Command) && strings.Contains(hook.Command, "config:") {
+					// Extract group name from "blues-traveler run config:groupname:jobname"
+					parts := strings.Split(hook.Command, ":")
+					if len(parts) >= 3 {
+						groupName := parts[1]
+						if groupName != "" {
+							groups[groupName] = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Extract from all event types
+	extractGroups(settings.Hooks.PreToolUse)
+	extractGroups(settings.Hooks.PostToolUse)
+	extractGroups(settings.Hooks.UserPromptSubmit)
+	extractGroups(settings.Hooks.Notification)
+	extractGroups(settings.Hooks.Stop)
+	extractGroups(settings.Hooks.SubagentStop)
+	extractGroups(settings.Hooks.PreCompact)
+	extractGroups(settings.Hooks.SessionStart)
+	extractGroups(settings.Hooks.SessionEnd)
+
+	return groups
+}
+
 // IsPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.
 // Defaults to enabled if settings cannot be loaded or plugin key absent.
 func IsPluginEnabled(pluginKey string) bool {
