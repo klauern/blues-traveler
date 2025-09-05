@@ -707,10 +707,6 @@ func NewHooksConfigCmd() *cli.Command {
 					if err != nil {
 						return fmt.Errorf("load hooks config: %v", err)
 					}
-					if hooksCfg == nil || len(*hooksCfg) == 0 {
-						fmt.Println("No custom hooks found in config.")
-						return nil
-					}
 
 					// Load settings
 					settingsPath, err := btconfig.GetSettingsPath(useGlobal)
@@ -750,54 +746,86 @@ func NewHooksConfigCmd() *cli.Command {
 
 					changed := 0
 
-					// Iterate groups
-					for groupName, group := range *hooksCfg {
-						if groupFilter != "" && groupName != groupFilter {
+					// Step 1: Clean up stale groups that no longer exist in config
+					existingGroups := btconfig.GetConfigGroupsInSettings(settings)
+					configGroups := make(map[string]bool)
+					if hooksCfg != nil {
+						for groupName := range *hooksCfg {
+							configGroups[groupName] = true
+						}
+					}
+
+					// Remove groups that exist in settings but not in current config
+					for existingGroup := range existingGroups {
+						// If we have a group filter, only process that specific group
+						if groupFilter != "" && existingGroup != groupFilter {
 							continue
 						}
-
-						// Prune existing settings for this group (optionally event-filtered)
-						removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, eventFilter)
-						if removed > 0 {
-							fmt.Printf("Pruned %d entries for group '%s'%s\n", removed, groupName, func() string {
-								if eventFilter != "" {
-									return " (event: " + eventFilter + ")"
-								}
-								return ""
-							}())
-						}
-
-						// Add current definitions
-						for eventName, ev := range group {
-							if eventFilter != "" && eventFilter != eventName {
-								continue
-							}
-							for _, job := range ev.Jobs {
-								if job.Name == "" {
-									continue
-								}
-								// Build command to run this job
-								hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
-								// Timeout preference: CLI override > job.Timeout
-								var timeout *int
-								if timeoutOverride > 0 {
-									timeout = &timeoutOverride
-								} else if job.Timeout > 0 {
-									t := job.Timeout
-									timeout = &t
-								}
-								// Matcher
-								matcher := pickMatcher(eventName)
-								// Add to settings
-								res := btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
-								_ = res
-								changed++
-								if dry {
-									fmt.Printf("Would add: [%s] matcher=%q command=%q\n", eventName, matcher, hookCommand)
-								}
+						// If the group doesn't exist in current config, remove it
+						if !configGroups[existingGroup] {
+							removed := btconfig.RemoveConfigGroupFromSettings(settings, existingGroup, eventFilter)
+							if removed > 0 {
+								fmt.Printf("Cleaned up %d stale entries for removed group '%s'%s\n", removed, existingGroup, func() string {
+									if eventFilter != "" {
+										return " (event: " + eventFilter + ")"
+									}
+									return ""
+								}())
+								changed += removed
 							}
 						}
 					}
+
+					// Step 2: Iterate current config groups and sync them
+					if hooksCfg != nil {
+						for groupName, group := range *hooksCfg {
+							if groupFilter != "" && groupName != groupFilter {
+								continue
+							}
+
+							// Prune existing settings for this group (optionally event-filtered)
+							removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, eventFilter)
+							if removed > 0 {
+								fmt.Printf("Pruned %d entries for group '%s'%s\n", removed, groupName, func() string {
+									if eventFilter != "" {
+										return " (event: " + eventFilter + ")"
+									}
+									return ""
+								}())
+							}
+
+							// Add current definitions
+							for eventName, ev := range group {
+								if eventFilter != "" && eventFilter != eventName {
+									continue
+								}
+								for _, job := range ev.Jobs {
+									if job.Name == "" {
+										continue
+									}
+									// Build command to run this job
+									hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
+									// Timeout preference: CLI override > job.Timeout
+									var timeout *int
+									if timeoutOverride > 0 {
+										timeout = &timeoutOverride
+									} else if job.Timeout > 0 {
+										t := job.Timeout
+										timeout = &t
+									}
+									// Matcher
+									matcher := pickMatcher(eventName)
+									// Add to settings
+									res := btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
+									_ = res
+									changed++
+									if dry {
+										fmt.Printf("Would add: [%s] matcher=%q command=%q\n", eventName, matcher, hookCommand)
+									}
+								}
+							}
+						}
+					} // Close the if hooksCfg != nil block
 
 					if changed == 0 {
 						fmt.Println("No changes detected.")
