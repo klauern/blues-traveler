@@ -17,7 +17,7 @@ This is `blues-traveler`, a CLI tool for managing and running Claude Code hooks.
 
 ### Key Components
 
-- **CLI Layer** (`internal/cmd/`): Cobra-based command implementations
+- **CLI Layer** (`internal/cmd/`): urfave/cli v3 command implementations
 - **Registry** (`internal/core/registry.go`): Static hook registration and management
 - **Hooks** (`internal/hooks/`): Concrete hook implementations
 - **Settings** (`internal/config/`): Configuration management
@@ -90,7 +90,7 @@ task lint
 
 ## File Structure
 
-- `main.go`: CLI entry point with Cobra commands
+- `main.go`: CLI entry point with urfave/cli v3 commands
 - `internal/hooks/init.go`: Hook registration and built-in hook initialization
 - `internal/hooks/*.go`: Individual hook implementations
 - `internal/core/registry.go`: Hook registry and management
@@ -160,7 +160,7 @@ func (h *MyHook) Run() error {
 ### Common Patterns
 
 - Hooks are stateless and created fresh for each execution
-- Use `core.LogHookEvent()` for logging within hooks
+- Use `h.LogHookEvent()` (from `core.BaseHook`) for logging within hooks
 - Check `h.IsEnabled()` for configuration-based behavior
 - Implement event handlers in the `Run()` method
 - Use `core.BaseHook` to get common functionality like `Key()`, `Name()`, `Description()`, and `IsEnabled()`

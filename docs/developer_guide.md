@@ -20,7 +20,7 @@ Blues Traveler uses a **static hook registry** architecture for security and rel
 
 ### Key Components
 
-- **CLI Layer** (`internal/cmd/`): Cobra-based command implementations
+- **CLI Layer** (`internal/cmd/`): urfave/cli v3 command implementations
 - **Registry** (`internal/core/registry.go`): Static hook registration and management
 - **Hooks** (`internal/hooks/`): Concrete hook implementations
 - **Settings** (`internal/config/`): Configuration management
@@ -216,17 +216,18 @@ func (h *MyHook) Run() error {
 
 ### Built-in Logging
 
-Hooks can use the built-in logging system:
+Hooks can use the built-in logging via `BaseHook.LogHookEvent`:
 
 ```go
 import "github.com/klauern/blues-traveler/internal/core"
 
 func (h *MyHook) Run() error {
-    h.LogHookEvent("Starting operation", nil)
+    // Emits only when enabled via core.SetGlobalLoggingConfig
+    h.LogHookEvent("myhook_start", "", map[string]interface{}{"msg": "Starting"}, nil)
 
     // Your logic here
 
-    h.LogHookEvent("Operation completed", nil)
+    h.LogHookEvent("myhook_done", "", map[string]interface{}{"status": "ok"}, nil)
     return nil
 }
 ```
@@ -363,6 +364,6 @@ git push
 ## Resources
 
 - [Go Documentation](https://golang.org/doc/)
-- [Cobra CLI Framework](https://github.com/spf13/cobra)
+- [urfave/cli v3](https://github.com/urfave/cli)
 - [Claude Code Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)
 - [Project Issues](https://github.com/klauern/blues-traveler/issues)
