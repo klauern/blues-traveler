@@ -206,35 +206,35 @@ func runConfigSync(t *testing.T, groupFilter ...string) error {
 	// Step 2: Iterate current config groups and sync them
 	if hooksCfg != nil {
 		for groupName, group := range *hooksCfg {
-		if targetGroup != "" && groupName != targetGroup {
-			continue
-		}
+			if targetGroup != "" && groupName != targetGroup {
+				continue
+			}
 
-		// Prune existing settings for this group
-		removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, "")
-		if removed > 0 {
-			t.Logf("Pruned %d entries for group '%s'", removed, groupName)
-		}
+			// Prune existing settings for this group
+			removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, "")
+			if removed > 0 {
+				t.Logf("Pruned %d entries for group '%s'", removed, groupName)
+			}
 
-		// Add current definitions
-		for eventName, ev := range group {
-			for _, job := range ev.Jobs {
-				if job.Name == "" {
-					continue
+			// Add current definitions
+			for eventName, ev := range group {
+				for _, job := range ev.Jobs {
+					if job.Name == "" {
+						continue
+					}
+					// Build command to run this job
+					hookCommand := "blues-traveler run config:" + groupName + ":" + job.Name
+					// Use default matcher
+					matcher := "*"
+					if eventName == "PostToolUse" {
+						matcher = "Edit,Write"
+					}
+					// Add to settings
+					btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, nil)
+					changed++
 				}
-				// Build command to run this job
-				hookCommand := "blues-traveler run config:" + groupName + ":" + job.Name
-				// Use default matcher
-				matcher := "*"
-				if eventName == "PostToolUse" {
-					matcher = "Edit,Write"
-				}
-				// Add to settings
-				btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, nil)
-				changed++
 			}
 		}
-	}
 	} // Close the if hooksCfg != nil block
 
 	if changed == 0 {

@@ -779,52 +779,52 @@ func NewHooksConfigCmd() *cli.Command {
 					// Step 2: Iterate current config groups and sync them
 					if hooksCfg != nil {
 						for groupName, group := range *hooksCfg {
-						if groupFilter != "" && groupName != groupFilter {
-							continue
-						}
-
-						// Prune existing settings for this group (optionally event-filtered)
-						removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, eventFilter)
-						if removed > 0 {
-							fmt.Printf("Pruned %d entries for group '%s'%s\n", removed, groupName, func() string {
-								if eventFilter != "" {
-									return " (event: " + eventFilter + ")"
-								}
-								return ""
-							}())
-						}
-
-						// Add current definitions
-						for eventName, ev := range group {
-							if eventFilter != "" && eventFilter != eventName {
+							if groupFilter != "" && groupName != groupFilter {
 								continue
 							}
-							for _, job := range ev.Jobs {
-								if job.Name == "" {
+
+							// Prune existing settings for this group (optionally event-filtered)
+							removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, eventFilter)
+							if removed > 0 {
+								fmt.Printf("Pruned %d entries for group '%s'%s\n", removed, groupName, func() string {
+									if eventFilter != "" {
+										return " (event: " + eventFilter + ")"
+									}
+									return ""
+								}())
+							}
+
+							// Add current definitions
+							for eventName, ev := range group {
+								if eventFilter != "" && eventFilter != eventName {
 									continue
 								}
-								// Build command to run this job
-								hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
-								// Timeout preference: CLI override > job.Timeout
-								var timeout *int
-								if timeoutOverride > 0 {
-									timeout = &timeoutOverride
-								} else if job.Timeout > 0 {
-									t := job.Timeout
-									timeout = &t
-								}
-								// Matcher
-								matcher := pickMatcher(eventName)
-								// Add to settings
-								res := btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
-								_ = res
-								changed++
-								if dry {
-									fmt.Printf("Would add: [%s] matcher=%q command=%q\n", eventName, matcher, hookCommand)
+								for _, job := range ev.Jobs {
+									if job.Name == "" {
+										continue
+									}
+									// Build command to run this job
+									hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
+									// Timeout preference: CLI override > job.Timeout
+									var timeout *int
+									if timeoutOverride > 0 {
+										timeout = &timeoutOverride
+									} else if job.Timeout > 0 {
+										t := job.Timeout
+										timeout = &t
+									}
+									// Matcher
+									matcher := pickMatcher(eventName)
+									// Add to settings
+									res := btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
+									_ = res
+									changed++
+									if dry {
+										fmt.Printf("Would add: [%s] matcher=%q command=%q\n", eventName, matcher, hookCommand)
+									}
 								}
 							}
 						}
-					}
 					} // Close the if hooksCfg != nil block
 
 					if changed == 0 {
