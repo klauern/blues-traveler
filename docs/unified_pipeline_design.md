@@ -9,7 +9,7 @@ Blues Traveler uses a **static hook registry** where each hook runs independentl
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   CLI Commands  │───▶│  Hook Registry   │───▶│  Hook Impls     │
-│   (Cobra)      │    │                  │    │                 │
+│ (urfave/cli)   │    │                  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼

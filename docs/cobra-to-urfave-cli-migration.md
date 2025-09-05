@@ -205,7 +205,7 @@ After migration, update:
 - Any developer documentation mentioning Cobra
 
 ## Migration Status: ✅ COMPLETED
-This migration has been successfully completed. The blues-traveler CLI now uses urfave/cli v3 instead of Cobra.
+Status: Completed. The blues-traveler CLI now uses urfave/cli v3 instead of Cobra. All docs should reference urfave/cli v3.
 
 ### Summary of Changes Made:
 1. ✅ Updated `go.mod` to use `github.com/urfave/cli/v3 v3.4.1`

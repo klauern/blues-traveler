@@ -27,6 +27,7 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 ## Developer Resources
 
 ### 🛠️ [Developer Guide](developer_guide.md)
+### 🧩 [Custom Hooks Guide](custom_hooks.md)
 
 **For contributors and developers** - Learn how to extend Blues Traveler.
 
@@ -60,12 +61,13 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 
 ```
 blues-traveler/
-├── README.md                 # Main user documentation
+├── README.md                 # Main user documentation (urfave/cli v3 based)
 ├── CLAUDE.md                 # AI assistant guidance
 ├── docs/
 │   ├── index.md             # This documentation index
 │   ├── quick_start.md       # Getting started guide
 │   ├── developer_guide.md   # Developer reference
+│   ├── custom_hooks.md      # Custom hooks usage
 │   └── unified_pipeline_design.md  # Architecture details
 ├── internal/
 │   ├── cmd/                 # CLI command implementations
