@@ -5,18 +5,20 @@ Custom hooks let you define project- or user-specific automation for Claude Code
 ## Why Custom Hooks
 
 - Flexible: Run any command or script
-- Localized: Live next to your code in `.claude/hooks/`
+- Localized: Live in your user configuration at `~/.config/blues-traveler/`
 - Powerful: Conditions (`only`, `skip`), globs, env vars, per-job timeouts
 - Safe by default: Nothing runs unless installed via `config sync`
 
 ## Configuration Files
 
-Preferred location (project scope): `./.claude/hooks/hooks.yml`
+Preferred location (project scope): `~/.config/blues-traveler/projects/<project-name>.yml`
 
 Also supported:
-- Per-group files in `./.claude/hooks/*.yml`
-- Global config in `~/.claude/hooks/hooks.yml`
-- Embedded JSON via `blues-traveler-config.json` under `customHooks`
+- Per-project files in `~/.config/blues-traveler/projects/*.yml`
+- Global config in `~/.config/blues-traveler/global.yml`
+- Embedded JSON via XDG configuration files under `customHooks`
+
+For backwards compatibility, legacy locations (`.claude/hooks/`) are still supported but deprecated.
 
 ## YAML Example
 

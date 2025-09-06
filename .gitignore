@@ -28,6 +28,9 @@ Thumbs.db
 .claude/hooks/*.log
 .claude/hooks/*-config.json
 
+# XDG configuration (user-specific)
+.config/blues-traveler/
+
 # Log files
 blues-traveler.log
 *.log
