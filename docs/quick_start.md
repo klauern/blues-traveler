@@ -30,7 +30,7 @@ task build
 Define project-specific automation with custom hooks, then sync them into Claude Code settings:
 
 ```yaml
-# ./.claude/hooks/hooks.yml
+# ~/.config/blues-traveler/projects/my-project.yml
 my-project:
   PreToolUse:
     jobs:

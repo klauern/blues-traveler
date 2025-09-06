@@ -31,7 +31,7 @@ Note: Custom hooks can implement all of the above (and more) using your own scri
 Define your own security and formatting with custom hooks:
 
 ```yaml
-# ./.claude/hooks/hooks.yml
+# ~/.config/blues-traveler/projects/my-project.yml
 my-project:
   PreToolUse:
     jobs:
@@ -243,8 +243,8 @@ Blues Traveler uses a hierarchical configuration system:
 
 Project and global Blues Traveler configuration is stored at:
 
-- Project: `./.claude/hooks/blues-traveler-config.json`
-- Global: `~/.claude/hooks/blues-traveler-config.json`
+- Project: `~/.config/blues-traveler/projects/<project-name>.json`
+- Global: `~/.config/blues-traveler/global.json`
 
 Key sections:
 
@@ -425,7 +425,7 @@ For detailed documentation, see:
 | Hook not working | Check if enabled: `blues-traveler list-installed` |
 | Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
 | Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
-| Logs not appearing | Use `--log` flag and check `.claude/hooks/` directory |
+| Logs not appearing | Use `--log` flag and check `~/.config/blues-traveler/` directory |
 | Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
 | Config sync issues | Use `--dry-run` to preview changes, check config with `config validate` |
 | Stale hook entries | Run `config sync` - it automatically cleans up removed groups |

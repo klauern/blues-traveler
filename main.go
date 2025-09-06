@@ -70,6 +70,7 @@ Like the classic Blues Traveler song, our hooks will bring you back to clean, se
 			cmd.NewListInstalledCmd(),
 			cmd.NewListEventsCmd(eventsWrapper),
 			cmd.NewGenerateCmd(),
+			cmd.NewConfigCmd(),
 			cmd.NewConfigLogCmd(),
 			cmd.NewHooksConfigCmd(),
 			cmd.NewVersionCmd(versionInfo),

@@ -258,7 +258,7 @@ blues-traveler config groups
 // NewHooksConfigCmd provides `config`-like helpers for hooks.yml management
 func NewHooksConfigCmd() *cli.Command {
 	return &cli.Command{
-		Name:  "config",
+		Name:  "hooks",
 		Usage: "Manage custom hooks configuration (hooks.yml)",
 		Commands: []*cli.Command{
 			{
