@@ -75,7 +75,8 @@ func (x *XDGConfig) GetRegistryPath() string {
 func (x *XDGConfig) SanitizeProjectPath(projectPath string) string {
 	// Convert absolute path to a safe filename
 	// Replace path separators and special characters with hyphens
-	sanitized := strings.ReplaceAll(projectPath, string(filepath.Separator), "-")
+	sanitized := strings.ReplaceAll(projectPath, "/", "-")
+	sanitized = strings.ReplaceAll(sanitized, "\\", "-")
 	sanitized = strings.ReplaceAll(sanitized, ":", "-")
 	sanitized = strings.ReplaceAll(sanitized, " ", "-")
 	sanitized = strings.ReplaceAll(sanitized, "~", "home")
@@ -113,7 +114,7 @@ func (x *XDGConfig) EnsureDirectories() error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil { // #nosec G301 - XDG directories should be user-only accessible
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -133,7 +134,7 @@ func (x *XDGConfig) LoadRegistry() (*ProjectRegistry, error) {
 		}, nil
 	}
 
-	data, err := os.ReadFile(registryPath)
+	data, err := os.ReadFile(registryPath) // #nosec G304 - registryPath is internally controlled via GetRegistryPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read registry file: %w", err)
 	}
@@ -234,7 +235,7 @@ func (x *XDGConfig) LoadProjectConfig(projectPath string) (map[string]interface{
 		return make(map[string]interface{}), nil
 	}
 
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 - configPath is internally controlled via project registry
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -289,6 +290,11 @@ func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]
 		return fmt.Errorf("unsupported config format: %s", format)
 	}
 
+	// Ensure the projects directory exists
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
@@ -310,7 +316,7 @@ func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, err
 		return make(map[string]interface{}), nil
 	}
 
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 - configPath is internally controlled via project registry
 	if err != nil {
 		return nil, fmt.Errorf("failed to read global config file: %w", err)
 	}
@@ -363,6 +369,11 @@ func (x *XDGConfig) SaveGlobalConfig(configData map[string]interface{}, format s
 		data = []byte(buf.String())
 	default:
 		return fmt.Errorf("unsupported config format: %s", format)
+	}
+
+	// Ensure the config directory exists
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {

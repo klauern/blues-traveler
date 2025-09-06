@@ -236,7 +236,7 @@ func (d *LegacyConfigDiscovery) migrateConfig(projectPath, configPath string, dr
 	}
 
 	// Read the legacy config
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // #nosec G304 - configPath is validated legacy config path
 	if err != nil {
 		return fmt.Errorf("failed to read legacy config: %w", err)
 	}
@@ -273,7 +273,7 @@ func (d *LegacyConfigDiscovery) migrateConfig(projectPath, configPath string, dr
 
 // copyFile creates a copy of a file
 func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
+	data, err := os.ReadFile(src) // #nosec G304 - src is validated config file path for backup
 	if err != nil {
 		return err
 	}
