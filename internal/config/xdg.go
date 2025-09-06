@@ -19,7 +19,7 @@ type XDGConfig struct {
 
 // ProjectRegistry maps project paths to their configuration files
 type ProjectRegistry struct {
-	Version  string                    `json:"version"`
+	Version  string                   `json:"version"`
 	Projects map[string]ProjectConfig `json:"projects"`
 }
 
@@ -42,7 +42,7 @@ func NewXDGConfig() *XDGConfig {
 			baseDir = filepath.Join(homeDir, ".config")
 		}
 	}
-	
+
 	return &XDGConfig{
 		BaseDir: filepath.Join(baseDir, "blues-traveler"),
 	}
@@ -79,19 +79,19 @@ func (x *XDGConfig) SanitizeProjectPath(projectPath string) string {
 	sanitized = strings.ReplaceAll(sanitized, ":", "-")
 	sanitized = strings.ReplaceAll(sanitized, " ", "-")
 	sanitized = strings.ReplaceAll(sanitized, "~", "home")
-	
+
 	// Replace multiple consecutive hyphens with single hyphen
 	re := regexp.MustCompile(`-+`)
 	sanitized = re.ReplaceAllString(sanitized, "-")
-	
+
 	// Remove leading/trailing hyphens
 	sanitized = strings.Trim(sanitized, "-")
-	
+
 	// Limit length to avoid filesystem issues
 	if len(sanitized) > 200 {
 		sanitized = sanitized[:200]
 	}
-	
+
 	return sanitized
 }
 
@@ -111,20 +111,20 @@ func (x *XDGConfig) EnsureDirectories() error {
 		x.GetConfigDir(),
 		x.GetProjectsDir(),
 	}
-	
+
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
-	
+
 	return nil
 }
 
 // LoadRegistry loads the project registry
 func (x *XDGConfig) LoadRegistry() (*ProjectRegistry, error) {
 	registryPath := x.GetRegistryPath()
-	
+
 	// If registry doesn't exist, return empty registry
 	if _, err := os.Stat(registryPath); os.IsNotExist(err) {
 		return &ProjectRegistry{
@@ -132,22 +132,22 @@ func (x *XDGConfig) LoadRegistry() (*ProjectRegistry, error) {
 			Projects: make(map[string]ProjectConfig),
 		}, nil
 	}
-	
+
 	data, err := os.ReadFile(registryPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read registry file: %w", err)
 	}
-	
+
 	var registry ProjectRegistry
 	if err := json.Unmarshal(data, &registry); err != nil {
 		return nil, fmt.Errorf("failed to parse registry JSON: %w", err)
 	}
-	
+
 	// Ensure projects map is initialized
 	if registry.Projects == nil {
 		registry.Projects = make(map[string]ProjectConfig)
 	}
-	
+
 	return &registry, nil
 }
 
@@ -156,18 +156,18 @@ func (x *XDGConfig) SaveRegistry(registry *ProjectRegistry) error {
 	if err := x.EnsureDirectories(); err != nil {
 		return err
 	}
-	
+
 	registryPath := x.GetRegistryPath()
-	
+
 	data, err := json.MarshalIndent(registry, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal registry: %w", err)
 	}
-	
-	if err := os.WriteFile(registryPath, data, 0600); err != nil {
+
+	if err := os.WriteFile(registryPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write registry file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -177,16 +177,16 @@ func (x *XDGConfig) RegisterProject(projectPath, configFormat string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	configFile := x.GetProjectConfigPath(projectPath, configFormat)
 	relativeConfigFile := filepath.Join("projects", filepath.Base(configFile))
-	
+
 	registry.Projects[projectPath] = ProjectConfig{
 		ConfigFile:   relativeConfigFile,
 		LastModified: time.Now().UTC().Format(time.RFC3339),
 		ConfigFormat: configFormat,
 	}
-	
+
 	return x.SaveRegistry(registry)
 }
 
@@ -196,12 +196,12 @@ func (x *XDGConfig) GetProjectConfig(projectPath string) (*ProjectConfig, error)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	config, exists := registry.Projects[projectPath]
 	if !exists {
 		return nil, fmt.Errorf("project not found in registry: %s", projectPath)
 	}
-	
+
 	return &config, nil
 }
 
@@ -211,12 +211,12 @@ func (x *XDGConfig) ListProjects() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	projects := make([]string, 0, len(registry.Projects))
 	for projectPath := range registry.Projects {
 		projects = append(projects, projectPath)
 	}
-	
+
 	return projects, nil
 }
 
@@ -226,21 +226,21 @@ func (x *XDGConfig) LoadProjectConfig(projectPath string) (map[string]interface{
 	if err != nil {
 		return nil, err
 	}
-	
+
 	configPath := filepath.Join(x.GetConfigDir(), config.ConfigFile)
-	
+
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return make(map[string]interface{}), nil
 	}
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
-	
+
 	var configData map[string]interface{}
-	
+
 	switch config.ConfigFormat {
 	case "json":
 		if err := json.Unmarshal(data, &configData); err != nil {
@@ -253,7 +253,7 @@ func (x *XDGConfig) LoadProjectConfig(projectPath string) (map[string]interface{
 	default:
 		return nil, fmt.Errorf("unsupported config format: %s", config.ConfigFormat)
 	}
-	
+
 	return configData, nil
 }
 
@@ -262,16 +262,16 @@ func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]
 	if format == "" {
 		format = "json"
 	}
-	
+
 	if err := x.EnsureDirectories(); err != nil {
 		return err
 	}
-	
+
 	configPath := x.GetProjectConfigPath(projectPath, format)
-	
+
 	var data []byte
 	var err error
-	
+
 	switch format {
 	case "json":
 		data, err = json.MarshalIndent(configData, "", "  ")
@@ -288,11 +288,11 @@ func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]
 	default:
 		return fmt.Errorf("unsupported config format: %s", format)
 	}
-	
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
-	
+
 	// Register the project in the registry
 	return x.RegisterProject(projectPath, format)
 }
@@ -302,21 +302,21 @@ func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, err
 	if format == "" {
 		format = "json"
 	}
-	
+
 	configPath := x.GetGlobalConfigPath(format)
-	
+
 	// If global config doesn't exist, return empty config
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return make(map[string]interface{}), nil
 	}
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read global config file: %w", err)
 	}
-	
+
 	var configData map[string]interface{}
-	
+
 	switch format {
 	case "json":
 		if err := json.Unmarshal(data, &configData); err != nil {
@@ -329,7 +329,7 @@ func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, err
 	default:
 		return nil, fmt.Errorf("unsupported config format: %s", format)
 	}
-	
+
 	return configData, nil
 }
 
@@ -338,16 +338,16 @@ func (x *XDGConfig) SaveGlobalConfig(configData map[string]interface{}, format s
 	if format == "" {
 		format = "json"
 	}
-	
+
 	if err := x.EnsureDirectories(); err != nil {
 		return err
 	}
-	
+
 	configPath := x.GetGlobalConfigPath(format)
-	
+
 	var data []byte
 	var err error
-	
+
 	switch format {
 	case "json":
 		data, err = json.MarshalIndent(configData, "", "  ")
@@ -364,11 +364,11 @@ func (x *XDGConfig) SaveGlobalConfig(configData map[string]interface{}, format s
 	default:
 		return fmt.Errorf("unsupported config format: %s", format)
 	}
-	
-	if err := os.WriteFile(configPath, data, 0600); err != nil {
+
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write global config file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -378,30 +378,30 @@ func (x *XDGConfig) CleanupOrphanedConfigs() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var orphaned []string
-	
+
 	for projectPath, config := range registry.Projects {
 		// Check if project directory still exists
 		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 			configPath := filepath.Join(x.GetConfigDir(), config.ConfigFile)
-			
+
 			// Remove the config file
 			if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 				return orphaned, fmt.Errorf("failed to remove orphaned config %s: %w", configPath, err)
 			}
-			
+
 			// Remove from registry
 			delete(registry.Projects, projectPath)
 			orphaned = append(orphaned, projectPath)
 		}
 	}
-	
+
 	if len(orphaned) > 0 {
 		if err := x.SaveRegistry(registry); err != nil {
 			return orphaned, err
 		}
 	}
-	
+
 	return orphaned, nil
 }

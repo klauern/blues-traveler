@@ -30,8 +30,8 @@ func NewConfigCmd() *cli.Command {
 // NewConfigMigrateCmd creates the config migrate subcommand
 func NewConfigMigrateCmd() *cli.Command {
 	return &cli.Command{
-		Name:        "migrate",
-		Usage:       "Migrate existing configuration files to XDG structure",
+		Name:  "migrate",
+		Usage: "Migrate existing configuration files to XDG structure",
 		Description: `Discover and migrate existing .claude/hooks/blues-traveler-config.json files to XDG-compliant locations.
 		
 By default, only searches the current directory for legacy configurations.
@@ -91,7 +91,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 			}
 
 			fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
-			
+
 			if verbose && len(configs) > 0 {
 				fmt.Printf("\nDiscovered configurations:\n")
 				for projectPath, configPath := range configs {
@@ -168,19 +168,19 @@ func NewConfigListCmd() *cli.Command {
 
 			for _, project := range projects {
 				fmt.Printf("Project: %s\n", project)
-				
+
 				if verbose {
 					projectConfig, err := xdg.GetProjectConfig(project)
 					if err != nil {
 						fmt.Printf("  Error: %v\n", err)
 						continue
 					}
-					
+
 					configPath := filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
 					fmt.Printf("  Config File: %s\n", configPath)
 					fmt.Printf("  Format: %s\n", projectConfig.ConfigFormat)
 					fmt.Printf("  Last Modified: %s\n", projectConfig.LastModified)
-					
+
 					// Check if config file exists
 					if _, err := os.Stat(configPath); err != nil {
 						fmt.Printf("  Status: Missing (config file not found)\n")
@@ -188,7 +188,7 @@ func NewConfigListCmd() *cli.Command {
 						fmt.Printf("  Status: OK\n")
 					}
 				}
-				
+
 				fmt.Println()
 			}
 
@@ -301,7 +301,7 @@ func NewConfigEditCmd() *cli.Command {
 			cmd_exec.Stdin = os.Stdin
 			cmd_exec.Stdout = os.Stdout
 			cmd_exec.Stderr = os.Stderr
-			
+
 			return cmd_exec.Run()
 		},
 	}
@@ -325,7 +325,7 @@ func NewConfigCleanCmd() *cli.Command {
 			dryRun := cmd.Bool("dry-run")
 
 			xdg := config.NewXDGConfig()
-			
+
 			if dryRun {
 				fmt.Println("Dry run: checking for orphaned configurations...")
 			} else {

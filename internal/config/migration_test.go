@@ -35,7 +35,7 @@ func TestLegacyConfigDiscovery(t *testing.T) {
 	// Create legacy config files
 	for i, project := range projects {
 		legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-		err := os.MkdirAll(legacyConfigDir, 0755)
+		err := os.MkdirAll(legacyConfigDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create legacy config dir: %v", err)
 		}
@@ -55,7 +55,7 @@ func TestLegacyConfigDiscovery(t *testing.T) {
 			t.Fatalf("Failed to marshal config data: %v", err)
 		}
 
-		err = os.WriteFile(configPath, data, 0600)
+		err = os.WriteFile(configPath, data, 0o600)
 		if err != nil {
 			t.Fatalf("Failed to write config file: %v", err)
 		}
@@ -107,7 +107,7 @@ func TestMigrationDryRun(t *testing.T) {
 	// Create a project with legacy config
 	project := filepath.Join(tempDir, "test-project")
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestMigrationDryRun(t *testing.T) {
 		t.Fatalf("Failed to marshal config data: %v", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0600)
+	err = os.WriteFile(configPath, data, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestMigrationDryRun(t *testing.T) {
 
 	// Create a custom discovery instance that uses our test configs
 	customDiscovery := &LegacyConfigDiscovery{xdg: xdg}
-	
+
 	// Test dry run migration
 	result := &MigrationResult{
 		TotalFound:      len(testConfigs),
@@ -198,7 +198,7 @@ func TestActualMigration(t *testing.T) {
 	// Create a project with legacy config
 	project := filepath.Join(tempDir, "test-project")
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestActualMigration(t *testing.T) {
 		t.Fatalf("Failed to marshal config data: %v", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0600)
+	err = os.WriteFile(configPath, data, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestMigrationSkipExisting(t *testing.T) {
 
 	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestMigrationSkipExisting(t *testing.T) {
 		t.Fatalf("Failed to marshal config data: %v", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0600)
+	err = os.WriteFile(configPath, data, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestGetMigrationStatus(t *testing.T) {
 
 	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestGetMigrationStatus(t *testing.T) {
 		t.Fatalf("Failed to marshal config data: %v", err)
 	}
 
-	err = os.WriteFile(configPath, data, 0600)
+	err = os.WriteFile(configPath, data, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -463,13 +463,13 @@ func TestGetMigrationStatus(t *testing.T) {
 
 func TestFormatMigrationResult(t *testing.T) {
 	result := &MigrationResult{
-		TotalFound:    3,
-		TotalMigrated: 2,
-		TotalSkipped:  1,
-		TotalErrors:   0,
-		MigratedPaths: []string{"/project1", "/project2"},
-		SkippedPaths:  []string{"/project3"},
-		ErrorPaths:    []MigrationError{},
+		TotalFound:      3,
+		TotalMigrated:   2,
+		TotalSkipped:    1,
+		TotalErrors:     0,
+		MigratedPaths:   []string{"/project1", "/project2"},
+		SkippedPaths:    []string{"/project3"},
+		ErrorPaths:      []MigrationError{},
 		BackupLocations: []string{"/backup1", "/backup2"},
 	}
 
@@ -496,10 +496,10 @@ func TestFormatMigrationResult(t *testing.T) {
 
 	// Test with errors
 	resultWithErrors := &MigrationResult{
-		TotalFound:   1,
+		TotalFound:    1,
 		TotalMigrated: 0,
-		TotalSkipped: 0,
-		TotalErrors:  1,
+		TotalSkipped:  0,
+		TotalErrors:   1,
 		ErrorPaths: []MigrationError{
 			{Path: "/error-project", Error: "Permission denied"},
 		},
@@ -531,13 +531,13 @@ func TestHasLegacyConfig(t *testing.T) {
 
 	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
 
 	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
-	err = os.WriteFile(configPath, []byte("{}"), 0600)
+	err = os.WriteFile(configPath, []byte("{}"), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -556,9 +556,9 @@ func TestHasLegacyConfig(t *testing.T) {
 
 // Helper function to check if a string contains a substring
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 containsMiddle(s, substr)))
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			containsMiddle(s, substr)))
 }
 
 func containsMiddle(s, substr string) bool {

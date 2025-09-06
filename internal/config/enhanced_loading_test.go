@@ -33,7 +33,7 @@ func TestLoadConfigWithFallback(t *testing.T) {
 
 	// Create test project
 	project := filepath.Join(tempDir, "test-project")
-	err = os.MkdirAll(project, 0755)
+	err = os.MkdirAll(project, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create project dir: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestLoadConfigWithFallback(t *testing.T) {
 
 	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0755)
+	err = os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to marshal legacy config: %v", err)
 	}
-	err = os.WriteFile(legacyConfigPath, data, 0600)
+	err = os.WriteFile(legacyConfigPath, data, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write legacy config: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	}
 
 	// Recreate empty XDG temp dir
-	err = os.MkdirAll(xdgTempDir, 0755)
+	err = os.MkdirAll(xdgTempDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to recreate XDG temp dir: %v", err)
 	}

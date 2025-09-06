@@ -39,7 +39,7 @@ func (e *EnhancedConfigLoader) LoadConfigWithFallback(projectPath string) (*LogC
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
-	
+
 	switch e.strategy {
 	case LoadXDGFirst:
 		return e.loadXDGFirstWithFallback(absProjectPath)
@@ -72,7 +72,7 @@ func (e *EnhancedConfigLoader) loadXDGFirstWithFallback(projectPath string) (*Lo
 	if config, configPath, err := e.tryLoadXDGConfig(projectPath); err == nil {
 		return config, configPath, nil
 	}
-	
+
 	// Fall back to legacy config
 	return e.loadLegacyOnly(projectPath)
 }
@@ -83,7 +83,7 @@ func (e *EnhancedConfigLoader) loadGlobalXDGFirstWithFallback() (*LogConfig, str
 	if config, configPath, err := e.tryLoadGlobalXDGConfig(); err == nil {
 		return config, configPath, nil
 	}
-	
+
 	// Fall back to legacy global config
 	return e.loadGlobalLegacyOnly()
 }
@@ -95,50 +95,50 @@ func (e *EnhancedConfigLoader) tryLoadXDGConfig(projectPath string) (*LogConfig,
 	if err != nil {
 		return nil, "", fmt.Errorf("project not in XDG registry: %w", err)
 	}
-	
+
 	configPath := filepath.Join(e.xdg.GetConfigDir(), projectConfig.ConfigFile)
-	
+
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, "", fmt.Errorf("XDG config file does not exist: %s", configPath)
 	}
-	
+
 	// Load XDG config data
 	configData, err := e.xdg.LoadProjectConfig(projectPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load XDG project config: %w", err)
 	}
-	
+
 	// Convert to LogConfig
 	config, err := e.convertToLogConfig(configData)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to convert XDG config: %w", err)
 	}
-	
+
 	return config, configPath, nil
 }
 
 // tryLoadGlobalXDGConfig attempts to load global configuration from XDG location
 func (e *EnhancedConfigLoader) tryLoadGlobalXDGConfig() (*LogConfig, string, error) {
 	configPath := e.xdg.GetGlobalConfigPath("json")
-	
+
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, "", fmt.Errorf("XDG global config file does not exist: %s", configPath)
 	}
-	
+
 	// Load XDG global config data
 	configData, err := e.xdg.LoadGlobalConfig("json")
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load XDG global config: %w", err)
 	}
-	
+
 	// Convert to LogConfig
 	config, err := e.convertToLogConfig(configData)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to convert XDG global config: %w", err)
 	}
-	
+
 	return config, configPath, nil
 }
 
@@ -159,7 +159,7 @@ func (e *EnhancedConfigLoader) loadLegacyOnly(projectPath string) (*LogConfig, s
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load legacy config: %w", err)
 	}
-	
+
 	return config, legacyPath, nil
 }
 
@@ -169,12 +169,12 @@ func (e *EnhancedConfigLoader) loadGlobalLegacyOnly() (*LogConfig, string, error
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to get legacy global config path: %w", err)
 	}
-	
+
 	config, err := LoadLogConfig(legacyPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load legacy global config: %w", err)
 	}
-	
+
 	return config, legacyPath, nil
 }
 
@@ -185,28 +185,28 @@ func (e *EnhancedConfigLoader) convertToLogConfig(configData map[string]interfac
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config data: %w", err)
 	}
-	
+
 	config := &LogConfig{
 		LogRotation: DefaultLogRotationConfig(),
 		Other:       make(map[string]interface{}),
 	}
-	
+
 	if err := json.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config data: %w", err)
 	}
-	
+
 	// Preserve unknown fields
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal raw config data: %w", err)
 	}
-	
+
 	// Remove known fields from raw data
 	delete(raw, "logRotation")
 	delete(raw, "customHooks")
 	delete(raw, "blockedUrls")
 	config.Other = raw
-	
+
 	return config, nil
 }
 
@@ -216,18 +216,18 @@ func (e *EnhancedConfigLoader) SaveConfigWithXDG(projectPath string, config *Log
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
-	
+
 	// Convert LogConfig to generic map
 	configData, err := e.convertFromLogConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to convert LogConfig: %w", err)
 	}
-	
+
 	// Save to XDG location
 	if err := e.xdg.SaveProjectConfig(absProjectPath, configData, format); err != nil {
 		return fmt.Errorf("failed to save XDG project config: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -238,12 +238,12 @@ func (e *EnhancedConfigLoader) SaveGlobalConfigWithXDG(config *LogConfig, format
 	if err != nil {
 		return fmt.Errorf("failed to convert LogConfig: %w", err)
 	}
-	
+
 	// Save to XDG location
 	if err := e.xdg.SaveGlobalConfig(configData, format); err != nil {
 		return fmt.Errorf("failed to save XDG global config: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -254,17 +254,17 @@ func (e *EnhancedConfigLoader) convertFromLogConfig(config *LogConfig) (map[stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal LogConfig: %w", err)
 	}
-	
+
 	var configData map[string]interface{}
 	if err := json.Unmarshal(data, &configData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal to map: %w", err)
 	}
-	
+
 	// Add back the "Other" fields
 	for k, v := range config.Other {
 		configData[k] = v
 	}
-	
+
 	return configData, nil
 }
 
@@ -276,21 +276,21 @@ func (e *EnhancedConfigLoader) GetConfigPath(projectPath string, global bool) (s
 		}
 		return e.xdg.GetGlobalConfigPath("json"), nil
 	}
-	
+
 	absProjectPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
-	
+
 	if e.strategy == LoadLegacyOnly {
 		return GetLegacyConfigPath(absProjectPath), nil
 	}
-	
+
 	// For XDG paths, we need to check if the project is registered
 	if projectConfig, err := e.xdg.GetProjectConfig(absProjectPath); err == nil {
 		return filepath.Join(e.xdg.GetConfigDir(), projectConfig.ConfigFile), nil
 	}
-	
+
 	// If not registered, return the potential XDG path
 	return e.xdg.GetProjectConfigPath(absProjectPath, "json"), nil
 }
@@ -301,7 +301,7 @@ func (e *EnhancedConfigLoader) IsProjectRegistered(projectPath string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	_, err = e.xdg.GetProjectConfig(absProjectPath)
 	return err == nil
 }
