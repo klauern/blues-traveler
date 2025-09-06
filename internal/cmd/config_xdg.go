@@ -297,7 +297,7 @@ func NewConfigEditCmd() *cli.Command {
 
 			// Launch editor
 			fmt.Printf("Opening %s with %s...\n", configPath, editor)
-			cmd_exec := exec.Command(editor, configPath)
+			cmd_exec := exec.Command(editor, configPath) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
 			cmd_exec.Stdin = os.Stdin
 			cmd_exec.Stdout = os.Stdout
 			cmd_exec.Stderr = os.Stderr
