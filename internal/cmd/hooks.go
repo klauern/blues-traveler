@@ -578,7 +578,8 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 		Flags: []cli.Flag{
 			&cli.BoolFlag{Name: "global", Aliases: []string{"g"}, Usage: "Install to global settings"},
 			&cli.StringFlag{Name: "event", Aliases: []string{"e"}, Usage: "Filter to a single event"},
-			&cli.StringFlag{Name: "matcher", Aliases: []string{"m"}, Value: "*", Usage: "Tool matcher pattern"},
+			&cli.StringFlag{Name: "matcher", Aliases: []string{"m"}, Value: "*", Usage: "Default tool matcher for events (e.g., '*')"},
+			&cli.StringFlag{Name: "post-matcher", Value: "Edit,Write", Usage: "Matcher for PostToolUse when not overridden"},
 			&cli.BoolFlag{Name: "list", Usage: "List available groups"},
 			&cli.IntFlag{Name: "timeout", Aliases: []string{"t"}, Usage: "Override timeout in seconds for installed commands"},
 			&cli.BoolFlag{Name: "init", Usage: "If group not found, create a sample group stub in hooks.yml"},
@@ -610,7 +611,8 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 			}
 			groupName := args[0]
 			global := cmd.Bool("global")
-			matcher := cmd.String("matcher")
+			defaultMatcher := cmd.String("matcher")
+			postMatcher := cmd.String("post-matcher")
 			eventFilter := strings.TrimSpace(cmd.String("event"))
 			timeoutOverride := cmd.Int("timeout")
 
@@ -677,6 +679,14 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 				}
 			}
 
+			// Helper to choose matcher based on event type
+			pickMatcher := func(event string) string {
+				if event == "PostToolUse" {
+					return postMatcher
+				}
+				return defaultMatcher
+			}
+
 			// Build commands per event
 			group := (*cfg)[groupName]
 			installed := 0
@@ -703,8 +713,9 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 						timeout = &t
 					}
 
-					// Use tool matcher for settings (Edit,Write,*, etc.).
+					// Use event-specific matcher for settings (Edit,Write,*, etc.).
 					// File globs are evaluated at runtime inside the hook.
+					matcher := pickMatcher(eventName)
 					res := config.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
 					_ = res
 					installed++

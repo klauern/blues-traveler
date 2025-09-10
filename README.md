@@ -28,10 +28,21 @@ Note: Custom hooks can implement all of the above (and more) using your own scri
 
 ### Custom Hooks (Recommended)
 
-Define your own security and formatting with custom hooks:
+Define your own security and formatting with custom hooks. You can create **project-specific** or **global** custom hook groups.
+
+#### Project-Specific Custom Hooks
+
+Create hooks that apply only to the current project:
+
+```bash
+# Initialize a project custom hook group
+blues-traveler hooks custom init --group my-project
+
+# This creates: ./.claude/hooks/hooks.yml
+```
 
 ```yaml
-# ~/.config/blues-traveler/projects/my-project.yml
+# ./.claude/hooks/hooks.yml
 my-project:
   PreToolUse:
     jobs:
@@ -48,17 +59,88 @@ my-project:
         glob: ["*.go"]
 ```
 
-Then sync into Claude Code settings:
+#### Global Custom Hooks
+
+Create hooks that apply to all your projects:
 
 ```bash
-blues-traveler hooks custom validate
-blues-traveler hooks custom sync
+# Initialize a global custom hook group
+blues-traveler hooks custom init --group ruby-global --global
+
+# This creates: ~/.claude/hooks/hooks.yml
 ```
 
-You can test a single job locally:
+```yaml
+# ~/.claude/hooks/hooks.yml
+ruby-global:
+  PreToolUse:
+    jobs:
+      - name: rubocop-check
+        run: bundle exec rubocop .
+        only: ${TOOL_NAME} == "Bash"
+        glob: ["*.rb"]
+  PostToolUse:
+    jobs:
+      - name: ruby-test
+        run: bundle exec rake test
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*_test.rb", "*_spec.rb"]
+      - name: rubocop-fix
+        run: bundle exec rubocop --auto-correct ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.rb"]
+
+python-global:
+  PreToolUse:
+    jobs:
+      - name: flake8-check
+        run: flake8 .
+        only: ${TOOL_NAME} == "Bash"
+        glob: ["*.py"]
+  PostToolUse:
+    jobs:
+      - name: python-test
+        run: python -m pytest ${FILES_CHANGED}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["test_*.py", "*_test.py"]
+      - name: black-format
+        run: black ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+      - name: isort-imports
+        run: isort ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+```
+
+#### Installing Custom Hooks
+
+After creating your custom hook groups, install them into Claude Code settings:
 
 ```bash
+# Install project-specific hooks
+blues-traveler hooks custom install my-project
+
+# Install global hooks for specific languages
+blues-traveler hooks custom install ruby-global --global
+blues-traveler hooks custom install python-global --global
+
+# Or sync all custom hooks at once
+blues-traveler hooks custom sync
+blues-traveler hooks custom sync --global  # for global hooks
+```
+
+#### Testing Custom Hooks
+
+You can test individual jobs locally:
+
+```bash
+# Test project hooks
 blues-traveler hooks run config:my-project:format-go
+
+# Test global hooks
+blues-traveler hooks run config:ruby-global:rubocop-check
+blues-traveler hooks run config:python-global:flake8-check
 ```
 
 ### Installation
@@ -265,10 +347,14 @@ Blues Traveler uses a hierarchical configuration system:
 
 ### Blues Traveler Config (embedded)
 
-Project and global Blues Traveler configuration is stored at:
+Blues Traveler configuration can be stored in two ways:
 
-- Project: `~/.config/blues-traveler/projects/<project-name>.json`
-- Global: `~/.config/blues-traveler/global.json`
+#### 1. Embedded in Main Config (Recommended)
+
+Custom hooks can be embedded directly in the main Blues Traveler config:
+
+- **Project**: `~/.config/blues-traveler/projects/<project-name>.json`
+- **Global**: `~/.config/blues-traveler/global.json`
 
 Key sections:
 
@@ -276,18 +362,45 @@ Key sections:
 - `customHooks`: Custom hook groups (by name) with events and jobs.
 - `blockedUrls`: URL prefixes used by the `fetch-blocker` hook.
 
+#### 2. Separate Hook Config Files (Legacy)
+
+Custom hooks can also be defined in separate YAML files:
+
+- **Project**: `./.claude/hooks/hooks.yml` (or `./.claude/hooks.yml`)
+- **Global**: `~/.claude/hooks/hooks.yml` (or `~/.claude/hooks.yml`)
+
+**Priority Order**: Project configs override global configs, and embedded configs override separate files.
+
 Custom hooks support environment variables and simple expressions to control when jobs run:
 
-- Env vars:
-  - `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`
-  - `FILES_CHANGED` (space-separated list)
-  - `TOOL_FILE`, `TOOL_OUTPUT_FILE` (for `PostToolUse` on `Edit`/`Write`)
-  - `USER_PROMPT` (for `UserPromptSubmit`)
-- Expressions in `only`/`skip`:
-  - Boolean ops: `&&`, `||`, unary `!`
-  - Comparisons: `==`, `!=`
-  - Glob: `matches` (right side is a glob). When `FILES_CHANGED` contains multiple tokens, any match passes.
-  - Regex: `regex` (right side is a Go regex). Matches any token when multiple files are present.
+#### Available Environment Variables
+
+| Variable | Available In | Description | Example Value |
+|----------|--------------|-------------|---------------|
+| `EVENT_NAME` | All events | The Claude Code event name | `"PreToolUse"`, `"PostToolUse"` |
+| `TOOL_NAME` | All events | The tool being used | `"Edit"`, `"Write"`, `"Bash"` |
+| `PROJECT_ROOT` | All events | Current working directory | `"/path/to/project"` |
+| `FILES_CHANGED` | PostToolUse only | Space-separated list of changed files | `"src/main.go src/utils.go"` |
+| `TOOL_FILE` | PostToolUse only | First file from FILES_CHANGED (convenience) | `"src/main.go"` |
+| `TOOL_OUTPUT_FILE` | PostToolUse only | Same as TOOL_FILE (for Edit/Write) | `"src/main.go"` |
+| `USER_PROMPT` | UserPromptSubmit only | The user's prompt text | `"Add error handling"` |
+
+**Important Notes:**
+
+- `FILES_CHANGED`, `TOOL_FILE`, and `TOOL_OUTPUT_FILE` are **only available in PostToolUse events** when files are actually changed (Edit/Write tools)
+- PreToolUse events only have access to `EVENT_NAME`, `TOOL_NAME`, and `PROJECT_ROOT`
+- Use `glob` patterns to filter which files trigger the job, and `only`/`skip` conditions to control execution
+
+#### Expression Syntax
+
+Expressions in `only`/`skip` conditions support:
+
+- **Boolean operators**: `&&`, `||`, unary `!`
+- **Comparisons**: `==`, `!=`
+- **Glob matching**: `matches` (right side is a glob pattern)
+- **Regex matching**: `regex` (right side is a Go regex pattern)
+
+When `FILES_CHANGED` contains multiple tokens, any match passes the condition.
 
 Examples:
 
@@ -305,21 +418,111 @@ mygroup:
         only: ${FILES_CHANGED} regex ".*controller.*\\.rb$"
 ```
 
-Example:
+#### Creating Global Custom Hooks (Embedded Config)
+
+You can create global custom hooks by editing the embedded config directly:
+
+```bash
+# Edit global config
+blues-traveler config edit --global
+```
+
+Add your custom hooks to the `customHooks` section:
 
 ```json
 {
   "logRotation": { "maxAge": 30, "maxSize": 10, "maxBackups": 5, "compress": true },
   "customHooks": {
-    "ruby": {
-      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
-      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    "ruby-global": {
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "rubocop-check",
+            "run": "bundle exec rubocop .",
+            "only": "${TOOL_NAME} == \"Bash\"",
+            "glob": ["*.rb"]
+          }
+        ]
+      },
+      "PostToolUse": {
+        "jobs": [
+          {
+            "name": "ruby-test",
+            "run": "bundle exec rake test",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*_test.rb", "*_spec.rb"]
+          },
+          {
+            "name": "rubocop-fix",
+            "run": "bundle exec rubocop --auto-correct ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.rb"]
+          }
+        ]
+      }
+    },
+    "python-global": {
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "flake8-check",
+            "run": "flake8 .",
+            "only": "${TOOL_NAME} == \"Bash\"",
+            "glob": ["*.py"]
+          }
+        ]
+      },
+      "PostToolUse": {
+        "jobs": [
+          {
+            "name": "python-test",
+            "run": "python -m pytest ${FILES_CHANGED}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["test_*.py", "*_test.py"]
+          },
+          {
+            "name": "black-format",
+            "run": "black ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.py"]
+          },
+          {
+            "name": "isort-imports",
+            "run": "isort ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.py"]
+          }
+        ]
+      }
     }
   },
   "blockedUrls": [
     { "prefix": "https://github.com/*/*/private/*", "suggestion": "Use 'gh api' for private repos" },
     { "prefix": "https://api.company.com/private/*" }
   ]
+}
+```
+
+Then install the global hooks:
+
+```bash
+# Install global custom hooks
+blues-traveler hooks custom install ruby-global --global
+blues-traveler hooks custom install python-global --global
+```
+
+#### Project-Specific Example
+
+For project-specific hooks, create a similar structure in your project config:
+
+```json
+{
+  "customHooks": {
+    "ruby": {
+      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
+      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    }
+  }
 }
 ```
 
