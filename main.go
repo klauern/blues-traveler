@@ -63,16 +63,9 @@ func main() {
 		Description: `A CLI tool that runs Claude Code hooks directly and manages hook installations.
 Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
 		Commands: []*cli.Command{
-			cmd.NewListCmd(getPluginWrapper, compat.PluginKeys),
-			cmd.NewRunCmd(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys),
-			cmd.NewInstallCmd(getPluginWrapper, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes),
-			cmd.NewUninstallCmd(),
-			cmd.NewListInstalledCmd(),
-			cmd.NewListEventsCmd(eventsWrapper),
-			cmd.NewGenerateCmd(),
+			cmd.NewHooksCommand(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes, eventsWrapper),
 			cmd.NewConfigCmd(),
-			cmd.NewConfigLogCmd(),
-			cmd.NewHooksConfigCmd(),
+			cmd.NewGenerateCmd(),
 			cmd.NewVersionCmd(versionInfo),
 		},
 	}

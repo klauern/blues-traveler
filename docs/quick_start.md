@@ -50,9 +50,9 @@ my-project:
 Sync and test:
 
 ```bash
-blues-traveler config validate
-blues-traveler config sync
-blues-traveler run config:my-project:format-go
+blues-traveler hooks custom validate
+blues-traveler hooks custom sync
+blues-traveler hooks run config:my-project:format-go
 ```
 
 Built-in hooks remain available for quick setup, but custom hooks can replace or extend them to fit your workflow.
@@ -60,7 +60,7 @@ Built-in hooks remain available for quick setup, but custom hooks can replace or
 ### 1. Verify Installation
 
 ```bash
-blues-traveler list
+blues-traveler hooks list
 ```
 
 You should see available hooks like:
@@ -76,7 +76,7 @@ You should see available hooks like:
 Start with the security hook to protect against dangerous commands:
 
 ```bash
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 ```
 
 This will:
@@ -90,7 +90,7 @@ This will:
 Run the security hook manually to test:
 
 ```bash
-blues-traveler run security --log
+blues-traveler hooks run security --log
 ```
 
 ## Common Configurations
@@ -101,13 +101,13 @@ Set up a complete code quality pipeline:
 
 ```bash
 # Security: Block dangerous commands
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 
 # Format: Auto-format code after editing
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
 
 # Debug: Log all operations
-blues-traveler install debug --event PreToolUse --log --log-format pretty
+blues-traveler hooks install debug --event PreToolUse --log --log-format pretty
 ```
 
 ### Production Monitoring
@@ -116,8 +116,8 @@ For production environments, add comprehensive logging:
 
 ```bash
 # Audit all operations globally
-blues-traveler install audit --event PreToolUse --global
-blues-traveler install audit --event PostToolUse --global
+blues-traveler hooks install audit --event PreToolUse --global
+blues-traveler hooks install audit --event PostToolUse --global
 ```
 
 ## Verify Configuration
@@ -125,14 +125,14 @@ blues-traveler install audit --event PostToolUse --global
 Check what's currently installed:
 
 ```bash
-blues-traveler list-installed
+blues-traveler hooks list --installed
 ```
 
 This shows all hooks configured in your Claude Code settings.
 
 ## Next Steps
 
-- **Explore Events**: Run `blues-traveler list-events` to see all available events
+- **Explore Events**: Run `blues-traveler hooks list --events` to see all available events
 - **Customize Settings**: Edit `.claude/settings.json` for advanced configuration
 - **Add More Hooks**: Install additional hooks based on your needs
 - **Check Logs**: Use `--log` flag when running hooks to see detailed output
@@ -143,7 +143,7 @@ This shows all hooks configured in your Claude Code settings.
 
 ```bash
 # Check available hooks
-blues-traveler list
+blues-traveler hooks list
 
 # Verify installation
 which blues-traveler
@@ -153,10 +153,10 @@ which blues-traveler
 
 ```bash
 # Check if hook is enabled
-blues-traveler list-installed
+blues-traveler hooks list --installed
 
 # Run with logging
-blues-traveler run <hook-name> --log
+blues-traveler hooks run <hook-name> --log
 ```
 
 ### Settings Issues

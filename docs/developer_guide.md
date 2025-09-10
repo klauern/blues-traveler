@@ -340,7 +340,7 @@ git push
 - Use `--log` flag when running hooks
 - Check log files in `.claude/hooks/`
 - Enable verbose logging with `--log-format pretty`
-- Use `blues-traveler list-installed` to verify configuration
+- Use `blues-traveler hooks list --installed` to verify configuration
 
 ## Contributing
 

@@ -51,14 +51,14 @@ my-project:
 Then sync into Claude Code settings:
 
 ```bash
-blues-traveler config validate
-blues-traveler config sync
+blues-traveler hooks custom validate
+blues-traveler hooks custom sync
 ```
 
 You can test a single job locally:
 
 ```bash
-blues-traveler run config:my-project:format-go
+blues-traveler hooks run config:my-project:format-go
 ```
 
 ### Installation
@@ -77,70 +77,93 @@ cd blues-traveler
 task build
 
 # List available hooks
-blues-traveler list
+blues-traveler hooks list
 
 # Install your first hook (security recommended)
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 
 # Verify installation
-blues-traveler list-installed
+blues-traveler hooks list --installed
 ```
 
 ## 📖 Core Commands
 
-### Basic Operations
+### Hook Operations
 
 ```bash
 # List all available hooks
-blues-traveler list
-
-# Run a specific hook manually
-blues-traveler run <hook-name> [--log] [--log-format jsonl|pretty]
-
-# Install hook in Claude Code settings
-blues-traveler install <hook-name> [options]
-
-# Remove hook from Claude Code settings
-blues-traveler uninstall <hook-name|all> [--global]
+blues-traveler hooks list
 
 # List installed hooks
-blues-traveler list-installed [--global]
+blues-traveler hooks list --installed [--global]
 
 # List available Claude Code events
-blues-traveler list-events
+blues-traveler hooks list --events
 
-# Custom hooks (embedded config)
-blues-traveler config init [--group NAME] [--name FILE] [--global] [--overwrite]
-blues-traveler config validate
-blues-traveler config groups
-blues-traveler config show
-blues-traveler config sync [group] [--global] [--dry-run] [--event E]
-blues-traveler install custom <group> [--event E] [--matcher GLOB] [--timeout S]
+# Run a specific hook manually
+blues-traveler hooks run <hook-name> [--log] [--log-format jsonl|pretty]
 
-# Blocked URLs management (fetch-blocker)
-blues-traveler config blocked list [--global]
-blues-traveler config blocked add <prefix> [--suggestion TEXT] [--global]
-blues-traveler config blocked remove <prefix> [--global]
-blues-traveler config blocked clear [--global]
+# Install hook in Claude Code settings
+blues-traveler hooks install <hook-name> [--global] [--event <event>] [--matcher <pattern>] [--timeout <seconds>] [--log] [--log-format <format>]
+
+# Remove hook from Claude Code settings
+blues-traveler hooks uninstall <hook-name|all> [--global] [--yes]
 ```
 
-### Installation Options
+### Custom Hooks Management
 
 ```bash
-# Install to project settings (default)
-blues-traveler install <hook-name>
+# Initialize custom hooks configuration
+blues-traveler hooks custom init [--group NAME] [--name FILE] [--global] [--overwrite]
 
-# Install globally for all projects
-blues-traveler install <hook-name> --global
+# Validate custom hooks configuration
+blues-traveler hooks custom validate
 
-# Install with specific event and matcher
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+# List available custom hook groups
+blues-traveler hooks custom list
+
+# Show custom hooks configuration
+blues-traveler hooks custom show [--format yaml|json] [--global]
+
+# Sync custom hooks to Claude Code settings
+blues-traveler hooks custom sync [group] [--global] [--dry-run] [--event E] [--matcher <pattern>] [--timeout <seconds>]
+
+# Install custom hook group
+blues-traveler hooks custom install <group> [--global] [--event E] [--matcher GLOB] [--timeout S] [--list] [--init] [--prune]
+
+# Manage blocked URLs (fetch-blocker)
+blues-traveler hooks custom blocked list [--global]
+blues-traveler hooks custom blocked add <prefix> [--suggestion TEXT] [--global]
+blues-traveler hooks custom blocked remove <prefix> [--global]
+blues-traveler hooks custom blocked clear [--global]
+```
+
+### Configuration Management
+
+```bash
+# Migrate existing configurations to XDG structure
+blues-traveler config migrate [--dry-run] [--verbose] [--all]
+
+# List tracked project configurations
+blues-traveler config list [--verbose] [--paths-only]
+
+# Edit configuration files
+blues-traveler config edit [--global] [--project <path>] [--editor <editor>]
+
+# Clean up orphaned configurations
+blues-traveler config clean [--dry-run]
+
+# Show configuration status
+blues-traveler config status [--project <path>]
+
+# Configure log rotation settings
+blues-traveler config log [--global] [--max-age <days>] [--max-size <MB>] [--max-backups <count>] [--compress] [--show]
 
 # Enable logging with custom format
-blues-traveler install debug --log --log-format pretty
+blues-traveler hooks install debug --log --log-format pretty
 
 # Set custom timeout (seconds)
-blues-traveler install security --timeout 30
+blues-traveler hooks install security --timeout 30
 ```
 
 ## 🎯 Common Usage Patterns
@@ -151,13 +174,13 @@ Protect against dangerous commands and risky operations:
 
 ```bash
 # Block dangerous commands
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 
 # Block unauthorized web fetches
-blues-traveler install fetch-blocker --event PreToolUse
+blues-traveler hooks install fetch-blocker --event PreToolUse
 
 # Suggest better alternatives to find
-blues-traveler install find-blocker --event PreToolUse
+blues-traveler hooks install find-blocker --event PreToolUse
 ```
 
 ### Code Quality Pipeline
@@ -166,13 +189,13 @@ Maintain consistent code quality and formatting:
 
 ```bash
 # Auto-format code after edits
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
 
 # Enforce code quality standards
-blues-traveler install vet --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install vet --event PostToolUse --matcher "Edit,Write"
 
 # Debug and monitor operations
-blues-traveler install debug --event PreToolUse --log --log-format pretty
+blues-traveler hooks install debug --event PreToolUse --log --log-format pretty
 ```
 
 ### Production Monitoring
@@ -181,11 +204,11 @@ Comprehensive audit logging for production environments:
 
 ```bash
 # Global audit logging for all operations
-blues-traveler install audit --event PreToolUse --global
-blues-traveler install audit --event PostToolUse --global
+blues-traveler hooks install audit --event PreToolUse --global
+blues-traveler hooks install audit --event PostToolUse --global
 
 # Global security enforcement
-blues-traveler install security --event PreToolUse --global
+blues-traveler hooks install security --event PreToolUse --global
 ```
 
 ### Developer Workflow
@@ -194,10 +217,10 @@ Optimal setup for development:
 
 ```bash
 # Security + formatting + debugging
-blues-traveler install security --event PreToolUse
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
-blues-traveler install debug --event PreToolUse --log
-blues-traveler install find-blocker --event PreToolUse  # Use fd instead
+blues-traveler hooks install security --event PreToolUse
+blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install debug --event PreToolUse --log
+blues-traveler hooks install find-blocker --event PreToolUse  # Use fd instead
 ```
 
 ### Custom Hooks Sync
@@ -206,22 +229,23 @@ Sync custom hooks from your configuration into Claude Code settings:
 
 ```bash
 # Sync all custom hooks from config to settings
-blues-traveler config sync
+blues-traveler hooks custom sync
 
 # Sync only a specific group
-blues-traveler config sync my-python-group
+blues-traveler hooks custom sync my-python-group
 
 # Preview changes without applying them
-blues-traveler config sync --dry-run
+blues-traveler hooks custom sync --dry-run
 
 # Sync to global settings instead of project
-blues-traveler config sync --global
+blues-traveler hooks custom sync --global
 
 # Sync only hooks for a specific event
-blues-traveler config sync --event PostToolUse
+blues-traveler hooks custom sync --event PostToolUse
 ```
 
 **Key Benefits:**
+
 - **Smart Cleanup**: Automatically removes hooks from settings when they're removed from config
 - **Group Management**: Sync specific groups or all at once
 - **Safe Preview**: Use `--dry-run` to see what changes will be made

@@ -79,16 +79,25 @@ task lint
 
 ```bash
 # List available hooks
-./blues-traveler list
-
-# Run a specific hook
-./blues-traveler run <hook-key>
-
-# Install hook into Claude Code settings
-./blues-traveler install <hook-key> [flags]
+./blues-traveler hooks list
 
 # List installed hooks from settings
-./blues-traveler list-installed
+./blues-traveler hooks list --installed
+
+# List available events
+./blues-traveler hooks list --events
+
+# Run a specific hook
+./blues-traveler hooks run <hook-key>
+
+# Install hook into Claude Code settings
+./blues-traveler hooks install <hook-key> [flags]
+
+# Install custom hook group
+./blues-traveler hooks custom install <group-name> [flags]
+
+# Sync custom hooks to settings
+./blues-traveler hooks custom sync [group] [flags]
 ```
 
 ## File Structure
@@ -98,7 +107,10 @@ task lint
 - `internal/hooks/*.go`: Individual hook implementations
 - `internal/core/registry.go`: Hook registry and management
 - `internal/config/settings.go`: Settings file management with JSON marshaling
-- `internal/cmd/*.go`: CLI command implementations
+- `internal/cmd/hooks.go`: Consolidated hooks command with all hook operations
+- `internal/cmd/config_xdg.go`: Configuration management commands
+- `internal/cmd/generate.go`: Code generation commands
+- `internal/cmd/version.go`: Version information command
 - `Taskfile.yml`: Task runner configuration for build/test/lint workflows
 
 ## Dependencies
