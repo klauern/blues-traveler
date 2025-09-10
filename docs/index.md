@@ -83,16 +83,16 @@ blues-traveler/
 
 ```bash
 # List available hooks
-blues-traveler list
+blues-traveler hooks list
 
 # Install a hook
-blues-traveler install <hook-name> --event <event-type>
+blues-traveler hooks install <hook-name> --event <event-type>
 
 # Run a hook manually
-blues-traveler run <hook-name> --log
+blues-traveler hooks run <hook-name> --log
 
 # Check configuration
-blues-traveler list-installed
+blues-traveler hooks list --installed
 ```
 
 ### Key Hooks

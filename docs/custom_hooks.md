@@ -47,15 +47,15 @@ my-project:
 ## Install and Test
 
 ```bash
-blues-traveler config validate
-blues-traveler config sync            # install all groups/events
-blues-traveler run config:my-project:format-go
+blues-traveler hooks custom validate
+blues-traveler hooks custom sync            # install all groups/events
+blues-traveler hooks run config:my-project:format-go
 ```
 
 Filter installs to a single group/event:
 
 ```bash
-blues-traveler install custom my-project --event PostToolUse
+blues-traveler hooks custom install my-project --event PostToolUse
 ```
 
 ## Variables Available
@@ -82,4 +82,3 @@ Built-ins remain for convenience; custom hooks are recommended for most workflow
 - Add `timeout` to avoid long-running jobs
 - Combine `only`/`skip` to be precise about when jobs run
 - Version control your `.claude/hooks/` directory
-

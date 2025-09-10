@@ -28,10 +28,21 @@ Note: Custom hooks can implement all of the above (and more) using your own scri
 
 ### Custom Hooks (Recommended)
 
-Define your own security and formatting with custom hooks:
+Define your own security and formatting with custom hooks. You can create **project-specific** or **global** custom hook groups.
+
+#### Project-Specific Custom Hooks
+
+Create hooks that apply only to the current project:
+
+```bash
+# Initialize a project custom hook group
+blues-traveler hooks custom init --group my-project
+
+# This creates: ./.claude/hooks/hooks.yml
+```
 
 ```yaml
-# ~/.config/blues-traveler/projects/my-project.yml
+# ./.claude/hooks/hooks.yml
 my-project:
   PreToolUse:
     jobs:
@@ -48,17 +59,88 @@ my-project:
         glob: ["*.go"]
 ```
 
-Then sync into Claude Code settings:
+#### Global Custom Hooks
+
+Create hooks that apply to all your projects:
 
 ```bash
-blues-traveler config validate
-blues-traveler config sync
+# Initialize a global custom hook group
+blues-traveler hooks custom init --group ruby-global --global
+
+# This creates: ~/.claude/hooks/hooks.yml
 ```
 
-You can test a single job locally:
+```yaml
+# ~/.claude/hooks/hooks.yml
+ruby-global:
+  PreToolUse:
+    jobs:
+      - name: rubocop-check
+        run: bundle exec rubocop .
+        only: ${TOOL_NAME} == "Bash"
+        glob: ["*.rb"]
+  PostToolUse:
+    jobs:
+      - name: ruby-test
+        run: bundle exec rake test
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*_test.rb", "*_spec.rb"]
+      - name: rubocop-fix
+        run: bundle exec rubocop --auto-correct ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.rb"]
+
+python-global:
+  PreToolUse:
+    jobs:
+      - name: flake8-check
+        run: flake8 .
+        only: ${TOOL_NAME} == "Bash"
+        glob: ["*.py"]
+  PostToolUse:
+    jobs:
+      - name: python-test
+        run: python -m pytest ${FILES_CHANGED}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["test_*.py", "*_test.py"]
+      - name: black-format
+        run: black ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+      - name: isort-imports
+        run: isort ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.py"]
+```
+
+#### Installing Custom Hooks
+
+After creating your custom hook groups, install them into Claude Code settings:
 
 ```bash
-blues-traveler run config:my-project:format-go
+# Install project-specific hooks
+blues-traveler hooks custom install my-project
+
+# Install global hooks for specific languages
+blues-traveler hooks custom install ruby-global --global
+blues-traveler hooks custom install python-global --global
+
+# Or sync all custom hooks at once
+blues-traveler hooks custom sync
+blues-traveler hooks custom sync --global  # for global hooks
+```
+
+#### Testing Custom Hooks
+
+You can test individual jobs locally:
+
+```bash
+# Test project hooks
+blues-traveler hooks run config:my-project:format-go
+
+# Test global hooks
+blues-traveler hooks run config:ruby-global:rubocop-check
+blues-traveler hooks run config:python-global:flake8-check
 ```
 
 ### Installation
@@ -77,70 +159,93 @@ cd blues-traveler
 task build
 
 # List available hooks
-blues-traveler list
+blues-traveler hooks list
 
 # Install your first hook (security recommended)
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 
 # Verify installation
-blues-traveler list-installed
+blues-traveler hooks list --installed
 ```
 
 ## 📖 Core Commands
 
-### Basic Operations
+### Hook Operations
 
 ```bash
 # List all available hooks
-blues-traveler list
-
-# Run a specific hook manually
-blues-traveler run <hook-name> [--log] [--log-format jsonl|pretty]
-
-# Install hook in Claude Code settings
-blues-traveler install <hook-name> [options]
-
-# Remove hook from Claude Code settings
-blues-traveler uninstall <hook-name|all> [--global]
+blues-traveler hooks list
 
 # List installed hooks
-blues-traveler list-installed [--global]
+blues-traveler hooks list --installed [--global]
 
 # List available Claude Code events
-blues-traveler list-events
+blues-traveler hooks list --events
 
-# Custom hooks (embedded config)
-blues-traveler config init [--group NAME] [--name FILE] [--global] [--overwrite]
-blues-traveler config validate
-blues-traveler config groups
-blues-traveler config show
-blues-traveler config sync [group] [--global] [--dry-run] [--event E]
-blues-traveler install custom <group> [--event E] [--matcher GLOB] [--timeout S]
+# Run a specific hook manually
+blues-traveler hooks run <hook-name> [--log] [--log-format jsonl|pretty]
 
-# Blocked URLs management (fetch-blocker)
-blues-traveler config blocked list [--global]
-blues-traveler config blocked add <prefix> [--suggestion TEXT] [--global]
-blues-traveler config blocked remove <prefix> [--global]
-blues-traveler config blocked clear [--global]
+# Install hook in Claude Code settings
+blues-traveler hooks install <hook-name> [--global] [--event <event>] [--matcher <pattern>] [--timeout <seconds>] [--log] [--log-format <format>]
+
+# Remove hook from Claude Code settings
+blues-traveler hooks uninstall <hook-name|all> [--global] [--yes]
 ```
 
-### Installation Options
+### Custom Hooks Management
 
 ```bash
-# Install to project settings (default)
-blues-traveler install <hook-name>
+# Initialize custom hooks configuration
+blues-traveler hooks custom init [--group NAME] [--name FILE] [--global] [--overwrite]
 
-# Install globally for all projects
-blues-traveler install <hook-name> --global
+# Validate custom hooks configuration
+blues-traveler hooks custom validate
 
-# Install with specific event and matcher
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+# List available custom hook groups
+blues-traveler hooks custom list
+
+# Show custom hooks configuration
+blues-traveler hooks custom show [--format yaml|json] [--global]
+
+# Sync custom hooks to Claude Code settings
+blues-traveler hooks custom sync [group] [--global] [--dry-run] [--event E] [--matcher <pattern>] [--timeout <seconds>]
+
+# Install custom hook group
+blues-traveler hooks custom install <group> [--global] [--event E] [--matcher GLOB] [--timeout S] [--list] [--init] [--prune]
+
+# Manage blocked URLs (fetch-blocker)
+blues-traveler hooks custom blocked list [--global]
+blues-traveler hooks custom blocked add <prefix> [--suggestion TEXT] [--global]
+blues-traveler hooks custom blocked remove <prefix> [--global]
+blues-traveler hooks custom blocked clear [--global]
+```
+
+### Configuration Management
+
+```bash
+# Migrate existing configurations to XDG structure
+blues-traveler config migrate [--dry-run] [--verbose] [--all]
+
+# List tracked project configurations
+blues-traveler config list [--verbose] [--paths-only]
+
+# Edit configuration files
+blues-traveler config edit [--global] [--project <path>] [--editor <editor>]
+
+# Clean up orphaned configurations
+blues-traveler config clean [--dry-run]
+
+# Show configuration status
+blues-traveler config status [--project <path>]
+
+# Configure log rotation settings
+blues-traveler config log [--global] [--max-age <days>] [--max-size <MB>] [--max-backups <count>] [--compress] [--show]
 
 # Enable logging with custom format
-blues-traveler install debug --log --log-format pretty
+blues-traveler hooks install debug --log --log-format pretty
 
 # Set custom timeout (seconds)
-blues-traveler install security --timeout 30
+blues-traveler hooks install security --timeout 30
 ```
 
 ## 🎯 Common Usage Patterns
@@ -151,13 +256,13 @@ Protect against dangerous commands and risky operations:
 
 ```bash
 # Block dangerous commands
-blues-traveler install security --event PreToolUse
+blues-traveler hooks install security --event PreToolUse
 
 # Block unauthorized web fetches
-blues-traveler install fetch-blocker --event PreToolUse
+blues-traveler hooks install fetch-blocker --event PreToolUse
 
 # Suggest better alternatives to find
-blues-traveler install find-blocker --event PreToolUse
+blues-traveler hooks install find-blocker --event PreToolUse
 ```
 
 ### Code Quality Pipeline
@@ -166,13 +271,13 @@ Maintain consistent code quality and formatting:
 
 ```bash
 # Auto-format code after edits
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
 
 # Enforce code quality standards
-blues-traveler install vet --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install vet --event PostToolUse --matcher "Edit,Write"
 
 # Debug and monitor operations
-blues-traveler install debug --event PreToolUse --log --log-format pretty
+blues-traveler hooks install debug --event PreToolUse --log --log-format pretty
 ```
 
 ### Production Monitoring
@@ -181,11 +286,11 @@ Comprehensive audit logging for production environments:
 
 ```bash
 # Global audit logging for all operations
-blues-traveler install audit --event PreToolUse --global
-blues-traveler install audit --event PostToolUse --global
+blues-traveler hooks install audit --event PreToolUse --global
+blues-traveler hooks install audit --event PostToolUse --global
 
 # Global security enforcement
-blues-traveler install security --event PreToolUse --global
+blues-traveler hooks install security --event PreToolUse --global
 ```
 
 ### Developer Workflow
@@ -194,10 +299,10 @@ Optimal setup for development:
 
 ```bash
 # Security + formatting + debugging
-blues-traveler install security --event PreToolUse
-blues-traveler install format --event PostToolUse --matcher "Edit,Write"
-blues-traveler install debug --event PreToolUse --log
-blues-traveler install find-blocker --event PreToolUse  # Use fd instead
+blues-traveler hooks install security --event PreToolUse
+blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
+blues-traveler hooks install debug --event PreToolUse --log
+blues-traveler hooks install find-blocker --event PreToolUse  # Use fd instead
 ```
 
 ### Custom Hooks Sync
@@ -206,22 +311,23 @@ Sync custom hooks from your configuration into Claude Code settings:
 
 ```bash
 # Sync all custom hooks from config to settings
-blues-traveler config sync
+blues-traveler hooks custom sync
 
 # Sync only a specific group
-blues-traveler config sync my-python-group
+blues-traveler hooks custom sync my-python-group
 
 # Preview changes without applying them
-blues-traveler config sync --dry-run
+blues-traveler hooks custom sync --dry-run
 
 # Sync to global settings instead of project
-blues-traveler config sync --global
+blues-traveler hooks custom sync --global
 
 # Sync only hooks for a specific event
-blues-traveler config sync --event PostToolUse
+blues-traveler hooks custom sync --event PostToolUse
 ```
 
 **Key Benefits:**
+
 - **Smart Cleanup**: Automatically removes hooks from settings when they're removed from config
 - **Group Management**: Sync specific groups or all at once
 - **Safe Preview**: Use `--dry-run` to see what changes will be made
@@ -241,10 +347,14 @@ Blues Traveler uses a hierarchical configuration system:
 
 ### Blues Traveler Config (embedded)
 
-Project and global Blues Traveler configuration is stored at:
+Blues Traveler configuration can be stored in two ways:
 
-- Project: `~/.config/blues-traveler/projects/<project-name>.json`
-- Global: `~/.config/blues-traveler/global.json`
+#### 1. Embedded in Main Config (Recommended)
+
+Custom hooks can be embedded directly in the main Blues Traveler config:
+
+- **Project**: `~/.config/blues-traveler/projects/<project-name>.json`
+- **Global**: `~/.config/blues-traveler/global.json`
 
 Key sections:
 
@@ -252,18 +362,45 @@ Key sections:
 - `customHooks`: Custom hook groups (by name) with events and jobs.
 - `blockedUrls`: URL prefixes used by the `fetch-blocker` hook.
 
+#### 2. Separate Hook Config Files (Legacy)
+
+Custom hooks can also be defined in separate YAML files:
+
+- **Project**: `./.claude/hooks/hooks.yml` (or `./.claude/hooks.yml`)
+- **Global**: `~/.claude/hooks/hooks.yml` (or `~/.claude/hooks.yml`)
+
+**Priority Order**: Project configs override global configs, and embedded configs override separate files.
+
 Custom hooks support environment variables and simple expressions to control when jobs run:
 
-- Env vars:
-  - `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`
-  - `FILES_CHANGED` (space-separated list)
-  - `TOOL_FILE`, `TOOL_OUTPUT_FILE` (for `PostToolUse` on `Edit`/`Write`)
-  - `USER_PROMPT` (for `UserPromptSubmit`)
-- Expressions in `only`/`skip`:
-  - Boolean ops: `&&`, `||`, unary `!`
-  - Comparisons: `==`, `!=`
-  - Glob: `matches` (right side is a glob). When `FILES_CHANGED` contains multiple tokens, any match passes.
-  - Regex: `regex` (right side is a Go regex). Matches any token when multiple files are present.
+#### Available Environment Variables
+
+| Variable | Available In | Description | Example Value |
+|----------|--------------|-------------|---------------|
+| `EVENT_NAME` | All events | The Claude Code event name | `"PreToolUse"`, `"PostToolUse"` |
+| `TOOL_NAME` | All events | The tool being used | `"Edit"`, `"Write"`, `"Bash"` |
+| `PROJECT_ROOT` | All events | Current working directory | `"/path/to/project"` |
+| `FILES_CHANGED` | PostToolUse only | Space-separated list of changed files | `"src/main.go src/utils.go"` |
+| `TOOL_FILE` | PostToolUse only | First file from FILES_CHANGED (convenience) | `"src/main.go"` |
+| `TOOL_OUTPUT_FILE` | PostToolUse only | Same as TOOL_FILE (for Edit/Write) | `"src/main.go"` |
+| `USER_PROMPT` | UserPromptSubmit only | The user's prompt text | `"Add error handling"` |
+
+**Important Notes:**
+
+- `FILES_CHANGED`, `TOOL_FILE`, and `TOOL_OUTPUT_FILE` are **only available in PostToolUse events** when files are actually changed (Edit/Write tools)
+- PreToolUse events only have access to `EVENT_NAME`, `TOOL_NAME`, and `PROJECT_ROOT`
+- Use `glob` patterns to filter which files trigger the job, and `only`/`skip` conditions to control execution
+
+#### Expression Syntax
+
+Expressions in `only`/`skip` conditions support:
+
+- **Boolean operators**: `&&`, `||`, unary `!`
+- **Comparisons**: `==`, `!=`
+- **Glob matching**: `matches` (right side is a glob pattern)
+- **Regex matching**: `regex` (right side is a Go regex pattern)
+
+When `FILES_CHANGED` contains multiple tokens, any match passes the condition.
 
 Examples:
 
@@ -281,21 +418,111 @@ mygroup:
         only: ${FILES_CHANGED} regex ".*controller.*\\.rb$"
 ```
 
-Example:
+#### Creating Global Custom Hooks (Embedded Config)
+
+You can create global custom hooks by editing the embedded config directly:
+
+```bash
+# Edit global config
+blues-traveler config edit --global
+```
+
+Add your custom hooks to the `customHooks` section:
 
 ```json
 {
   "logRotation": { "maxAge": 30, "maxSize": 10, "maxBackups": 5, "compress": true },
   "customHooks": {
-    "ruby": {
-      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
-      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    "ruby-global": {
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "rubocop-check",
+            "run": "bundle exec rubocop .",
+            "only": "${TOOL_NAME} == \"Bash\"",
+            "glob": ["*.rb"]
+          }
+        ]
+      },
+      "PostToolUse": {
+        "jobs": [
+          {
+            "name": "ruby-test",
+            "run": "bundle exec rake test",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*_test.rb", "*_spec.rb"]
+          },
+          {
+            "name": "rubocop-fix",
+            "run": "bundle exec rubocop --auto-correct ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.rb"]
+          }
+        ]
+      }
+    },
+    "python-global": {
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "flake8-check",
+            "run": "flake8 .",
+            "only": "${TOOL_NAME} == \"Bash\"",
+            "glob": ["*.py"]
+          }
+        ]
+      },
+      "PostToolUse": {
+        "jobs": [
+          {
+            "name": "python-test",
+            "run": "python -m pytest ${FILES_CHANGED}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["test_*.py", "*_test.py"]
+          },
+          {
+            "name": "black-format",
+            "run": "black ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.py"]
+          },
+          {
+            "name": "isort-imports",
+            "run": "isort ${TOOL_OUTPUT_FILE}",
+            "only": "${TOOL_NAME} == \"Edit\" || ${TOOL_NAME} == \"Write\"",
+            "glob": ["*.py"]
+          }
+        ]
+      }
     }
   },
   "blockedUrls": [
     { "prefix": "https://github.com/*/*/private/*", "suggestion": "Use 'gh api' for private repos" },
     { "prefix": "https://api.company.com/private/*" }
   ]
+}
+```
+
+Then install the global hooks:
+
+```bash
+# Install global custom hooks
+blues-traveler hooks custom install ruby-global --global
+blues-traveler hooks custom install python-global --global
+```
+
+#### Project-Specific Example
+
+For project-specific hooks, create a similar structure in your project config:
+
+```json
+{
+  "customHooks": {
+    "ruby": {
+      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
+      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+    }
+  }
 }
 ```
 
