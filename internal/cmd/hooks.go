@@ -264,8 +264,8 @@ This will automatically configure the hook to run for the specified events.`,
 				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
-			// Create command: blues-traveler run <type>
-			hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
+			// Create command: blues-traveler hooks run <type>
+			hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
 			if logEnabled {
 				hookCommand += " --log"
 				if logFormat != config.LoggingFormatJSONL {
@@ -382,8 +382,8 @@ func newHooksUninstallCommand() *cli.Command {
 				return fmt.Errorf("failed to get executable path: %v", err)
 			}
 
-			// Create command pattern to match: blues-traveler run <type>
-			hookCommand := fmt.Sprintf("%s run %s", execPath, hookType)
+			// Create command pattern to match: blues-traveler hooks run <type>
+			hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
 
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
@@ -702,7 +702,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 					if err != nil {
 						return fmt.Errorf("failed to get executable path: %v", err)
 					}
-					hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
+					hookCommand := fmt.Sprintf("%s hooks run config:%s:%s", execPath, groupName, job.Name)
 
 					// Timeout selection: CLI override > job.Timeout > none
 					var timeout *int
@@ -883,7 +883,7 @@ func newHooksCustomSyncCommand() *cli.Command {
 								continue
 							}
 							// Build command to run this job
-							hookCommand := fmt.Sprintf("%s run config:%s:%s", execPath, groupName, job.Name)
+							hookCommand := fmt.Sprintf("%s hooks run config:%s:%s", execPath, groupName, job.Name)
 							// Timeout preference: CLI override > job.Timeout
 							var timeout *int
 							if timeoutOverride > 0 {
