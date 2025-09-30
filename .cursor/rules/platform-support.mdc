@@ -1,0 +1,79 @@
+---
+description: Platform abstraction for multi-IDE support (Cursor, Claude Code)
+---
+
+# Platform Abstraction System
+
+## Overview
+
+blues-traveler supports multiple IDE platforms through a **platform abstraction layer** in [internal/platform/](mdc:internal/platform/).
+
+## Architecture
+
+### Platform Interface
+
+All platforms implement [internal/platform/platform.go](mdc:internal/platform/platform.go):
+
+```go
+type Platform interface {
+    Type() Type
+    Name() string
+    ConfigPath() (string, error)
+    SupportsEvent(event core.EventType) bool
+    MapEventFromGeneric(event core.EventType) []string
+    MapEventToGeneric(platformEvent string) (core.EventType, bool)
+    ValidateEventName(eventName string) bool
+    AllEvents() []PlatformEvent
+}
+```
+
+### Supported Platforms
+
+- **Claude Code** ([internal/platform/claude/](mdc:internal/platform/claude/)) - Environment variable protocol
+- **Cursor** ([internal/platform/cursor/](mdc:internal/platform/cursor/)) - JSON stdin/stdout protocol
+
+## Key Differences
+
+| Aspect   | Claude Code             | Cursor                           |
+| -------- | ----------------------- | -------------------------------- |
+| Protocol | Environment variables   | JSON stdin/stdout                |
+| Config   | `.claude/settings.json` | `~/.cursor/hooks.json`           |
+| Matchers | Regex in config         | None (filter in wrapper scripts) |
+| Events   | 9 events                | 6 events                         |
+
+## Import Cycle Prevention
+
+**IMPORTANT**: To avoid import cycles, platform instantiation must happen in [internal/cmd/](mdc:internal/cmd/) layer:
+
+```go
+// ✅ Correct - in cmd layer
+func newPlatformFromType(t platform.Type) platform.Platform {
+    switch t {
+    case platform.Cursor:
+        return cursor.New()
+    case platform.ClaudeCode:
+        return claude.New()
+    }
+}
+
+// ❌ Wrong - creates import cycle
+// Don't create factory in internal/platform/
+```
+
+## Platform Detection
+
+[internal/platform/detect.go](mdc:internal/platform/detect.go) auto-detects platform in this order:
+
+1. `BLUES_TRAVELER_PLATFORM` env var
+2. `.cursor/` directory exists
+3. `.claude/` directory exists
+4. `~/.cursor/hooks.json` exists
+5. Default to Claude Code
+
+## Adding New Platforms
+
+1. Create `internal/platform/<name>/platform.go`
+2. Implement `Platform` interface
+3. Add platform Type constant to [platform.go](mdc:internal/platform/platform.go)
+4. Update platform factory in cmd layer
+5. Update detection logic in [detect.go](mdc:internal/platform/detect.go)
