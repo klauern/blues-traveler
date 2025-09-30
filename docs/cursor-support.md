@@ -1,7 +1,7 @@
 # Cursor Hooks Support
 
-> **Status**: ✅ Phase 2 Complete - Full installation and CLI integration
-> **Version**: v0.2.0-alpha (In Development)
+> **Status**: ✅ Phase 3 Complete - Full hook execution with JSON transformation
+> **Version**: v0.3.0-alpha (Ready for Testing)
 
 ## Overview
 
@@ -9,7 +9,7 @@ blues-traveler now supports Cursor IDE hooks in addition to Claude Code. Cursor 
 
 ## Architecture
 
-```
+```text
 Cursor Agent
     ↓ JSON stdin
 Wrapper Script (auto-generated)
@@ -138,19 +138,16 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 - [x] `blues-traveler platform detect` command
 - [x] Basic integration (hooks allow all operations)
 
-**Current Limitation**: Hooks in Cursor mode currently allow all operations without executing hook logic. This is because the cchooks Runner tries to read from stdin, which has already been consumed in Cursor mode. Full hook execution (converting Cursor events to cchooks events and calling handlers directly) will be implemented in Phase 3.
+### ✅ Phase 3: Full Hook Execution (Complete)
 
-### 📋 Phase 3: Polish (Future)
+- [x] Full hook execution in Cursor mode (convert events, call handlers)
+- [x] JSON transformation from Cursor format to Claude Code format
+- [x] Hook logic now executes properly (security checks, formatting, etc.)
+- [ ] Custom hooks support for Cursor (future enhancement)
+- [ ] Cross-platform sync command (future enhancement)
+- [ ] Migration guide (future enhancement)
 
-- [ ] Full hook execution in Cursor mode (convert events, call handlers)
-- [ ] Custom hooks support for Cursor
-- [ ] Cross-platform sync command
-- [ ] Update all documentation to be platform-agnostic (support both Cursor and Claude Code)
-- [ ] Migration guide
-- [ ] Full documentation
-- [ ] Beta release
-
-**Next Priority**: Implement executeCursorHook to convert Cursor JSON to cchooks events and call hook handlers directly, enabling security checks and other hook logic to actually run.
+**Status**: All core functionality is complete! Hooks now properly execute in Cursor mode by transforming Cursor JSON events to Claude Code format before passing them to hook handlers.
 
 ## Testing
 
@@ -179,6 +176,7 @@ blues-traveler hooks install security --event PreToolUse
 ```
 
 This automatically:
+
 - Generates wrapper script
 - Makes it executable
 - Updates `~/.cursor/hooks.json`
@@ -225,11 +223,25 @@ blues-traveler automatically detects the platform in this order:
 4. `~/.cursor/hooks.json` exists in home directory
 5. Default to Claude Code (backward compatibility)
 
+## Architecture Implementation
+
+The key to making Cursor hooks work is **JSON transformation**:
+
+1. Cursor sends events like `beforeShellExecution` with Cursor-specific fields
+2. `transformCursorToClaudeFormat()` converts to Claude Code format (`PreToolUse`)
+3. Transformed JSON is fed to the hook via stdin pipe
+4. Hook executes normally using cchooks Runner
+5. Response is converted back to Cursor format
+
+This allows all existing hooks (security, format, vet, etc.) to work in Cursor without modification!
+
 ## Next Steps
 
-See [docs/planning/PLAN.md](./planning/PLAN.md) for the complete implementation plan.
+- Custom hooks support for Cursor (use YAML/JSON config to define Cursor-specific hooks)
+- Cross-platform sync command to sync hooks between Claude Code and Cursor
+- Migration guide for users switching platforms
 
 ---
 
 **Last Updated**: 2024-09-30
-**Status**: Phase 2 Complete - Installation and CLI integration working
+**Status**: ✅ Phase 3 Complete - Full Cursor hooks support with proper hook execution

@@ -1757,58 +1757,162 @@ func executeCursorHook(hook interface {
 	Description() string
 }, input cursor.HookInput,
 ) cursor.HookOutput {
-	// TODO: This is a temporary implementation that bypasses hook execution
-	// In a future version, we should:
-	// 1. Convert Cursor input to cchooks events
-	// 2. Call hook handlers directly
-	// 3. Convert responses back to Cursor format
-	//
-	// For now, just allow the operation
+	// Transform Cursor JSON to Claude Code format
+	claudeJSON, err := transformCursorToClaudeFormat(input)
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to transform input: %v", err),
+		}
+	}
+
+	// Set up a pipe to feed the transformed JSON to the hook's stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	// Create a pipe with the transformed JSON input
+	r, w, err := os.Pipe()
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to create pipe: %v", err),
+		}
+	}
+	defer func() { _ = r.Close() }() // Ignore close error in defer
+
+	// Replace stdin with our pipe
+	os.Stdin = r
+
+	// Write JSON in a goroutine
+	go func() {
+		defer func() { _ = w.Close() }() // Ignore close error in defer
+		_, _ = w.Write(claudeJSON)        // Ignore write error, hook will fail if needed
+	}()
+
+	// Execute the hook
+	err = hook.Run()
+	// Convert error to Cursor response
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: err.Error(),
+		}
+	}
+
 	return cursor.HookOutput{
 		Permission: "allow",
 	}
 }
 
-// setupCursorEnvironment maps Cursor JSON input to environment variables
-// that blues-traveler hooks expect
-func setupCursorEnvironment(input cursor.HookInput) {
-	// Common fields
-	os.Setenv("CONVERSATION_ID", input.ConversationID)
-	os.Setenv("GENERATION_ID", input.GenerationID)
-	os.Setenv("EVENT_NAME", input.HookEventName)
-	os.Setenv("WORKSPACE_ROOTS", strings.Join(input.WorkspaceRoots, ":"))
+// transformCursorToClaudeFormat converts Cursor JSON to Claude Code format
+// that cchooks can understand
+func transformCursorToClaudeFormat(input cursor.HookInput) ([]byte, error) {
+	// Base event structure
+	event := map[string]interface{}{
+		"conversation_id": input.ConversationID,
+		"generation_id":   input.GenerationID,
+		"workspace_roots": input.WorkspaceRoots,
+	}
 
-	// Event-specific fields
+	// Map Cursor event to Claude Code event and add event-specific fields
 	switch input.HookEventName {
 	case cursor.BeforeShellExecution:
-		os.Setenv("TOOL_NAME", "shell")
-		os.Setenv("TOOL_ARGS", input.Command)
-		os.Setenv("CWD", input.CWD)
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = "Bash"
+		event["tool_parameters"] = map[string]interface{}{
+			"command": input.Command,
+		}
+		if input.CWD != "" {
+			event["cwd"] = input.CWD
+		}
 
 	case cursor.BeforeMCPExecution:
-		os.Setenv("TOOL_NAME", input.ToolName)
-		os.Setenv("TOOL_ARGS", input.ToolInput)
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = input.ToolName
+		// Parse tool_input if it's JSON
+		var toolParams interface{}
+		if err := json.Unmarshal([]byte(input.ToolInput), &toolParams); err == nil {
+			event["tool_parameters"] = toolParams
+		} else {
+			event["tool_parameters"] = map[string]interface{}{
+				"input": input.ToolInput,
+			}
+		}
 		if input.URL != "" {
-			os.Setenv("MCP_URL", input.URL)
+			event["mcp_url"] = input.URL
 		}
 
 	case cursor.AfterFileEdit:
-		os.Setenv("FILE_PATH", input.FilePath)
-		if editsJSON, err := json.Marshal(input.Edits); err == nil {
-			os.Setenv("FILE_EDITS", string(editsJSON))
+		event["hook_event_name"] = "PostToolUse"
+		event["tool_name"] = "Edit"
+		event["tool_parameters"] = map[string]interface{}{
+			"file_path": input.FilePath,
+			"edits":     input.Edits,
 		}
 
 	case cursor.BeforeReadFile:
-		os.Setenv("FILE_PATH", input.FilePath)
-		os.Setenv("FILE_CONTENT", input.Content)
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = "Read"
+		event["tool_parameters"] = map[string]interface{}{
+			"file_path": input.FilePath,
+		}
 
 	case cursor.BeforeSubmitPrompt:
-		os.Setenv("USER_PROMPT", input.Prompt)
+		event["hook_event_name"] = "UserPromptSubmit"
+		event["user_prompt"] = input.Prompt
+		event["attachments"] = input.Attachments
+
+	case cursor.Stop:
+		event["hook_event_name"] = "Stop"
+		event["status"] = input.Status
+
+	default:
+		return nil, fmt.Errorf("unsupported Cursor event: %s", input.HookEventName)
+	}
+
+	return json.Marshal(event)
+}
+
+// setupCursorEnvironment maps Cursor JSON input to environment variables
+// that blues-traveler hooks expect
+func setupCursorEnvironment(input cursor.HookInput) {
+	// Common fields (ignore errors as these are best-effort environment setup)
+	_ = os.Setenv("CONVERSATION_ID", input.ConversationID)
+	_ = os.Setenv("GENERATION_ID", input.GenerationID)
+	_ = os.Setenv("EVENT_NAME", input.HookEventName)
+	_ = os.Setenv("WORKSPACE_ROOTS", strings.Join(input.WorkspaceRoots, ":"))
+
+	// Event-specific fields (all Setenv calls ignore errors - best effort)
+	switch input.HookEventName {
+	case cursor.BeforeShellExecution:
+		_ = os.Setenv("TOOL_NAME", "shell")
+		_ = os.Setenv("TOOL_ARGS", input.Command)
+		_ = os.Setenv("CWD", input.CWD)
+
+	case cursor.BeforeMCPExecution:
+		_ = os.Setenv("TOOL_NAME", input.ToolName)
+		_ = os.Setenv("TOOL_ARGS", input.ToolInput)
+		if input.URL != "" {
+			_ = os.Setenv("MCP_URL", input.URL)
+		}
+
+	case cursor.AfterFileEdit:
+		_ = os.Setenv("FILE_PATH", input.FilePath)
+		if editsJSON, err := json.Marshal(input.Edits); err == nil {
+			_ = os.Setenv("FILE_EDITS", string(editsJSON))
+		}
+
+	case cursor.BeforeReadFile:
+		_ = os.Setenv("FILE_PATH", input.FilePath)
+		_ = os.Setenv("FILE_CONTENT", input.Content)
+
+	case cursor.BeforeSubmitPrompt:
+		_ = os.Setenv("USER_PROMPT", input.Prompt)
 		if attachmentsJSON, err := json.Marshal(input.Attachments); err == nil {
-			os.Setenv("PROMPT_ATTACHMENTS", string(attachmentsJSON))
+			_ = os.Setenv("PROMPT_ATTACHMENTS", string(attachmentsJSON))
 		}
 
 	case cursor.Stop:
-		os.Setenv("STOP_STATUS", input.Status)
+		_ = os.Setenv("STOP_STATUS", input.Status)
 	}
 }
