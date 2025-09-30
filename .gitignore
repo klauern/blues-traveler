@@ -41,3 +41,5 @@ coverage.html
 
 # Build artifacts
 dist/
+
+!.cursor/
