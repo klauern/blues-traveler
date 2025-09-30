@@ -3,6 +3,7 @@ package cursor
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"text/template"
 
@@ -35,9 +36,9 @@ func GenerateWrapper(config WrapperConfig) (string, error) {
 
 // WrapperScriptPath returns the recommended path for a wrapper script
 func WrapperScriptPath(hookKey, event string) (string, error) {
-	home, err := filepath.Abs("~")
+	home, err := os.UserHomeDir()
 	if err != nil {
-		home = "$HOME"
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
 	filename := fmt.Sprintf("%s-%s-%s.sh", constants.BinaryName, hookKey, event)
@@ -123,7 +124,7 @@ fi
 {{- end }}
 
 # Run blues-traveler in Cursor mode
-if {{.BinaryPath}} run {{.HookKey}} --cursor-mode <<< "$input"; then
+if {{.BinaryPath}} hooks run {{.HookKey}} --cursor-mode <<< "$input"; then
   # Hook succeeded, allow operation
   exit 0
 else
