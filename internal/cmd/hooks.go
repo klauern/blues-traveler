@@ -11,6 +11,9 @@ import (
 
 	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/core"
+	"github.com/klauern/blues-traveler/internal/platform"
+	"github.com/klauern/blues-traveler/internal/platform/claude"
+	"github.com/klauern/blues-traveler/internal/platform/cursor"
 	"github.com/urfave/cli/v3"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -108,6 +111,11 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 		Description: `Run a specific hook plugin. Executes only that hook's handlers (no unified pipeline).`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
+				Name:  "cursor-mode",
+				Value: false,
+				Usage: "Run in Cursor mode (JSON I/O over stdin/stdout)",
+			},
+			&cli.BoolFlag{
 				Name:    "log",
 				Aliases: []string{"l"},
 				Value:   false,
@@ -125,6 +133,12 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 				return fmt.Errorf("exactly one argument required: [plugin-key]")
 			}
 			key := args[0]
+
+			// Check for Cursor mode
+			cursorMode := cmd.Bool("cursor-mode")
+			if cursorMode {
+				return runHookCursorMode(key, getPlugin, isPluginEnabled)
+			}
 
 			// Validate plugin exists early
 			p, exists := getPlugin(key)
@@ -1509,4 +1523,132 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 		globalFlag = " --global"
 	}
 	fmt.Printf("\nUse 'hooks list --installed%s' to verify the changes.\n", globalFlag)
+}
+
+// newPlatformFromType creates a Platform instance from a Type
+// This helper exists in cmd to avoid import cycles in the platform package
+func newPlatformFromType(t platform.Type) platform.Platform {
+	switch t {
+	case platform.Cursor:
+		return cursor.New()
+	case platform.ClaudeCode:
+		return claude.New()
+	default:
+		return claude.New()
+	}
+}
+
+// runHookCursorMode runs a hook in Cursor mode (JSON I/O over stdin/stdout)
+func runHookCursorMode(key string, getPlugin func(string) (interface {
+	Run() error
+	Description() string
+}, bool), isPluginEnabled func(string) bool,
+) error {
+	// Read JSON input from stdin
+	var input cursor.HookInput
+	decoder := json.NewDecoder(os.Stdin)
+	if err := decoder.Decode(&input); err != nil {
+		// Output error as JSON response
+		output := cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to parse hook input: %v", err),
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		os.Exit(3)
+	}
+
+	// Validate plugin exists
+	p, exists := getPlugin(key)
+	if !exists {
+		output := cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Hook '%s' not found", key),
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		os.Exit(3)
+	}
+
+	// Check if plugin is enabled
+	if !isPluginEnabled(key) {
+		// Disabled hooks should allow (not interfere)
+		output := cursor.HookOutput{
+			Permission: "allow",
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		return nil
+	}
+
+	// Set up environment variables from JSON input
+	setupCursorEnvironment(input)
+
+	// Run the hook
+	err := p.Run()
+
+	// Prepare response
+	output := cursor.HookOutput{
+		Permission: "allow",
+	}
+
+	if err != nil {
+		output.Permission = "deny"
+		output.UserMessage = fmt.Sprintf("Hook '%s' failed: %v", key, err)
+	}
+
+	// Write JSON response to stdout
+	encoder := json.NewEncoder(os.Stdout)
+	if err := encoder.Encode(output); err != nil {
+		// Can't write response, exit with error
+		os.Exit(3)
+	}
+
+	// Exit with code 3 if denied
+	if output.Permission == "deny" {
+		os.Exit(3)
+	}
+
+	return nil
+}
+
+// setupCursorEnvironment maps Cursor JSON input to environment variables
+// that blues-traveler hooks expect
+func setupCursorEnvironment(input cursor.HookInput) {
+	// Common fields
+	os.Setenv("CONVERSATION_ID", input.ConversationID)
+	os.Setenv("GENERATION_ID", input.GenerationID)
+	os.Setenv("EVENT_NAME", input.HookEventName)
+	os.Setenv("WORKSPACE_ROOTS", strings.Join(input.WorkspaceRoots, ":"))
+
+	// Event-specific fields
+	switch input.HookEventName {
+	case cursor.BeforeShellExecution:
+		os.Setenv("TOOL_NAME", "shell")
+		os.Setenv("TOOL_ARGS", input.Command)
+		os.Setenv("CWD", input.CWD)
+
+	case cursor.BeforeMCPExecution:
+		os.Setenv("TOOL_NAME", input.ToolName)
+		os.Setenv("TOOL_ARGS", input.ToolInput)
+		if input.URL != "" {
+			os.Setenv("MCP_URL", input.URL)
+		}
+
+	case cursor.AfterFileEdit:
+		os.Setenv("FILE_PATH", input.FilePath)
+		if editsJSON, err := json.Marshal(input.Edits); err == nil {
+			os.Setenv("FILE_EDITS", string(editsJSON))
+		}
+
+	case cursor.BeforeReadFile:
+		os.Setenv("FILE_PATH", input.FilePath)
+		os.Setenv("FILE_CONTENT", input.Content)
+
+	case cursor.BeforeSubmitPrompt:
+		os.Setenv("USER_PROMPT", input.Prompt)
+		if attachmentsJSON, err := json.Marshal(input.Attachments); err == nil {
+			os.Setenv("PROMPT_ATTACHMENTS", string(attachmentsJSON))
+		}
+
+	case cursor.Stop:
+		os.Setenv("STOP_STATUS", input.Status)
+	}
 }
