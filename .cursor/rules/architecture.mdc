@@ -5,7 +5,7 @@ alwaysApply: true
 
 ## Project Overview
 
-This is `blues-traveler`, a CLI tool for managing and running Claude Code hooks with a **static hook registry** architecture.
+This is `blues-traveler`, a CLI tool for managing and running Claude Code and Cursor IDE hooks with a **static hook registry** architecture and **platform abstraction** for multi-IDE support.
 
 ## Core Design Principles
 
@@ -46,6 +46,7 @@ Use `core.BaseHook` for common functionality - DO NOT reimplement these methods 
 - [internal/core/registry.go](mdc:internal/core/registry.go) - Registry management
 - [internal/config/](mdc:internal/config/) - Configuration system
 - [internal/cmd/](mdc:internal/cmd/) - CLI commands
+- [internal/platform/](mdc:internal/platform/) - Platform abstraction (Claude Code, Cursor)
 
 ## Configuration
 

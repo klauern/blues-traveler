@@ -8,6 +8,8 @@ description: Platform abstraction for multi-IDE support (Cursor, Claude Code)
 
 blues-traveler supports multiple IDE platforms through a **platform abstraction layer** in [internal/platform/](mdc:internal/platform/).
 
+**Status**: ✅ **Cursor support complete** (Phase 3) - See [cursor-implementation.mdc](mdc:.cursor/rules/cursor-implementation.mdc) for details.
+
 ## Architecture
 
 ### Platform Interface
