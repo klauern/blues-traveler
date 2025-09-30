@@ -1786,7 +1786,7 @@ func executeCursorHook(hook interface {
 	// Write JSON in a goroutine
 	go func() {
 		defer func() { _ = w.Close() }() // Ignore close error in defer
-		_, _ = w.Write(claudeJSON)        // Ignore write error, hook will fail if needed
+		_, _ = w.Write(claudeJSON)       // Ignore write error, hook will fail if needed
 	}()
 
 	// Execute the hook
