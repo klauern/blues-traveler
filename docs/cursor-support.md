@@ -1,7 +1,7 @@
 # Cursor Hooks Support
 
-> **Status**: ✅ Phase 1 Complete - Core infrastructure implemented
-> **Version**: v0.1.0-alpha (In Development)
+> **Status**: ✅ Phase 2 Complete - Full installation and CLI integration
+> **Version**: v0.2.0-alpha (In Development)
 
 ## Overview
 
@@ -57,7 +57,7 @@ echo '{"hook_event_name": "beforeShellExecution", "command": "rm -rf /"}' | \
 
 ### Wrapper Scripts
 
-Generate wrapper scripts for Cursor (automatic with `hooks install --platform cursor` - coming in Phase 2):
+Wrapper scripts are automatically generated when you install hooks for Cursor using `hooks install --platform cursor`:
 
 ```bash
 # Example generated wrapper for security hook
@@ -164,9 +164,29 @@ go test ./internal/platform/cursor/... -v
 go test ./...
 ```
 
-## Example: Using in Cursor (Manual Setup)
+## Example: Using in Cursor
 
-Until Phase 2 is complete, you can manually set up Cursor hooks:
+### Automated Installation (Recommended)
+
+Use the built-in install command:
+
+```bash
+# Install security hook for Cursor
+blues-traveler hooks install security --platform cursor --event PreToolUse
+
+# Auto-detect platform (works if you're in a directory with .cursor/)
+blues-traveler hooks install security --event PreToolUse
+```
+
+This automatically:
+- Generates wrapper script
+- Makes it executable
+- Updates `~/.cursor/hooks.json`
+- Maps events correctly
+
+### Manual Setup (Advanced)
+
+If you need manual control, you can set up Cursor hooks manually:
 
 1. **Create wrapper script** (`~/.cursor/hooks/blues-traveler-security.sh`):
 
@@ -207,9 +227,9 @@ blues-traveler automatically detects the platform in this order:
 
 ## Next Steps
 
-See [tmp/cursor-hooks/PLAN.md](../tmp/cursor-hooks/PLAN.md) for the complete implementation plan.
+See [docs/planning/PLAN.md](./planning/PLAN.md) for the complete implementation plan.
 
 ---
 
 **Last Updated**: 2024-09-30
-**Status**: Phase 1 Complete
+**Status**: Phase 2 Complete - Installation and CLI integration working
