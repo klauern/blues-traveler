@@ -64,6 +64,7 @@ func main() {
 Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
 		Commands: []*cli.Command{
 			cmd.NewHooksCommand(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes, eventsWrapper),
+			cmd.NewPlatformCmd(),
 			cmd.NewConfigCmd(),
 			cmd.NewGenerateCmd(),
 			cmd.NewVersionCmd(versionInfo),
