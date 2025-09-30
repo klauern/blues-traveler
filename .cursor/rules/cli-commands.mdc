@@ -1,0 +1,145 @@
+---
+globs: internal/cmd/*.go,main.go
+description: Guidelines for CLI command implementation using urfave/cli v3
+---
+# CLI Command Implementation Guidelines
+
+## Framework: urfave/cli v3
+
+This project uses **urfave/cli v3**, NOT Cobra. See [docs/cobra-to-urfave-cli-migration.md](mdc:docs/cobra-to-urfave-cli-migration.md) for migration details.
+
+## Command Structure
+
+```go
+func NewMyCommand() *cli.Command {
+    return &cli.Command{
+        Name:      "mycommand",
+        Usage:     "Does something useful",
+        ArgsUsage: "[required-arg]",
+        Flags: []cli.Flag{
+            &cli.BoolFlag{
+                Name:    "flag-name",
+                Aliases: []string{"f"},
+                Value:   false,
+                Usage:   "Flag description",
+            },
+        },
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+            // Command logic
+            return nil
+        },
+    }
+}
+```
+
+## Flag Types
+
+### String Flag
+
+```go
+&cli.StringFlag{
+    Name:    "name",
+    Aliases: []string{"n"},
+    Value:   "default",
+    Usage:   "Description",
+}
+```
+
+### Bool Flag
+
+```go
+&cli.BoolFlag{
+    Name:    "enabled",
+    Aliases: []string{"e"},
+    Value:   false,
+    Usage:   "Description",
+}
+```
+
+### Int Flag
+
+```go
+&cli.IntFlag{
+    Name:  "timeout",
+    Value: 30,
+    Usage: "Timeout in seconds",
+}
+```
+
+## Accessing Flags and Arguments
+
+```go
+Action: func(ctx context.Context, cmd *cli.Command) error {
+    // Get flag values
+    name := cmd.String("name")
+    enabled := cmd.Bool("enabled")
+    timeout := cmd.Int("timeout")
+
+    // Get arguments
+    args := cmd.Args().Slice()
+    if len(args) < 1 {
+        return fmt.Errorf("required argument missing")
+    }
+
+    return nil
+}
+```
+
+## Error Handling
+
+- Return errors from `Action` function (DO NOT call `os.Exit(1)`)
+- urfave/cli handles error display and exit codes
+- Use descriptive error messages with context
+
+```go
+if err := doSomething(); err != nil {
+    return fmt.Errorf("failed to do something: %w", err)
+}
+```
+
+## Binary Name
+
+Use `constants.BinaryName` for consistent branding:
+
+```go
+import "github.com/klauern/blues-traveler/internal/constants"
+
+Usage: fmt.Sprintf("Install %s hook", constants.BinaryName)
+```
+
+## Main Application Structure
+
+See [main.go](mdc:main.go) for the app structure:
+
+```go
+func main() {
+    cmd := &cli.Command{
+        Name:  "blues-traveler",
+        Usage: "Claude Code hook runner and manager",
+        Commands: []*cli.Command{
+            // Register subcommands here
+        },
+    }
+
+    if err := cmd.Run(context.Background(), os.Args); err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+}
+```
+
+## Existing Commands Reference
+
+See [internal/cmd/](mdc:internal/cmd/):
+
+- [hooks.go](mdc:internal/cmd/hooks.go) - Hook management (list, run, install, etc.)
+- [config_xdg.go](mdc:internal/cmd/config_xdg.go) - XDG configuration management
+- [generate.go](mdc:internal/cmd/generate.go) - Code generation
+- [version.go](mdc:internal/cmd/version.go) - Version information
+
+## Testing Commands
+
+- Test all flag combinations
+- Verify error handling and messages
+- Ensure help text is clear and accurate
+- Test with both short and long flag names

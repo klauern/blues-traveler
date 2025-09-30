@@ -1,0 +1,103 @@
+---
+globs: internal/hooks/*.go
+description: Guidelines for implementing hooks in the internal/hooks directory
+---
+# Hook Implementation Guidelines
+
+## Hook Structure Pattern
+
+Every hook MUST follow this structure (see [docs/developer_guide.md](mdc:docs/developer_guide.md)):
+
+```go
+type MyHook struct {
+    *core.BaseHook
+}
+
+func NewMyHook(ctx *core.HookContext) core.Hook {
+    base := core.NewBaseHook("myhook", "MyHook", "Does something useful", ctx)
+    return &MyHook{BaseHook: base}
+}
+
+func (h *MyHook) Run() error {
+    // Hook logic here
+    return nil
+}
+```
+
+## Key Requirements
+
+### Use BaseHook
+
+- ALWAYS embed `*core.BaseHook` to get common functionality
+- DO NOT manually implement `Key()`, `Name()`, `Description()`, or `IsEnabled()`
+- Access context via `h.Context()`
+
+### Logging
+
+Use `h.LogHookEvent()` from `core.BaseHook`:
+
+```go
+h.LogHookEvent("event_name", "", map[string]interface{}{"key": "value"}, nil)
+```
+
+### Check Enabled State
+
+```go
+func (h *MyHook) Run() error {
+    if !h.IsEnabled() {
+        return nil // Hook disabled via settings
+    }
+    // ... rest of implementation
+}
+```
+
+## Registration
+
+After creating a hook, register it in [internal/hooks/init.go](mdc:internal/hooks/init.go):
+
+```go
+func init() {
+    builtinHooks := map[string]core.HookFactory{
+        // ... existing hooks
+        "myhook": NewMyHook,  // Add here
+    }
+    core.RegisterBuiltinHooks(builtinHooks)
+}
+```
+
+## Testing
+
+Create tests in `internal/hooks/myhook_test.go`:
+
+- Test hook registration and discovery
+- Test `Run()` execution and error handling
+- Test configuration integration
+- See existing tests like [internal/hooks/security_test.go](mdc:internal/hooks/security_test.go) for patterns
+
+## Built-in Hooks Reference
+
+See [AGENTS.md](mdc:AGENTS.md) for complete list:
+
+- `security` - PreToolUse security checks
+- `format` - PostToolUse code formatting
+- `debug` - Logging to blues-traveler.log
+- `audit` - JSON audit logging
+- `vet` - Code quality enforcement
+- `fetch-blocker` - Block fetch requests
+- `find-blocker` - Block find commands
+
+## Event Types
+
+Hooks can handle these Claude Code events:
+
+- `PreToolUse` - Before tool execution (security, validation)
+- `PostToolUse` - After tool execution (formatting, testing)
+- `UserPromptSubmit` - When user submits prompt
+- `SessionStart`/`SessionEnd` - Session lifecycle
+
+## Common Patterns
+
+1. **Stateless Design**: Hooks are created fresh each time
+2. **Independent Execution**: No dependencies between hooks
+3. **Settings-Based Configuration**: Use `IsEnabled()` and settings
+4. **Structured Logging**: Use LogHookEvent for consistency
