@@ -145,6 +145,7 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 - [ ] Full hook execution in Cursor mode (convert events, call handlers)
 - [ ] Custom hooks support for Cursor
 - [ ] Cross-platform sync command
+- [ ] Update all documentation to be platform-agnostic (support both Cursor and Claude Code)
 - [ ] Migration guide
 - [ ] Full documentation
 - [ ] Beta release
