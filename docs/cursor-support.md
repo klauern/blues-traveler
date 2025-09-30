@@ -130,21 +130,26 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 - [x] Event name mapper (Claude ↔ Cursor)
 - [x] Unit tests for core functionality
 
-### 📋 Phase 2: CLI Integration (Next)
+### ✅ Phase 2: CLI Integration (Complete)
 
-- [ ] `--platform cursor` flag on install command
-- [ ] Automatic wrapper script generation and installation
-- [ ] Platform auto-detection in commands
-- [ ] `blues-traveler platform detect` command
-- [ ] Integration tests
+- [x] `--platform cursor` flag on install command
+- [x] Automatic wrapper script generation and installation
+- [x] Platform auto-detection in commands
+- [x] `blues-traveler platform detect` command
+- [x] Basic integration (hooks allow all operations)
+
+**Current Limitation**: Hooks in Cursor mode currently allow all operations without executing hook logic. This is because the cchooks Runner tries to read from stdin, which has already been consumed in Cursor mode. Full hook execution (converting Cursor events to cchooks events and calling handlers directly) will be implemented in Phase 3.
 
 ### 📋 Phase 3: Polish (Future)
 
+- [ ] Full hook execution in Cursor mode (convert events, call handlers)
 - [ ] Custom hooks support for Cursor
 - [ ] Cross-platform sync command
 - [ ] Migration guide
 - [ ] Full documentation
 - [ ] Beta release
+
+**Next Priority**: Implement executeCursorHook to convert Cursor JSON to cchooks events and call hook handlers directly, enabling security checks and other hook logic to actually run.
 
 ## Testing
 

@@ -6,7 +6,9 @@
 
 > *"The Hook brings you back"* - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
 
-CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities. Powered by `urfave/cli v3` with a static hook registry. Our hooks bring you back to clean, secure, and well-formatted code every time.
+CLI tool for managing and running [Claude Code](https://claude.ai/code) and [Cursor](https://cursor.sh) hooks with built-in security, formatting, debugging, and audit capabilities. Powered by `urfave/cli v3` with a static hook registry. Our hooks bring you back to clean, secure, and well-formatted code every time.
+
+**NEW**: Now supports Cursor IDE! Use `--platform cursor` to install hooks for Cursor. See [docs/cursor-support.md](docs/cursor-support.md) for details.
 
 ## ✨ Features
 
