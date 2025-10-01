@@ -97,8 +97,74 @@ func TestFunction_ErrorCase(t *testing.T) {
 }
 ```
 
+## Input Validation
+Always validate inputs before processing to prevent errors and security issues:
+
+### File Path Validation
+```go
+func processFile(filePath string) error {
+    // 1. Check not empty
+    if filePath == "" {
+        return fmt.Errorf("empty file path")
+    }
+    
+    // 2. Check file exists and is accessible
+    if _, err := os.Stat(filePath); err != nil {
+        return fmt.Errorf("file not accessible: %w", err)
+    }
+    
+    // 3. Prevent path traversal attacks
+    cleanPath := filepath.Clean(filePath)
+    if cleanPath != filePath {
+        return fmt.Errorf("invalid file path: possible path traversal attempt")
+    }
+    
+    // Safe to process
+    return processValidatedFile(cleanPath)
+}
+```
+
+### Tool Availability Checks
+Cache expensive checks (like PATH lookups) using sync.Once:
+```go
+var (
+    prettierOnce      sync.Once
+    prettierAvailable bool
+)
+
+func checkPrettierAvailable() bool {
+    prettierOnce.Do(func() {
+        _, err := exec.LookPath("prettier")
+        prettierAvailable = err == nil
+    })
+    return prettierAvailable
+}
+
+func formatFile(path string) error {
+    if !checkPrettierAvailable() {
+        return fmt.Errorf("prettier not found in PATH")
+    }
+    // Safe to use prettier
+}
+```
+
+### Parsing/Extraction Error Handling
+Log parse errors when they might indicate issues, but don't block operations:
+```go
+edit, err := event.InputAsEdit()
+if err != nil {
+    // Log for debugging but don't block
+    if h.Context().LoggingEnabled {
+        log.Printf("Failed to parse Edit input: %v", err)
+    }
+    return nil  // or return default value
+}
+// Use edit...
+```
+
 ## DO NOT
 - Ignore errors with `_` unless explicitly justified
 - Panic in library code (only in main or init)
 - Log and return the same error (choose one)
 - Create errors without context
+- Skip input validation (always validate external inputs)

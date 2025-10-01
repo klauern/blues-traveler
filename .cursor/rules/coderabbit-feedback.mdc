@@ -1,0 +1,281 @@
+---
+description: Systematic approach to handling CodeRabbit code review feedback
+---
+# CodeRabbit Review Response Guide
+
+## Overview
+CodeRabbit performs automated code reviews on PRs. This guide documents best practices for responding to its feedback based on actual fixes in this project.
+
+## Priority Classification
+
+CodeRabbit classifies issues by priority:
+
+### 🔴 High Priority (Must Fix Before Merge)
+- **Unresolved/Duplicate Issues**: Flagged in previous reviews but not addressed
+- **Breaking Changes**: Code that breaks existing functionality
+- **Critical Security Issues**: Path traversal, injection vulnerabilities
+- **Missing Required Functionality**: Core features not working
+
+### 🟡 Medium Priority (Should Fix)
+- **Code Quality**: Missing error handling, validation, availability checks
+- **Maintainability**: Code duplication, unclear logic
+- **Documentation**: Missing or incorrect comments
+- **Performance**: Inefficient patterns
+
+### 🟢 Low Priority (Nice to Have)
+- **Style Issues**: Formatting, naming conventions
+- **Documentation Polish**: Language improvements, typos
+
+## Systematic Response Process
+
+### 1. Extract and Categorize
+```bash
+# Use gh CLI to get CodeRabbit comments
+gh pr view <branch> --json comments --jq '.comments[] | select(.author.login == "coderabbitai")'
+```
+
+Create a checklist with:
+- File path and line numbers
+- Issue description
+- Priority level
+- Whether it's a duplicate (previously flagged)
+
+### 2. Fix High Priority First
+Address all high priority issues before medium/low. Common high priority patterns:
+
+**Example: Missing Environment Variables**
+```go
+// Before (missing TOOL_NAME)
+case cursor.AfterFileEdit:
+    _ = os.Setenv("FILE_PATH", input.FilePath)
+
+// After
+case cursor.AfterFileEdit:
+    _ = os.Setenv("TOOL_NAME", "Edit")  // Added
+    _ = os.Setenv("FILE_PATH", input.FilePath)
+```
+
+**Example: Shell Script Quoting**
+```bash
+# Before (breaks with spaces in paths)
+if {{.BinaryPath}} hooks run {{.HookKey}} --cursor-mode; then
+
+# After (properly quoted)
+if "{{.BinaryPath}}" hooks run "{{.HookKey}}" --cursor-mode; then
+```
+
+### 3. Apply Medium Priority Fixes
+
+#### Pattern 1: Input Validation
+Always validate inputs before processing:
+```go
+func (h *Hook) formatFile(filePath string) error {
+    // Validate not empty
+    if filePath == "" {
+        return fmt.Errorf("empty file path")
+    }
+    
+    // Validate existence
+    if _, err := os.Stat(filePath); err != nil {
+        return fmt.Errorf("file not accessible: %w", err)
+    }
+    
+    // Prevent path traversal
+    cleanPath := filepath.Clean(filePath)
+    if cleanPath != filePath {
+        return fmt.Errorf("invalid file path: possible path traversal attempt")
+    }
+    
+    // Process file...
+}
+```
+
+#### Pattern 2: Tool Availability Checks
+Cache availability checks to avoid repeated PATH lookups:
+```go
+var (
+    toolOnce      sync.Once
+    toolAvailable bool
+)
+
+func checkToolAvailable() bool {
+    toolOnce.Do(func() {
+        _, err := exec.LookPath("tool")
+        toolAvailable = err == nil
+    })
+    return toolAvailable
+}
+
+func (h *Hook) useTool() error {
+    if !checkToolAvailable() {
+        return fmt.Errorf("tool not found in PATH")
+    }
+    // Use tool...
+}
+```
+
+#### Pattern 3: Error Logging
+Log parse/extraction errors when they might indicate deeper issues:
+```go
+edit, err := event.InputAsEdit()
+if err != nil {
+    if h.Context().LoggingEnabled {
+        log.Printf("Failed to parse Edit input: %v", err)
+    }
+    return cchooks.Allow()  // Don't block on parse errors
+} else {
+    filePath = edit.FilePath
+}
+```
+
+#### Pattern 4: Extract Duplicated Logic
+When you see similar code blocks, extract to helper:
+```go
+// Before: Duplicated in multiple places
+switch event.ToolName {
+case "Edit":
+    edit, err := event.InputAsEdit()
+    if err == nil {
+        filePath = edit.FilePath
+    }
+case "Write":
+    write, err := event.InputAsWrite()
+    if err == nil {
+        filePath = write.FilePath
+    }
+}
+
+// After: Single helper method
+func (h *Hook) extractFilePath(event *Event) (string, error) {
+    switch event.ToolName {
+    case "Edit":
+        edit, err := event.InputAsEdit()
+        if err != nil {
+            return "", err
+        }
+        return edit.FilePath, nil
+    case "Write":
+        write, err := event.InputAsWrite()
+        if err != nil {
+            return "", err
+        }
+        return write.FilePath, nil
+    default:
+        return "", fmt.Errorf("unsupported tool: %s", event.ToolName)
+    }
+}
+```
+
+### 4. Security Improvements
+
+#### Token-based Analysis Over Substring Matching
+Avoid false positives by analyzing tokens instead of substrings:
+```go
+// Before: Substring matching (false positives on URLs, comments)
+if strings.Contains(cmdLower, " /etc") {
+    return true, "blocked system path"
+}
+
+// After: Token-based (accurate)
+for _, t := range tokens[1:] {
+    if strings.HasPrefix(t, "-") {
+        continue  // Skip flags
+    }
+    lt := strings.ToLower(t)
+    if strings.HasPrefix(lt, "/etc") {
+        return true, "blocked system path"
+    }
+}
+```
+
+### 5. Documentation Improvements
+
+Add comprehensive comments for complex logic:
+```go
+// isInQuotedString performs a simple check if the pattern is within quotes
+// 
+// Limitations:
+// - Does not handle escaped quotes (e.g., \' or \")
+// - May produce false positives/negatives with mixed quoting styles
+// - Does not account for nested quotes or quotes in comments
+// - A full shell parser would be more accurate for edge cases
+func (h *Hook) isInQuotedString(command, pattern string) bool {
+    // Implementation...
+}
+```
+
+Explain ordering requirements:
+```go
+// generateSuggestion creates suggestions based on find patterns
+//
+// Pattern matching order is important:
+// - More specific patterns checked first (e.g., -type f with -name)
+// - Generic patterns checked later (e.g., just -name)
+// - Early returns prevent less specific suggestions overriding better ones
+func (h *Hook) generateSuggestion(cmd string) string {
+    // Check specific patterns first...
+}
+```
+
+## Commit Strategy
+
+Create a single comprehensive commit addressing all feedback:
+```bash
+git add <files>
+git commit -m "fix: address CodeRabbit review feedback for <feature>
+
+Resolves N high and M medium priority issues identified in PR review:
+
+High Priority:
+- file.go: Brief description of fix
+- file.go: Brief description of fix
+
+Medium Priority:
+- file.go: Brief description of fix
+- file.go: Brief description of fix
+"
+```
+
+## Verification
+
+Before pushing fixes:
+```bash
+# Format code
+task format
+
+# Verify builds
+go build ./...
+
+# Run linter
+task lint
+
+# Run tests
+task test
+```
+
+## Common Patterns Fixed
+
+### Path Handling
+- Always use `filepath.Clean()` to prevent traversal
+- Check file existence with `os.Stat()`
+- Quote paths in shell scripts
+
+### Error Handling
+- Log extraction errors when parsing event data
+- Check tool availability before execution
+- Return clear error messages with context
+
+### Code Organization
+- Extract duplicated logic into helpers
+- Cache expensive checks (PATH lookups, etc.)
+- Document complex algorithms and limitations
+
+### Security
+- Use token-based analysis for command inspection
+- Validate all external inputs
+- Use case-insensitive comparisons consistently
+
+## Resources
+- See [error-handling.mdc](mdc:.cursor/rules/error-handling.mdc) for error patterns
+- See [code-review-standards.mdc](mdc:.cursor/rules/code-review-standards.mdc) for general standards
+- See [security-scanning.mdc](mdc:.cursor/rules/security-scanning.mdc) for security guidelines
