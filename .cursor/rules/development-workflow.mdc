@@ -135,7 +135,7 @@ Key dependencies (see [go.mod](mdc:go.mod)):
 - `gopkg.in/yaml.v3` - YAML parsing
 - `github.com/natefinch/lumberjack` - Log rotation
 
-Go version: 1.25.0+
+Go version: 1.25.1+
 
 ## Resources
 

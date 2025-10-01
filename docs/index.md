@@ -153,5 +153,5 @@ Want to improve the documentation?
 
 ---
 
-**Last Updated**: 2025-10-01  
+**Last Updated**: 2025-10-01
 **Cleanup**: Reduced from 14 files to 5 core docs (64% reduction)

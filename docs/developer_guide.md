@@ -206,6 +206,7 @@ func (h *MyHook) Run() error {
 ```
 
 This gives you:
+
 - `Key()`: Returns the hook identifier
 - `Name()`: Returns the human-readable name
 - `Description()`: Returns the hook description

@@ -30,11 +30,13 @@ Custom hooks let you define project- or user-specific automation for Claude Code
 **Preferred location** (project scope): `~/.config/blues-traveler/projects/<project-name>.yml`
 
 **Also supported**:
+
 - Per-project files in `~/.config/blues-traveler/projects/*.yml`
 - Global config in `~/.config/blues-traveler/global.yml`
 - Embedded JSON via XDG configuration files under `customHooks`
 
 **Legacy** (still supported but deprecated):
+
 - `.claude/hooks.yml` (project scope)
 - `~/.claude/hooks.yml` (user scope)
 
@@ -215,7 +217,7 @@ formatting:
         run: gofumpt -w ${TOOL_OUTPUT_FILE}
         only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
         glob: ["*.go"]
-      
+
       - name: format-python
         run: ruff format --fix ${TOOL_OUTPUT_FILE}
         only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
@@ -234,7 +236,7 @@ testing:
         glob: ["*.go"]
         skip: ${FILES_CHANGED} regex ".*_test\\.go$"
         timeout: 60
-      
+
       - name: lint
         run: golangci-lint run ${TOOL_OUTPUT_FILE}
         only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
@@ -308,7 +310,7 @@ Planned improvements:
 ---
 
 **See Also**:
+
 - [Quick Start Guide](quick_start.md) - General setup
 - [Developer Guide](developer_guide.md) - Hook internals
 - [Cursor Support](cursor-support.md) - Cursor-specific usage
-

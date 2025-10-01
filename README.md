@@ -1,6 +1,6 @@
 # Blues Traveler
 
-[![Go Version](https://img.shields.io/badge/go-1.25.0+-blue.svg)](https://golang.org/doc/go1.25)
+[![Go Version](https://img.shields.io/badge/go-1.25.1+-blue.svg)](https://golang.org/doc/go1.25)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
