@@ -38,6 +38,7 @@ func NewConfigHook(groupName, jobName string, job config.HookJob, event string, 
 	}
 }
 
+// Run executes the config hook command with proper context and environment
 func (h *ConfigHook) Run() error {
 	if !h.IsEnabled() {
 		return nil

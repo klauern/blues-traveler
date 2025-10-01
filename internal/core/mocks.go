@@ -21,6 +21,7 @@ type MockFileSystem struct {
 	mu       sync.RWMutex
 }
 
+// NewMockFileSystem creates a new mock filesystem for testing
 func NewMockFileSystem() *MockFileSystem {
 	return &MockFileSystem{
 		Files: make(map[string][]byte),
@@ -28,6 +29,7 @@ func NewMockFileSystem() *MockFileSystem {
 	}
 }
 
+// WriteFile implements FileSystem.WriteFile for testing
 func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	if m.WriteErr != nil {
 		return m.WriteErr
@@ -46,6 +48,7 @@ func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMod
 	return nil
 }
 
+// OpenFile implements FileSystem.OpenFile for testing
 func (m *MockFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	if m.OpenErr != nil {
 		return nil, m.OpenErr
@@ -56,6 +59,7 @@ func (m *MockFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.
 	return os.CreateTemp("", "mock_*")
 }
 
+// Stat implements FileSystem.Stat for testing
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	if m.StatErr != nil {
 		return nil, m.StatErr
@@ -92,16 +96,19 @@ type MockCommandExecutor struct {
 	mu        sync.RWMutex
 }
 
+// MockCommand represents a command that was executed
 type MockCommand struct {
 	Name string
 	Args []string
 }
 
+// MockCommandResponse represents the response for a mocked command
 type MockCommandResponse struct {
 	Output []byte
 	Error  error
 }
 
+// NewMockCommandExecutor creates a new mock command executor for testing
 func NewMockCommandExecutor() *MockCommandExecutor {
 	return &MockCommandExecutor{
 		Commands:  []MockCommand{},
@@ -109,6 +116,7 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 	}
 }
 
+// ExecuteCommand implements CommandExecutor.ExecuteCommand for testing
 func (m *MockCommandExecutor) ExecuteCommand(name string, args ...string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -190,6 +198,7 @@ type MockRunner struct {
 	RunCalled   bool
 }
 
+// Run implements Runner.Run for testing
 func (m *MockRunner) Run() {
 	m.RunCalled = true
 	// Don't actually read from stdin in tests

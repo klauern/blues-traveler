@@ -18,9 +18,12 @@ var templates embed.FS
 type HookType string
 
 const (
-	PreToolHook  HookType = "pre_tool"
+	// PreToolHook generates only a PreToolUse hook
+	PreToolHook HookType = "pre_tool"
+	// PostToolHook generates only a PostToolUse hook
 	PostToolHook HookType = "post_tool"
-	BothHooks    HookType = "both"
+	// BothHooks generates both PreToolUse and PostToolUse hooks
+	BothHooks HookType = "both"
 )
 
 // TemplateData holds data for template rendering

@@ -6,8 +6,10 @@ import "github.com/klauern/blues-traveler/internal/core"
 type Type string
 
 const (
+	// ClaudeCode represents the Claude Code AI assistant platform
 	ClaudeCode Type = "claudecode"
-	Cursor     Type = "cursor"
+	// Cursor represents the Cursor IDE platform
+	Cursor Type = "cursor"
 )
 
 // Platform represents an AI IDE platform that supports hooks
