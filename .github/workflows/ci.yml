@@ -16,7 +16,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        go-version: ['1.25.0']
 
     steps:
     - name: Checkout code
@@ -25,7 +24,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version-file: go.mod
         cache: true
         cache-dependency-path: go.sum
 
@@ -80,7 +79,7 @@ jobs:
   format-check:
     name: Format Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -88,7 +87,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.0'
+        go-version-file: go.mod
         cache: true
 
     - name: Install gofumpt
@@ -116,7 +115,7 @@ jobs:
   security-check:
     name: Security Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -126,7 +125,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.0'
+        go-version-file: go.mod
 
     - name: Download dependencies
       run: go mod download
@@ -139,5 +138,4 @@ jobs:
     - name: Run govulncheck
       uses: golang/govulncheck-action@v1
       with:
-        go-version-input: '1.25.0'
         go-package: './...'
