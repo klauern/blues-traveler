@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -76,15 +77,18 @@ func TestWrapperScriptPath(t *testing.T) {
 		t.Fatalf("WrapperScriptPath failed: %v", err)
 	}
 
-	if !strings.Contains(path, ".cursor/hooks") {
-		t.Errorf("Path should contain .cursor/hooks, got: %s", path)
+	// Normalize path separators for cross-platform testing
+	normalizedPath := filepath.ToSlash(path)
+
+	if !strings.Contains(normalizedPath, ".cursor/hooks") {
+		t.Errorf("Path should contain .cursor/hooks, got: %s", normalizedPath)
 	}
 
-	if !strings.Contains(path, "security") {
-		t.Errorf("Path should contain hook key 'security', got: %s", path)
+	if !strings.Contains(normalizedPath, "security") {
+		t.Errorf("Path should contain hook key 'security', got: %s", normalizedPath)
 	}
 
-	if !strings.Contains(path, BeforeShellExecution) {
-		t.Errorf("Path should contain event name, got: %s", path)
+	if !strings.Contains(normalizedPath, BeforeShellExecution) {
+		t.Errorf("Path should contain event name, got: %s", normalizedPath)
 	}
 }
