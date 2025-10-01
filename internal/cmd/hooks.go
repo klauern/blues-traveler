@@ -340,7 +340,7 @@ func newHooksUninstallCommand() *cli.Command {
 
 			// Handle 'all' case
 			if hookType == "all" {
-				uninstallAllKlauerHooks(global, cmd.Bool("yes"))
+				uninstallAllBluesTravelerHooks(global, cmd.Bool("yes"))
 				return nil
 			}
 
