@@ -1,0 +1,53 @@
+---
+globs: AGENTS.md,CLAUDE.md
+description: Ensures AGENTS.md and CLAUDE.md stay synchronized for AI assistant consistency
+---
+
+# AGENTS.md and CLAUDE.md Synchronization
+
+## Critical Requirement
+
+**AGENTS.md and CLAUDE.md MUST be kept identical at all times.**
+
+These files provide the same guidance to different AI assistants:
+
+- [CLAUDE.md](mdc:CLAUDE.md) - For Claude Code (claude.ai/code)
+- [AGENTS.md](mdc:AGENTS.md) - For Cursor AI and other agents
+
+## When Making Changes
+
+If you modify either file:
+
+1. **ALWAYS apply the same change to both files**
+2. Verify they remain identical after editing
+3. Include both files in the same commit
+
+## Verification
+
+Before committing changes to either file, run:
+
+```bash
+diff AGENTS.md CLAUDE.md
+```
+
+The output should be empty (no differences).
+
+## Common Updates
+
+When updating these files, common changes include:
+
+- Adding new built-in hooks to the hooks table
+- Updating architecture documentation
+- Adding new development commands
+- Clarifying "What NOT to Do" guidance
+- Updating file structure information
+- Adding new common patterns or examples
+
+## Rationale
+
+Keeping these files in sync ensures:
+
+- Consistent guidance across different AI platforms
+- Unified understanding of project architecture
+- Same best practices regardless of which AI assistant is used
+- Easier maintenance (one source of truth, two files)
