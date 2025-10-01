@@ -106,6 +106,10 @@ esac
 # Apply matcher filter
 # Note: Cursor doesn't support config-level matchers, so we implement it here
 matcher="{{.Matcher}}"
+# Convert wildcard matcher to valid regex (default * becomes .*)
+if [[ "$matcher" == "*" ]]; then
+  matcher=".*"
+fi
 check_value=""
 
 case "$EVENT_NAME" in
@@ -130,7 +134,7 @@ fi
 {{- end }}
 
 # Run blues-traveler in Cursor mode
-if {{.BinaryPath}} hooks run {{.HookKey}} --cursor-mode <<< "$input"; then
+if "{{.BinaryPath}}" hooks run "{{.HookKey}}" --cursor-mode <<< "$input"; then
   # Hook succeeded, allow operation
   exit 0
 else

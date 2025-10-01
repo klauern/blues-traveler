@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,8 +16,12 @@ import (
 
 var (
 	// Cache command availability to avoid repeated PATH lookups
-	gofumptOnce      sync.Once
-	gofumptAvailable bool
+	gofumptOnce       sync.Once
+	gofumptAvailable  bool
+	prettierOnce      sync.Once
+	prettierAvailable bool
+	uvxOnce           sync.Once
+	uvxAvailable      bool
 )
 
 // checkGofumptAvailable checks if gofumpt is available in PATH (cached)
@@ -26,6 +31,24 @@ func checkGofumptAvailable() bool {
 		gofumptAvailable = err == nil
 	})
 	return gofumptAvailable
+}
+
+// checkPrettierAvailable checks if prettier is available in PATH (cached)
+func checkPrettierAvailable() bool {
+	prettierOnce.Do(func() {
+		_, err := exec.LookPath("prettier")
+		prettierAvailable = err == nil
+	})
+	return prettierAvailable
+}
+
+// checkUvxAvailable checks if uvx is available in PATH (cached)
+func checkUvxAvailable() bool {
+	uvxOnce.Do(func() {
+		_, err := exec.LookPath("uvx")
+		uvxAvailable = err == nil
+	})
+	return uvxAvailable
 }
 
 // FormatHook implements code formatting logic
@@ -60,12 +83,20 @@ func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.Post
 		switch event.ToolName {
 		case "Edit":
 			edit, err := event.InputAsEdit()
-			if err == nil {
+			if err != nil {
+				if h.Context().LoggingEnabled {
+					log.Printf("Failed to parse Edit input: %v", err)
+				}
+			} else {
 				filePath = edit.FilePath
 			}
 		case "Write":
 			write, err := event.InputAsWrite()
-			if err == nil {
+			if err != nil {
+				if h.Context().LoggingEnabled {
+					log.Printf("Failed to parse Write input: %v", err)
+				}
+			} else {
 				filePath = write.FilePath
 			}
 		}
@@ -93,6 +124,22 @@ func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.Post
 
 // formatFile formats a file based on its extension
 func (h *FormatHook) formatFile(filePath string) error {
+	// Validate file path
+	if filePath == "" {
+		return fmt.Errorf("empty file path")
+	}
+
+	// Check if file exists and is accessible
+	if _, err := os.Stat(filePath); err != nil {
+		return fmt.Errorf("file not accessible: %w", err)
+	}
+
+	// Clean the path to prevent path traversal
+	cleanPath := filepath.Clean(filePath)
+	if cleanPath != filePath {
+		return fmt.Errorf("invalid file path: possible path traversal attempt")
+	}
+
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	switch ext {
@@ -133,17 +180,31 @@ func (h *FormatHook) formatGoFile(filePath string) error {
 
 // formatJSFile formats a JavaScript/TypeScript file using prettier
 func (h *FormatHook) formatJSFile(filePath string) error {
+	return h.formatWithPrettier(filePath, "JS/TS")
+}
+
+// formatWithPrettier formats a file using prettier (shared by JS and YAML)
+func (h *FormatHook) formatWithPrettier(filePath string, fileType string) error {
+	if !checkPrettierAvailable() {
+		return fmt.Errorf("prettier not found in PATH (required for %s formatting)", fileType)
+	}
+
 	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
 	if err != nil {
 		log.Printf("prettier error on %s: %s", filePath, output)
 		return fmt.Errorf("prettier failed: %s", output)
 	}
-	fmt.Printf("Formatted JS/TS file: %s\n", filePath)
+	fmt.Printf("Formatted %s file: %s\n", fileType, filePath)
 	return nil
 }
 
-// formatPythonFile formats a Python file using ruff or black
+// formatPythonFile formats a Python file using ruff
 func (h *FormatHook) formatPythonFile(filePath string) error {
+	// Check if uvx is available (required for ruff)
+	if !checkUvxAvailable() {
+		return fmt.Errorf("uvx not found in PATH (required for ruff Python formatting)")
+	}
+
 	// Run ruff format first
 	output, err := h.Context().CommandExecutor.ExecuteCommand("uvx", "ruff", "format", filePath)
 	if err != nil {
@@ -164,11 +225,5 @@ func (h *FormatHook) formatPythonFile(filePath string) error {
 
 // formatYAMLFile formats a YAML file using prettier
 func (h *FormatHook) formatYAMLFile(filePath string) error {
-	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
-	if err != nil {
-		log.Printf("prettier error on %s: %s", filePath, output)
-		return fmt.Errorf("prettier failed: %s", output)
-	}
-	fmt.Printf("Formatted YAML file: %s\n", filePath)
-	return nil
+	return h.formatWithPrettier(filePath, "YAML")
 }

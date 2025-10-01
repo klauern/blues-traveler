@@ -1881,12 +1881,14 @@ func setupCursorEnvironment(input cursor.HookInput) {
 		}
 
 	case cursor.AfterFileEdit:
+		_ = os.Setenv("TOOL_NAME", "Edit")
 		_ = os.Setenv("FILE_PATH", input.FilePath)
 		if editsJSON, err := json.Marshal(input.Edits); err == nil {
 			_ = os.Setenv("FILE_EDITS", string(editsJSON))
 		}
 
 	case cursor.BeforeReadFile:
+		_ = os.Setenv("TOOL_NAME", "Read")
 		_ = os.Setenv("FILE_PATH", input.FilePath)
 		_ = os.Setenv("FILE_CONTENT", input.Content)
 

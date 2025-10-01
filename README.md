@@ -674,7 +674,7 @@ For detailed documentation, see:
 
 | Issue                | Solution                                                                           |
 | -------------------- | ---------------------------------------------------------------------------------- |
-| Hook not found       | Run `blues-traveler list` to see available hooks                                   |
+| Hook not found       | Run `blues-traveler hooks list` to see available hooks                             |
 | Hook not working     | Check if enabled: `blues-traveler list-installed`                                  |
 | Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
 | Format not working   | Ensure formatters installed: `gofmt`, `prettier`, `black`                          |
