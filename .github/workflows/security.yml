@@ -111,6 +111,16 @@ jobs:
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
+      with:
+        merge-multiple: false
+      continue-on-error: true
+      id: download
+
+    - name: Retry download on failure
+      if: steps.download.outcome == 'failure'
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: false
 
     - name: Security scan summary
       run: |
