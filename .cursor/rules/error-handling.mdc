@@ -107,18 +107,18 @@ func processFile(filePath string) error {
     if filePath == "" {
         return fmt.Errorf("empty file path")
     }
-    
+
     // 2. Check file exists and is accessible
     if _, err := os.Stat(filePath); err != nil {
         return fmt.Errorf("file not accessible: %w", err)
     }
-    
+
     // 3. Prevent path traversal attacks
     cleanPath := filepath.Clean(filePath)
     if cleanPath != filePath {
         return fmt.Errorf("invalid file path: possible path traversal attempt")
     }
-    
+
     // Safe to process
     return processValidatedFile(cleanPath)
 }

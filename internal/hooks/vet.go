@@ -60,7 +60,9 @@ func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToo
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
 		filePath, err := h.extractFilePath(event)
 		if err != nil {
-			// Log extraction error if needed, but don't block
+			if h.Context().LoggingEnabled {
+				h.LogHookEvent("file_path_extraction_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
+			}
 			return cchooks.Allow()
 		}
 

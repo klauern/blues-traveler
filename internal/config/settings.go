@@ -221,6 +221,9 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 	case "SessionStart":
 		result = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
 		settings.Hooks.SessionStart = result.Matchers
+	case "SessionEnd":
+		result = mergeHookMatcher(settings.Hooks.SessionEnd, hookMatcher)
+		settings.Hooks.SessionEnd = result.Matchers
 	}
 	return result
 }
@@ -309,6 +312,7 @@ func RemoveHookFromSettings(settings *Settings, command string) bool {
 	settings.Hooks.SubagentStop = removeHookFromMatchers(settings.Hooks.SubagentStop, command, &removed)
 	settings.Hooks.PreCompact = removeHookFromMatchers(settings.Hooks.PreCompact, command, &removed)
 	settings.Hooks.SessionStart = removeHookFromMatchers(settings.Hooks.SessionStart, command, &removed)
+	settings.Hooks.SessionEnd = removeHookFromMatchers(settings.Hooks.SessionEnd, command, &removed)
 
 	return removed
 }
@@ -361,6 +365,7 @@ func CountBluesTravelerInSettings(settings *Settings) int {
 	count += countInMatchers(settings.Hooks.SubagentStop)
 	count += countInMatchers(settings.Hooks.PreCompact)
 	count += countInMatchers(settings.Hooks.SessionStart)
+	count += countInMatchers(settings.Hooks.SessionEnd)
 
 	return count
 }
@@ -440,6 +445,7 @@ func RemoveAllBluesTravelerFromSettings(settings *Settings) int {
 	settings.Hooks.SubagentStop = removeFromMatchers(settings.Hooks.SubagentStop)
 	settings.Hooks.PreCompact = removeFromMatchers(settings.Hooks.PreCompact)
 	settings.Hooks.SessionStart = removeFromMatchers(settings.Hooks.SessionStart)
+	settings.Hooks.SessionEnd = removeFromMatchers(settings.Hooks.SessionEnd)
 
 	return removed
 }

@@ -209,7 +209,8 @@ func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
 	// Dangerous root/system targets (all lowercase for case-insensitive comparison)
 	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
 	for _, tgt := range targets {
-		lt := strings.ToLower(tgt)
+		// Strip surrounding quotes before comparison
+		lt := strings.Trim(strings.ToLower(tgt), "\"'")
 		if lt == "/" {
 			return true, "blocked rm: targets filesystem root"
 		}
@@ -275,7 +276,8 @@ func (h *SecurityHook) detectRecursiveOwnershipOrPerm(tokens []string) (bool, st
 		if strings.HasPrefix(t, "-") {
 			continue
 		}
-		lt := strings.ToLower(t)
+		// Strip surrounding quotes before comparison
+		lt := strings.Trim(strings.ToLower(t), "\"'")
 		if lt == "/" || strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/library") {
 			return true, "blocked recursive " + tokens[0] + " on critical path " + t
 		}

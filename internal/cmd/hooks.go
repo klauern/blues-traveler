@@ -1869,7 +1869,7 @@ func setupCursorEnvironment(input cursor.HookInput) {
 	// Event-specific fields (all Setenv calls ignore errors - best effort)
 	switch input.HookEventName {
 	case cursor.BeforeShellExecution:
-		_ = os.Setenv("TOOL_NAME", "shell")
+		_ = os.Setenv("TOOL_NAME", "Bash")
 		_ = os.Setenv("TOOL_ARGS", input.Command)
 		_ = os.Setenv("CWD", input.CWD)
 

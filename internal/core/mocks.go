@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -127,10 +128,10 @@ func (m *MockCommandExecutor) ExecuteCommand(name string, args ...string) ([]byt
 		Args: append([]string{}, args...),
 	})
 
-	// Create command key for lookup
+	// Create command key for lookup using full argument list
 	key := name
 	if len(args) > 0 {
-		key = fmt.Sprintf("%s %s", name, args[0])
+		key = fmt.Sprintf("%s %s", name, strings.Join(args, " "))
 	}
 
 	// Return response if configured

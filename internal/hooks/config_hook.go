@@ -122,7 +122,9 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 		case err := <-done:
 			return err
 		case <-timer.C:
-			_ = cmd.Process.Kill()
+			if err := cmd.Process.Kill(); err == nil {
+				_ = cmd.Wait() // reap the process to avoid zombies
+			}
 			return fmt.Errorf("command timed out after %ds", h.job.Timeout)
 		}
 	}
@@ -185,8 +187,11 @@ func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResp
 		}
 		env := h.envProvider.GetEnvironment(evName, ctxData)
 		if ok, err := h.shouldRun(env); err == nil && ok {
-			_ = h.runCommandWithEnv(env)
+			if err := h.runCommandWithEnv(env); err != nil && h.Context().LoggingEnabled {
+				h.LogHookEvent("raw_command_error", evName, rawEvent, map[string]interface{}{"error": err.Error()})
+			}
 		}
+		h.lastRaw = "" // reset after use
 		return nil
 	}
 }
@@ -194,6 +199,9 @@ func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResp
 func (h *ConfigHook) processRawFromStdin() error {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
+		if h.Context().LoggingEnabled {
+			h.LogHookEvent("stdin_read_error", "", map[string]interface{}{"error": err.Error()}, nil)
+		}
 		return nil // fail open
 	}
 	handler := h.rawHandler()
