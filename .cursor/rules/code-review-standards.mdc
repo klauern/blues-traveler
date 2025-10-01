@@ -1,0 +1,82 @@
+---
+description: Code review standards and pre-merge checks for blues-traveler
+---
+# Code Review Standards
+
+## Pre-merge Checks
+
+### Documentation Coverage
+- **Requirement**: Maintain at least 80% docstring coverage
+- **Tool**: CodeRabbit automatically checks this
+- **Fix**: Run `@coderabbitai generate docstrings` or manually add documentation
+
+### Required Documentation
+1. **All exported items** must have documentation comments:
+   - Types, interfaces, structs
+   - Functions and methods
+   - Constants and variables
+   - Package-level documentation
+
+2. **Documentation format**:
+   ```go
+   // ItemName does/represents/implements...
+   ```
+
+### Code Quality Checks
+- No golint warnings for exported items
+- No gosec security warnings without proper suppression
+- Tests must pass with race detector enabled
+- No unhandled errors
+
+## PR Review Process
+
+### Before Submitting PR
+1. Run `task check` to verify:
+   - Code formatting (gofumpt)
+   - Linting (golangci-lint)
+   - Tests pass
+   - Documentation coverage
+
+2. Ensure conventional commits:
+   ```
+   feat(scope): add new feature
+   fix(scope): fix bug
+   docs(scope): update documentation
+   test(scope): add tests
+   refactor(scope): refactor code
+   chore(scope): maintenance tasks
+   ```
+
+### CodeRabbit Integration
+- CodeRabbit will automatically review PRs
+- Address all warnings and errors
+- Common issues:
+  - Missing documentation (most common)
+  - Security concerns
+  - Test coverage
+
+### Manual Review Focus
+- Architecture consistency
+- Performance implications
+- Security considerations
+- API design
+- Error handling patterns
+
+## Fixing Common Issues
+
+### Documentation Coverage
+```bash
+# Check what needs documentation
+golint ./... | grep "should have comment"
+
+# Add documentation following the patterns in this project
+```
+
+### Security Issues
+- Use `#nosec` comments sparingly and with justification
+- Example: `// #nosec G304 - controlled path from trusted source`
+
+### Test Coverage
+- Aim for 80%+ coverage on core functionality
+- Use table-driven tests for multiple scenarios
+- Test error paths

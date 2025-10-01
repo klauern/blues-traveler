@@ -74,7 +74,7 @@ cmd := exec.Command("gofumpt", "-w", filePath)
 **NEVER suppress these without careful review:**
 
 1. Password/credential handling
-2. User input processing  
+2. User input processing
 3. External data parsing
 4. Network requests
 5. File uploads

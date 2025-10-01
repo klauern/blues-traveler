@@ -83,6 +83,7 @@ go test -v -run TestName ./internal/...
 See [security-scanning.mdc](mdc:.cursor/rules/security-scanning.mdc) for gosec guidance.
 
 Common fixes:
+
 1. Add `#nosec` with justification for false positives
 2. Fix actual security issues
 3. Adjust file/directory permissions (0750/0600 instead of 0755/0644)
@@ -109,6 +110,7 @@ The CI workflow reads from [go.mod](mdc:go.mod):
 ```
 
 When updating Go version:
+
 1. Update `go.mod`: `go mod edit -go=1.25.1`
 2. Update [development-workflow.mdc](mdc:.cursor/rules/development-workflow.mdc)
 3. Test locally before pushing
@@ -136,11 +138,13 @@ gh run watch
 ## Cache Management
 
 GitHub Actions caches:
+
 - Go module cache (`~/go/pkg/mod`)
 - Go build cache (`~/.cache/go-build`)
 - golangci-lint cache
 
 If experiencing cache issues:
+
 1. Use GitHub UI to clear cache
 2. Or bump cache key in workflow files
 
