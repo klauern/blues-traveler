@@ -51,6 +51,7 @@ func (h *FormatHook) Run() error {
 	return nil
 }
 
+// postToolUseHandler handles post-tool-use events and formats edited files
 func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Format code files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
@@ -90,6 +91,7 @@ func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.Post
 	return cchooks.Allow()
 }
 
+// formatFile formats a file based on its extension
 func (h *FormatHook) formatFile(filePath string) error {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
@@ -106,6 +108,7 @@ func (h *FormatHook) formatFile(filePath string) error {
 	return nil
 }
 
+// formatGoFile formats a Go file using gofumpt or gofmt
 func (h *FormatHook) formatGoFile(filePath string) error {
 	var output []byte
 	var err error
@@ -128,6 +131,7 @@ func (h *FormatHook) formatGoFile(filePath string) error {
 	return nil
 }
 
+// formatJSFile formats a JavaScript/TypeScript file using prettier
 func (h *FormatHook) formatJSFile(filePath string) error {
 	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
 	if err != nil {
@@ -138,6 +142,7 @@ func (h *FormatHook) formatJSFile(filePath string) error {
 	return nil
 }
 
+// formatPythonFile formats a Python file using ruff or black
 func (h *FormatHook) formatPythonFile(filePath string) error {
 	// Run ruff format first
 	output, err := h.Context().CommandExecutor.ExecuteCommand("uvx", "ruff", "format", filePath)
@@ -157,6 +162,7 @@ func (h *FormatHook) formatPythonFile(filePath string) error {
 	return nil
 }
 
+// formatYAMLFile formats a YAML file using prettier
 func (h *FormatHook) formatYAMLFile(filePath string) error {
 	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
 	if err != nil {

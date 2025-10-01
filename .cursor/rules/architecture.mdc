@@ -1,72 +1,78 @@
----
-alwaysApply: true
----
-# Blues Traveler Architecture Rules
+# Blues Traveler Architecture & Guidelines
 
 ## Project Overview
 
-This is `blues-traveler`, a CLI tool for managing and running Claude Code and Cursor IDE hooks with a **static hook registry** architecture and **platform abstraction** for multi-IDE support.
+`blues-traveler` is a CLI tool for managing and running hooks for Claude Code and Cursor IDE with:
+- **Static hook registry** - All hooks register at startup via `init()` functions
+- **Platform abstraction** - Multi-IDE support (Claude Code, Cursor)
+- **Custom hooks system** - YAML/JSON-driven project-specific automation
 
-## Core Design Principles
+## Core Architecture Principles
 
-### Static Registration
-
-- All hooks MUST register at startup via `init()` functions in [internal/hooks/init.go](mdc:internal/hooks/init.go)
+### 1. Static Registration
+- Hooks register via `init()` in [internal/hooks/init.go](mdc:internal/hooks/init.go)
 - NO dynamic plugin loading or runtime registration
-- Hooks are registered in the `builtinHooks` map
-
-### Independent Execution
-
-- Each hook runs in isolation for security and reliability
 - Hooks are stateless and created fresh for each execution
-- Simple lifecycle: Create → Execute → Cleanup
 
-### Hook Interface
+### 2. Hook Interface
+All hooks implement `core.Hook` using `core.BaseHook`:
+```go
+type MyHook struct {
+    *core.BaseHook
+}
 
-All hooks MUST implement the `core.Hook` interface:
+func NewMyHook(ctx *core.HookContext) core.Hook {
+    base := core.NewBaseHook("key", "Name", "Description", ctx)
+    return &MyHook{BaseHook: base}
+}
 
-- `Key() string` - Hook identifier
-- `Name() string` - Human-readable name
-- `Description() string` - Hook purpose
-- `Run() error` - Main execution logic
-- `IsEnabled() bool` - Settings-based enable check
+func (h *MyHook) Run() error {
+    if !h.IsEnabled() { return nil }
+    // Hook logic
+    return nil
+}
+```
 
-Use `core.BaseHook` for common functionality - DO NOT reimplement these methods manually.
+### 3. Platform Support
+- **Claude Code**: Environment variables, `.claude/settings.json`
+- **Cursor**: JSON stdin/stdout, `~/.cursor/hooks.json`
+- Platform detection order: env var → `.cursor/` → `.claude/` → default
 
-## Framework
+### 4. Configuration System
+- **XDG-compliant**: `~/.config/blues-traveler/` (respects `XDG_CONFIG_HOME`)
+- **Legacy fallback**: `.claude/settings.json` (project/global)
+- **Precedence**: Project → Global → Default
 
-- CLI framework: **urfave/cli v3** (NOT Cobra - that was migrated away)
-- See [docs/cobra-to-urfave-cli-migration.md](mdc:docs/cobra-to-urfave-cli-migration.md) for migration details
+## Key Guidelines
 
-## File Structure
+### DO ✅
+- Use `core.BaseHook` for all hooks
+- Add hooks to static registry in `init.go`
+- Use urfave/cli v3 for CLI commands
+- Respect XDG configuration paths
+- Test with 80%+ coverage for core functionality
 
+### DON'T ❌
+- Suggest dynamic plugin loading
+- Reference the old pipeline system (removed)
+- Modify registry at runtime
+- Reference Cobra (migrated to urfave/cli v3)
+- Reimplement BaseHook methods manually
+
+## Quick Reference
+
+### File Structure
 - [main.go](mdc:main.go) - CLI entry point
-- [internal/hooks/init.go](mdc:internal/hooks/init.go) - Hook registration
 - [internal/hooks/](mdc:internal/hooks/) - Hook implementations
-- [internal/core/registry.go](mdc:internal/core/registry.go) - Registry management
+- [internal/platform/](mdc:internal/platform/) - Platform abstraction
 - [internal/config/](mdc:internal/config/) - Configuration system
 - [internal/cmd/](mdc:internal/cmd/) - CLI commands
-- [internal/platform/](mdc:internal/platform/) - Platform abstraction (Claude Code, Cursor)
 
-## Configuration
+### Related Documentation
+- [Platform Support](mdc:.cursor/rules/platform-support.mdc) - Multi-IDE details
+- [Hook Implementation](mdc:.cursor/rules/hook-implementation.mdc) - Creating hooks
+- [Custom Hooks](mdc:.cursor/rules/custom-hooks.mdc) - YAML/JSON hooks
+- [CLI Commands](mdc:.cursor/rules/cli-commands.mdc) - urfave/cli v3 patterns
 
-Settings are managed in JSON format with two scopes:
-
-- **Project**: `./.claude/settings.json` (takes precedence)
-- **Global**: `~/.claude/settings.json` (fallback)
-- **XDG**: `~/.config/blues-traveler/` (preferred, see [docs/xdg-migration-spec.md](mdc:docs/xdg-migration-spec.md))
-
-## What NOT to Do
-
-- ❌ Suggest dynamic plugin loading or runtime registration
-- ❌ Reference the old pipeline system (removed)
-- ❌ Suggest modifying registry at runtime
-- ❌ Reference Cobra (migrated to urfave/cli v3)
-
-## What TO Do
-
-- ✅ Add hooks to static registry in [init.go](mdc:internal/hooks/init.go)
-- ✅ Implement `core.Hook` interface using `core.BaseHook`
-- ✅ Use existing settings system for configuration
 - ✅ Reference urfave/cli v3 for CLI functionality
 - ✅ Point to existing hook implementations as examples

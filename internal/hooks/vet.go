@@ -34,6 +34,7 @@ func (h *VetHook) Run() error {
 	return nil
 }
 
+// postToolUseHandler handles post-tool-use events and runs type checking on modified files
 func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Type check Python files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
@@ -73,11 +74,13 @@ func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToo
 	return cchooks.Allow()
 }
 
+// isPythonFile checks if a file is a Python file based on its extension
 func (h *VetHook) isPythonFile(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	return ext == ".py"
 }
 
+// typeCheckFile runs type checking on a Python file using mypy
 func (h *VetHook) typeCheckFile(filePath string) error {
 	output, err := h.Context().CommandExecutor.ExecuteCommand("uvx", "ty", "check", filePath)
 	if err != nil {

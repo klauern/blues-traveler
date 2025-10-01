@@ -1,93 +1,66 @@
----
-description: Custom hooks system for YAML/JSON-driven hooks
----
 # Custom Hooks System
 
-## Overview
+Custom hooks enable project-specific automation without modifying blues-traveler code.
 
-Custom hooks allow project-specific automation using YAML or JSON configuration files. See [docs/custom_hooks.md](mdc:docs/custom_hooks.md) for complete guide.
+## Configuration Format
 
-## Configuration Files
-
-### Preferred Location (XDG)
-
-```
-~/.config/blues-traveler/
-├── global.yml                    # Global custom hooks
-└── projects/
-    └── <project-name>.yml        # Per-project hooks
-```
-
-### Legacy Locations (Deprecated)
-
-- `.claude/hooks/blues-traveler-config.json`
-- `.claude/hooks.yml`
-
-## YAML Example
-
+### YAML Structure
 ```yaml
-my-project:
-  PreToolUse:
+group-name:
+  EventName:
     jobs:
-      - name: security-check
-        run: |
-          if echo "$TOOL_ARGS" | grep -E "(rm -rf|sudo|curl.*\\|.*sh)"; then
-            echo "Dangerous command detected"
-            exit 1
-          fi
-        only: ${TOOL_NAME} == "Bash"
-
-  PostToolUse:
-    jobs:
-      - name: format-go
-        run: gofmt -w ${TOOL_OUTPUT_FILE}
-        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
-        glob: ["*.go"]
+      - name: job-name
+        run: command or script
+        only: condition expression
+        skip: skip condition
+        glob: ["*.ext"]
         timeout: 30
-
-      - name: unit-tests
-        run: go test ./...
-        skip: ${FILES_CHANGED} regex ".*_test\\.go$"
-        timeout: 60
+        workdir: /path
+        env:
+          KEY: value
 ```
 
-## Job Configuration
+### Job Fields
 
-### Required Fields
+**Required:**
+- `name` - Unique identifier
+- `run` - Command/script to execute
 
-- `name` - Unique job identifier
-- `run` - Command or script to execute
+**Optional:**
+- `only` - Run condition (expression)
+- `skip` - Skip condition (expression)
+- `glob` - File patterns filter
+- `timeout` - Seconds (default: 30)
+- `workdir` - Working directory
+- `env` - Additional environment
 
-### Optional Fields
+## Expression Language
 
-- `only` - Condition to run (expression evaluator)
-- `skip` - Condition to skip (expression evaluator)
-- `glob` - File patterns to match (e.g., `["*.go", "*.js"]`)
-- `timeout` - Timeout in seconds (default: 30)
-- `workdir` - Working directory (default: project root)
-- `env` - Additional environment variables
+### Operators
+- `==`, `!=` - Equality
+- `&&`, `||`, `!` - Logical
+- `regex` - Regex match: `${VAR} regex "pattern"`
+- `matches` - Glob match: `${VAR} matches "*.go"`
 
-## Expression Evaluator
-
-Supports:
-
-- Variable substitution: `${TOOL_NAME}`
-- Equality: `${TOOL_NAME} == "Edit"`
-- Inequality: `${TOOL_NAME} != "Bash"`
-- Logical operators: `&&`, `||`, `!`
-- Regex matching: `${FILES_CHANGED} regex ".*\\.go$"`
-- Glob matching: `${TOOL_FILE} matches "*.py"`
+### Examples
+```yaml
+only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+skip: ${FILES_CHANGED} regex ".*_test\\.go$"
+only: ${TOOL_FILE} matches "*.py" && ${EVENT_NAME} == "PostToolUse"
+```
 
 ## Available Variables
 
-- `EVENT_NAME` - Current event (PreToolUse, PostToolUse, etc.)
-- `TOOL_NAME` - Tool being executed (Edit, Write, Bash, etc.)
-- `TOOL_OUTPUT_FILE` - File path for Edit/Write operations
-- `TOOL_FILE` - Alias for TOOL_OUTPUT_FILE
-- `FILES_CHANGED` - Comma-separated list of changed files
-- `USER_PROMPT` - User's prompt text
-- `PROJECT_ROOT` - Project root directory
-- `TOOL_ARGS` - Raw tool arguments
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `EVENT_NAME` | Current event | `PreToolUse` |
+| `TOOL_NAME` | Tool being used | `Edit`, `Bash` |
+| `TOOL_FILE` | File being edited | `/path/to/file.go` |
+| `TOOL_OUTPUT_FILE` | Same as TOOL_FILE | `/path/to/file.go` |
+| `FILES_CHANGED` | Changed files (comma-separated) | `main.go,test.go` |
+| `TOOL_ARGS` | Raw tool arguments | Command string |
+| `USER_PROMPT` | User's prompt | User input text |
+| `PROJECT_ROOT` | Project directory | `/home/user/project` |
 
 ## CLI Commands
 
@@ -95,7 +68,7 @@ Supports:
 # Validate configuration
 blues-traveler hooks custom validate
 
-# Sync all custom hooks to settings
+# Sync all custom hooks
 blues-traveler hooks custom sync
 
 # Sync specific group
@@ -104,35 +77,59 @@ blues-traveler hooks custom sync my-project
 # Install custom hook group
 blues-traveler hooks custom install my-project --event PostToolUse
 
-# List groups
-blues-traveler config groups
+# List available groups
+blues-traveler hooks custom list
 
-# Show configuration
-blues-traveler config show
+# Show group configuration
+blues-traveler hooks custom show my-project
 ```
 
-## Implementation Files
+## Common Patterns
 
-- [internal/config/hooks_config.go](mdc:internal/config/hooks_config.go) - Config loading and parsing
-- [internal/hooks/config_hook.go](mdc:internal/hooks/config_hook.go) - Runtime execution
-- [internal/core/expressions.go](mdc:internal/core/expressions.go) - Expression evaluator
+### Security Check
+```yaml
+security:
+  PreToolUse:
+    jobs:
+      - name: block-dangerous
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|curl.*sh)"; then
+            echo "Dangerous command blocked"
+            exit 1
+          fi
+        only: ${TOOL_NAME} == "Bash"
+```
 
-## Replacing Built-in Hooks
+### Auto-Format
+```yaml
+formatters:
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofumpt -w ${TOOL_FILE}
+        glob: ["*.go"]
+      - name: format-python
+        run: ruff format ${TOOL_FILE}
+        glob: ["*.py"]
+```
 
-Custom hooks can replace or supplement built-in hooks:
+### Test Runner
+```yaml
+testing:
+  PostToolUse:
+    jobs:
+      - name: test-affected
+        run: go test ./...
+        only: ${FILES_CHANGED} regex "\\.go$"
+        skip: ${FILES_CHANGED} regex "_test\\.go$"
+        timeout: 120
+```
 
-| Built-in | Custom Equivalent |
-|----------|-------------------|
-| `security` | PreToolUse job with command validation |
-| `format` | PostToolUse job with formatter commands |
-| `vet` | PostToolUse job with linter commands |
-| `debug` | Custom logging in job scripts |
+## Implementation
 
-## Best Practices
+- Config parsing: [internal/config/hooks_config.go](mdc:internal/config/hooks_config.go)
+- Runtime execution: [internal/hooks/config_hook.go](mdc:internal/hooks/config_hook.go)
+- Expression evaluation: [internal/core/expressions.go](mdc:internal/core/expressions.go)
 
-1. **Use glob patterns** to scope work and improve performance
-2. **Add timeouts** to prevent long-running jobs
-3. **Combine only/skip** for precise control
-4. **Version control** your hooks configuration
 5. **Test with `--dry-run`** before syncing
 6. **Use project-specific configs** rather than global when possible

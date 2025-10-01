@@ -32,6 +32,7 @@ func (h *FindBlockerHook) Run() error {
 	return nil
 }
 
+// preToolUseHandler handles pre-tool-use events and blocks find commands
 func (h *FindBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	// Log detailed event data if logging is enabled
 	if h.Context().LoggingEnabled {

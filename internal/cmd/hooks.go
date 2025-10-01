@@ -469,6 +469,7 @@ func listAvailableHooks(getPlugin func(string) (interface {
 	return nil
 }
 
+// listInstalledHooks displays hooks currently installed in Claude Code settings
 func listInstalledHooks(global bool) error {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
@@ -509,6 +510,7 @@ func listInstalledHooks(global bool) error {
 	return nil
 }
 
+// listEvents displays all available hook events and their descriptions
 func listEvents(allEvents func() []ClaudeCodeEvent) error {
 	fmt.Println("Available Claude Code Hook Events:")
 	fmt.Println()
@@ -706,6 +708,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 	}
 }
 
+// newHooksCustomListCommand creates the custom hooks list command
 func newHooksCustomListCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
@@ -728,6 +731,7 @@ func newHooksCustomListCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomSyncCommand creates the custom hooks sync command
 func newHooksCustomSyncCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "sync",
@@ -897,6 +901,7 @@ func newHooksCustomSyncCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomInitCommand creates the custom hooks init command
 func newHooksCustomInitCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
@@ -1055,6 +1060,7 @@ func newHooksCustomInitCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomValidateCommand creates the custom hooks validate command
 func newHooksCustomValidateCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "validate",
@@ -1073,6 +1079,7 @@ func newHooksCustomValidateCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomShowCommand creates the custom hooks show command
 func newHooksCustomShowCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "show",
@@ -1126,6 +1133,7 @@ func newHooksCustomShowCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomBlockedCommand creates the custom hooks blocked command
 func newHooksCustomBlockedCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "blocked",
@@ -1351,7 +1359,7 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 	fmt.Printf("   Edit this file to add your own blocked URL prefixes.\n")
 }
 
-// Helper functions for the consolidated list command
+// printHookMatchers displays the matchers for a specific event in a formatted list
 func printHookMatchers(eventName string, matchers []config.HookMatcher) {
 	if len(matchers) == 0 {
 		return
@@ -1375,6 +1383,7 @@ func printHookMatchers(eventName string, matchers []config.HookMatcher) {
 	fmt.Println()
 }
 
+// printUninstallExamples shows example commands for uninstalling hooks
 func printUninstallExamples(global bool) {
 	scope := "project"
 	globalFlag := ""
@@ -1409,7 +1418,8 @@ func printUninstallExamples(global bool) {
 	fmt.Printf("   from ALL events (PreToolUse, PostToolUse, etc.)\n")
 }
 
-func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
+// uninstallAllBluesTravelerHooks removes all blues-traveler hooks from settings
+func uninstallAllBluesTravelerHooks(global bool, skipConfirmation bool) {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
 	if err != nil {
@@ -1686,43 +1696,17 @@ func installHookCursor(p platform.Platform, hookType string, plugin interface {
 	installedCount := 0
 	installedEvents := []string{}
 
+	// Build the command to register in Cursor hooks.json
+	// Format: /path/to/blues-traveler hooks run <hook> --cursor-mode
+	// Note: Matcher filtering happens inside blues-traveler (passed via stdin JSON matching logic)
+	command := fmt.Sprintf("%s hooks run %s --cursor-mode", execPath, hookType)
+
 	// Install hook for each mapped Cursor event
 	for _, cursorEvent := range cursorEvents {
-		// Generate wrapper script
-		wrapperConfig := cursor.WrapperConfig{
-			HookKey:     hookType,
-			CursorEvent: cursorEvent,
-			Matcher:     matcher,
-			BinaryPath:  execPath,
-			Description: plugin.Description(),
-		}
-
-		wrapperScript, err := cursor.GenerateWrapper(wrapperConfig)
-		if err != nil {
-			return fmt.Errorf("failed to generate wrapper script: %w", err)
-		}
-
-		// Get wrapper script path
-		scriptPath, err := cursor.WrapperScriptPath(hookType, cursorEvent)
-		if err != nil {
-			return fmt.Errorf("failed to get wrapper script path: %w", err)
-		}
-
-		// Ensure directory exists
-		scriptDir := filepath.Dir(scriptPath)
-		if err := os.MkdirAll(scriptDir, 0o755); err != nil {
-			return fmt.Errorf("failed to create wrapper script directory: %w", err)
-		}
-
-		// Write wrapper script
-		if err := os.WriteFile(scriptPath, []byte(wrapperScript), 0o755); err != nil {
-			return fmt.Errorf("failed to write wrapper script: %w", err)
-		}
-
 		// Check if hook already exists in config
-		if !cfg.HasHook(cursorEvent, scriptPath) {
+		if !cfg.HasHook(cursorEvent, command) {
 			// Add hook to Cursor config
-			cfg.AddHook(cursorEvent, scriptPath)
+			cfg.AddHook(cursorEvent, command)
 			installedCount++
 			installedEvents = append(installedEvents, cursorEvent)
 		}
@@ -1738,7 +1722,7 @@ func installHookCursor(p platform.Platform, hookType string, plugin interface {
 		fmt.Printf("✅ Successfully installed %s hook for Cursor\n", hookType)
 		fmt.Printf("   Generic Event: %s\n", event)
 		fmt.Printf("   Cursor Events: %s\n", strings.Join(installedEvents, ", "))
-		fmt.Printf("   Matcher: %s\n", matcher)
+		fmt.Printf("   Command: %s\n", command)
 		fmt.Printf("   Config: %s\n", configPath)
 		fmt.Println()
 		fmt.Println("The hook will be active in new Cursor sessions.")

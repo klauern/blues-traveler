@@ -1,148 +1,99 @@
----
-globs: docs/**/*.md
-description: Documentation structure and maintenance guidelines
----
 
-# Documentation Guidelines
+# Documentation Guide
 
-## Documentation Structure
+## Project Documentation Structure
 
-Blues Traveler uses a streamlined documentation structure to avoid duplication and confusion:
+### Core Documentation
+- [README.md](mdc:README.md) - Project overview and quick start
+- [CLAUDE.md](mdc:CLAUDE.md) - AI assistant guidance (always keep updated!)
+- [AGENTS.md](mdc:AGENTS.md) - Built-in hooks reference
 
-```
-docs/
-├── index.md                 # Documentation index - DO NOT duplicate structure here
-├── quick_start.md           # Getting started guide for new users
-├── developer_guide.md       # Complete developer reference (includes architecture)
-├── custom-hooks-guide.md    # Custom hooks user guide and implementation notes
-├── cursor-support.md        # Cursor platform support documentation
-└── archive/                 # Historical documents (completed migrations, old planning)
-```
+### User Guides
+- [docs/quick_start.md](mdc:docs/quick_start.md) - Getting started guide
+- [docs/developer_guide.md](mdc:docs/developer_guide.md) - Development guidelines
+- [docs/custom-hooks-guide.md](mdc:docs/custom-hooks-guide.md) - Custom hooks tutorial
 
-## Core Principles
+### Platform Documentation
+- [docs/cursor-support.md](mdc:docs/cursor-support.md) - Cursor IDE integration
+- [docs/archive/cursor-planning/](mdc:docs/archive/cursor-planning/) - Cursor implementation history
 
-### 1. Single Source of Truth
+### Cursor Rules (This Directory)
+- [architecture.mdc](mdc:.cursor/rules/architecture.mdc) - Core architecture & principles
+- [platform-support.mdc](mdc:.cursor/rules/platform-support.mdc) - Multi-IDE platform details
+- [configuration.mdc](mdc:.cursor/rules/configuration.mdc) - Config system & XDG paths
+- [hook-implementation.mdc](mdc:.cursor/rules/hook-implementation.mdc) - Hook development guide
+- [custom-hooks.mdc](mdc:.cursor/rules/custom-hooks.mdc) - YAML/JSON hooks system
+- [cli-commands.mdc](mdc:.cursor/rules/cli-commands.mdc) - urfave/cli v3 patterns
+- [testing.mdc](mdc:.cursor/rules/testing.mdc) - Testing guidelines
+- [development-workflow.mdc](mdc:.cursor/rules/development-workflow.mdc) - Contributing guide
+- [cursor-implementation.mdc](mdc:.cursor/rules/cursor-implementation.mdc) - Cursor-specific details
 
-- **One topic = One file**: Each topic should have exactly one canonical documentation file
-- **No duplicate filenames**: Avoid similar names like `custom-hooks.md` vs `custom_hooks.md`
-- **Clear naming**: Use descriptive, consistent naming (hyphens, not underscores)
+## Documentation Standards
 
-### 2. Archive vs Delete
+### Code Examples
+- Use realistic, working examples
+- Include imports and error handling
+- Follow Go idioms and project patterns
 
-When documentation becomes outdated:
+### File References
+- Use MDC links: `[file.go](mdc:path/to/file.go)`
+- Use relative paths from workspace root
+- Link to specific sections when helpful
 
-- **Archive** if it has historical value (migrations, planning, design decisions)
-  - Move to `docs/archive/` with descriptive subdirectory
-  - Preserve git history with `git mv`
-  - Update cross-references
+### Version Information
+- Document version requirements (Go 1.23.0+)
+- Note deprecations with migration paths
+- Update CLAUDE.md when architecture changes
 
-- **Delete** if it's truly obsolete or incorrect
-  - Only if no historical value and not referenced elsewhere
-  - Content still preserved in git history
-
-### 3. Migration and Planning Docs
-
-- **Implementation plans**: Keep in `docs/archive/` once completed
-- **Research findings**: Archive after implementation
-- **Migration guides**: Archive once migration is complete and production-ready
-- **Status markers**: Mark clearly as ✅ COMPLETE or 🚧 IN PROGRESS
-
-### 4. Avoid These Anti-Patterns
-
-❌ **Don't**:
-- Create multiple files for the same topic
-- Use both hyphens and underscores in similar filenames
-- Leave completed migration docs in active docs/
-- Duplicate architecture/design content across files
-- Keep outdated status markers (update or archive)
-
-✅ **Do**:
-- Merge related content into comprehensive guides
-- Use clear, unique names
-- Archive historical content
-- Cross-reference instead of duplicate
-- Keep status current
-
-## File Purposes
-
-### [index.md](mdc:docs/index.md)
-- Navigation hub for all documentation
-- Should reference all active docs (not archive)
-- Keep descriptions short
-
-### [quick_start.md](mdc:docs/quick_start.md)
-- First-time user experience
-- Installation and basic usage
-- Links to detailed guides
-
-### [developer_guide.md](mdc:docs/developer_guide.md)
-- Complete developer reference
-- Architecture and design decisions (consolidated)
-- Adding hooks, testing, contributing
-- **Includes architecture content** (no separate architecture doc)
-
-### [custom-hooks-guide.md](mdc:docs/custom-hooks-guide.md)
-- User guide for custom hooks
-- Implementation status and technical notes
-- Examples and patterns
-- **Single merged document** (not split into multiple files)
-
-### [cursor-support.md](mdc:docs/cursor-support.md)
-- Canonical Cursor platform documentation
-- Installation, usage, event mapping
-- **Single source** (planning docs archived after completion)
-
-## When Adding New Documentation
-
-1. **Check existing files first**: Can content be added to existing doc?
-2. **Verify uniqueness**: Is there already a file on this topic?
-3. **Update index.md**: Add reference to new documentation
-4. **Use proper naming**: `topic-name.md` (hyphens, lowercase)
-5. **Link related content**: Cross-reference instead of duplicating
-
-## Updating Documentation
-
-- **Keep status current**: Update phase markers, completion status
-- **Archive when complete**: Move planning/migration docs after implementation
-- **Consolidate regularly**: Merge related content that has grown separately
-- **Update cross-references**: When moving or renaming files
-
-## Examples of Good Documentation Hygiene
-
-**Good** ✅:
-```
-docs/
-├── cursor-support.md         # Single comprehensive guide
-└── archive/
-    └── cursor-planning/      # Historical planning docs
-        ├── PLAN.md
-        └── RESEARCH.md
-```
-
-**Bad** ❌:
-```
-docs/
-├── cursor-support.md
-├── cursor_support.md
-├── cursor-docs.md
-├── planning/
-│   └── cursor-plan.md
-└── cursor-wrapper-simplification.md
-```
+### Formatting
+- Use consistent heading levels
+- Include tables for comparisons
+- Add code fences with language hints
 
 ## Maintenance Checklist
 
-When reviewing documentation:
+When making changes:
+1. ✅ Update affected documentation
+2. ✅ Keep CLAUDE.md in sync
+3. ✅ Update examples to match code
+4. ✅ Check all MDC links still work
+5. ✅ Ensure consistency across docs
 
-- [ ] No duplicate filenames (check similar names with hyphens/underscores)
-- [ ] Completed migration docs moved to archive
-- [ ] Status markers are current
-- [ ] No duplicate content across files
-- [ ] Index.md reflects current structure
-- [ ] Cross-references are valid
-- [ ] Historical content in archive/ with context
+## Common Documentation Patterns
 
----
+### Feature Documentation
+1. **What**: Clear description
+2. **Why**: Use case/problem solved
+3. **How**: Implementation details
+4. **Example**: Working code sample
+5. **Reference**: Links to code/specs
+
+### API Documentation
+```go
+// FunctionName does X with Y to produce Z.
+//
+// Parameters:
+//   - param1: description
+//   - param2: description
+//
+// Returns:
+//   - result: description
+//   - error: when this happens
+//
+// Example:
+//   result, err := FunctionName(x, y)
+//   if err != nil {
+//       // handle error
+//   }
+func FunctionName(param1 Type1, param2 Type2) (Result, error) {
+```
+
+### Configuration Documentation
+- Show both YAML and JSON formats
+- Include all fields with descriptions
+- Provide real-world examples
+- Note defaults and constraints
+
 
 **Last Updated**: 2025-10-01
 **Consolidated**: Reduced from 14 files to 8 core files (58% reduction)
