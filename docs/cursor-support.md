@@ -3,21 +3,23 @@
 > **Status**: ✅ Phase 3 Complete - Full hook execution with JSON transformation
 > **Version**: v0.3.0-alpha (Ready for Testing)
 
+## Prerequisites
+
+- **blues-traveler**: Must be installed and available in your PATH
+- **Cursor IDE**: Version that supports hooks (usually the latest version)
+
 ## Overview
 
-blues-traveler now supports Cursor IDE hooks in addition to Claude Code. Cursor hooks use a different protocol (JSON over stdin/stdout) compared to Claude Code (environment variables), so blues-traveler implements a **hybrid adapter pattern** to bridge the two systems.
+blues-traveler now supports Cursor IDE hooks in addition to Claude Code. Cursor hooks use a different protocol (JSON over stdin/stdout) compared to Claude Code (environment variables), so blues-traveler implements **direct execution** with the `--cursor-mode` flag.
 
 ## Architecture
 
 ```text
 Cursor Agent
     ↓ JSON stdin
-Wrapper Script (auto-generated)
-    ↓ Parse JSON, set env vars
-blues-traveler run <hook> --cursor-mode
+blues-traveler run <hook> --cursor-mode [--matcher <pattern>]
+    ↓ Transform JSON to Claude Code format
     ↓ Execute hook, return JSON
-Wrapper Script
-    ↓ JSON stdout
 Cursor Agent
 ```
 
@@ -27,7 +29,7 @@ Cursor Agent
 | --------------- | ----------------------- | ------------------------ |
 | **Protocol**    | Environment variables   | JSON stdin/stdout        |
 | **Config File** | `.claude/settings.json` | `~/.cursor/hooks.json`   |
-| **Matchers**    | Regex in config         | None (filter in scripts) |
+| **Matchers**    | Regex in config         | Regex in command args    |
 | **Events**      | 9 events                | 6 events                 |
 
 ## Cursor Events Supported
@@ -53,24 +55,27 @@ Run any blues-traveler hook in Cursor mode:
 # Read JSON from stdin, output JSON to stdout
 echo '{"hook_event_name": "beforeShellExecution", "command": "rm -rf /"}' | \
   blues-traveler run security --cursor-mode
+
+# With matcher filter
+echo '{"hook_event_name": "beforeShellExecution", "command": "rm -rf /"}' | \
+  blues-traveler run security --cursor-mode --matcher "rm.*"
 ```
 
-### Wrapper Scripts
+### Direct Registration
 
-Wrapper scripts are automatically generated when you install hooks for Cursor using `hooks install --platform cursor`:
+Hooks are registered directly in `~/.cursor/hooks.json` using the `hooks install --platform cursor` command:
 
-```bash
-# Example generated wrapper for security hook
-#!/bin/bash
-input=$(cat)
-export EVENT_NAME=$(echo "$input" | jq -r '.hook_event_name')
-export TOOL_ARGS=$(echo "$input" | jq -r '.command')
-
-if blues-traveler run security --cursor-mode <<< "$input"; then
-  exit 0
-else
-  exit 3  # Deny permission
-fi
+```json
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "/path/to/blues-traveler hooks run security --cursor-mode --matcher \".*\""
+      }
+    ]
+  }
+}
 ```
 
 ## Environment Variable Mapping
@@ -124,7 +129,6 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 - [x] Platform abstraction layer
 - [x] Cursor JSON I/O types and schemas
 - [x] `--cursor-mode` flag for JSON protocol
-- [x] Wrapper script generator with templates
 - [x] Cursor config handler (`~/.cursor/hooks.json`)
 - [x] Platform detection logic
 - [x] Event name mapper (Claude ↔ Cursor)
@@ -133,21 +137,22 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 ### ✅ Phase 2: CLI Integration (Complete)
 
 - [x] `--platform cursor` flag on install command
-- [x] Automatic wrapper script generation and installation
+- [x] Direct command registration in hooks.json
 - [x] Platform auto-detection in commands
 - [x] `blues-traveler platform detect` command
-- [x] Basic integration (hooks allow all operations)
+- [x] Matcher support via command-line flags
 
 ### ✅ Phase 3: Full Hook Execution (Complete)
 
 - [x] Full hook execution in Cursor mode (convert events, call handlers)
 - [x] JSON transformation from Cursor format to Claude Code format
-- [x] Hook logic now executes properly (security checks, formatting, etc.)
+- [x] Hook logic executes properly (security checks, formatting, etc.)
+- [x] Matcher filtering with regex support
+- [x] Direct command registration (no wrapper scripts needed)
 - [ ] Custom hooks support for Cursor (future enhancement)
 - [ ] Cross-platform sync command (future enhancement)
-- [ ] Migration guide (future enhancement)
 
-**Status**: All core functionality is complete! Hooks now properly execute in Cursor mode by transforming Cursor JSON events to Claude Code format before passing them to hook handlers.
+**Status**: ✅ **Phase 3 Complete!** All core functionality implemented. Hooks execute in Cursor mode by transforming Cursor JSON events to Claude Code format. Installation simplified with direct command registration instead of wrapper scripts.
 
 ## Testing
 
@@ -171,14 +176,16 @@ Use the built-in install command:
 # Install security hook for Cursor
 blues-traveler hooks install security --platform cursor --event PreToolUse
 
+# With custom matcher
+blues-traveler hooks install security --platform cursor --event PreToolUse --matcher "rm.*|sudo.*"
+
 # Auto-detect platform (works if you're in a directory with .cursor/)
 blues-traveler hooks install security --event PreToolUse
 ```
 
 This automatically:
 
-- Generates wrapper script
-- Makes it executable
+- Builds the appropriate command with `--cursor-mode` and optional `--matcher`
 - Updates `~/.cursor/hooks.json`
 - Maps events correctly
 
@@ -186,28 +193,16 @@ This automatically:
 
 If you need manual control, you can set up Cursor hooks manually:
 
-1. **Create wrapper script** (`~/.cursor/hooks/blues-traveler-security.sh`):
-
-   ```bash
-   #!/bin/bash
-   input=$(cat)
-   blues-traveler run security --cursor-mode <<< "$input"
-   ```
-
-2. **Make executable**:
-
-   ```bash
-   chmod +x ~/.cursor/hooks/blues-traveler-security.sh
-   ```
-
-3. **Update Cursor config** (`~/.cursor/hooks.json`):
+1. **Update Cursor config** (`~/.cursor/hooks.json`):
 
    ```json
    {
      "version": 1,
      "hooks": {
        "beforeShellExecution": [
-         { "command": "~/.cursor/hooks/blues-traveler-security.sh" }
+         {
+           "command": "/path/to/blues-traveler hooks run security --cursor-mode --matcher \"rm.*|sudo.*\""
+         }
        ]
      }
    }
@@ -235,6 +230,16 @@ The key to making Cursor hooks work is **JSON transformation**:
 
 This allows all existing hooks (security, format, vet, etc.) to work in Cursor without modification!
 
+## Matcher Support
+
+Matchers filter which events trigger hooks, similar to Claude Code's config-based matchers:
+
+- For `beforeShellExecution`: matches against the command string
+- For `beforeMCPExecution`: matches against the tool name
+- For `afterFileEdit` and `beforeReadFile`: matches against the file path
+- Use standard regex syntax (e.g., `"rm.*|sudo.*"`, `".*\\.go$"`)
+- Special value `"*"` or empty string matches all events
+
 ## Next Steps
 
 - Custom hooks support for Cursor (use YAML/JSON config to define Cursor-specific hooks)
@@ -243,5 +248,5 @@ This allows all existing hooks (security, format, vet, etc.) to work in Cursor w
 
 ---
 
-**Last Updated**: 2024-09-30
-**Status**: ✅ Phase 3 Complete - Full Cursor hooks support with proper hook execution
+**Last Updated**: 2025-10-01
+**Status**: ✅ Phase 3 Complete - Full Cursor support with direct command registration

@@ -29,9 +29,9 @@ func TestCursorPlatform_MapEventFromGeneric(t *testing.T) {
 		wantEvents   []string
 	}{
 		{
-			name:         "PreToolUse maps to shell and MCP execution",
+			name:         "PreToolUse maps to shell, MCP, and file read",
 			genericEvent: core.PreToolUseEvent,
-			wantEvents:   []string{BeforeShellExecution, BeforeMCPExecution},
+			wantEvents:   []string{BeforeShellExecution, BeforeMCPExecution, BeforeReadFile},
 		},
 		{
 			name:         "PostToolUse maps to file edit",

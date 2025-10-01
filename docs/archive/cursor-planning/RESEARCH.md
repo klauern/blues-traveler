@@ -212,7 +212,7 @@ To support blues-traveler's existing model, we need to:
 
 ✅ **ANSWERED**:
 
-```
+```text
 User Input -> beforeSubmitPrompt -> [Backend] -> beforeShellExecution/beforeMCPExecution -> [Execution] -> afterFileEdit -> ... -> stop
 ```
 

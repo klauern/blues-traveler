@@ -80,31 +80,47 @@ func NewConfig() *Config {
 	}
 }
 
-// AddHook adds a hook command to the specified event
+// AddHook adds a hook command to the specified event (ignores duplicates)
 func (c *Config) AddHook(event, command string) {
 	if c.Hooks == nil {
 		c.Hooks = make(map[string][]HookDef)
 	}
+
+	// Check if hook already exists
+	if c.HasHook(event, command) {
+		return
+	}
+
 	c.Hooks[event] = append(c.Hooks[event], HookDef{Command: command})
 }
 
-// RemoveHook removes a hook command from the specified event
+// RemoveHook removes all instances of a hook command from the specified event
 func (c *Config) RemoveHook(event, command string) bool {
 	hooks, exists := c.Hooks[event]
 	if !exists {
 		return false
 	}
 
-	for i, hook := range hooks {
-		if hook.Command == command {
-			c.Hooks[event] = append(hooks[:i], hooks[i+1:]...)
-			if len(c.Hooks[event]) == 0 {
-				delete(c.Hooks, event)
-			}
-			return true
+	// Filter out all matching hooks
+	var newHooks []HookDef
+	removed := false
+	for _, hook := range hooks {
+		if hook.Command != command {
+			newHooks = append(newHooks, hook)
+		} else {
+			removed = true
 		}
 	}
-	return false
+
+	if removed {
+		if len(newHooks) == 0 {
+			delete(c.Hooks, event)
+		} else {
+			c.Hooks[event] = newHooks
+		}
+	}
+
+	return removed
 }
 
 // HasHook checks if a hook command exists for the specified event

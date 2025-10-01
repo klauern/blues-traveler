@@ -10,6 +10,16 @@ import (
 	"github.com/klauern/blues-traveler/internal/platform"
 )
 
+// validCursorEvents is a map for efficient event name validation
+var validCursorEvents = map[string]bool{
+	BeforeShellExecution: true,
+	BeforeMCPExecution:   true,
+	AfterFileEdit:        true,
+	BeforeReadFile:       true,
+	BeforeSubmitPrompt:   true,
+	Stop:                 true,
+}
+
 // CursorPlatform implements Platform for Cursor IDE
 type CursorPlatform struct{}
 
@@ -47,8 +57,8 @@ func (p *CursorPlatform) SupportsEvent(event core.EventType) bool {
 func (p *CursorPlatform) MapEventFromGeneric(event core.EventType) []string {
 	switch event {
 	case core.PreToolUseEvent:
-		// PreToolUse maps to both shell and MCP execution events
-		return []string{BeforeShellExecution, BeforeMCPExecution}
+		// PreToolUse maps to shell, MCP, and file read events
+		return []string{BeforeShellExecution, BeforeMCPExecution, BeforeReadFile}
 	case core.PostToolUseEvent:
 		// PostToolUse only maps to file edits in Cursor
 		return []string{AfterFileEdit}
@@ -80,21 +90,7 @@ func (p *CursorPlatform) MapEventToGeneric(platformEvent string) (core.EventType
 
 // ValidateEventName returns true if the event name is valid for Cursor
 func (p *CursorPlatform) ValidateEventName(eventName string) bool {
-	validEvents := []string{
-		BeforeShellExecution,
-		BeforeMCPExecution,
-		AfterFileEdit,
-		BeforeReadFile,
-		BeforeSubmitPrompt,
-		Stop,
-	}
-
-	for _, valid := range validEvents {
-		if eventName == valid {
-			return true
-		}
-	}
-	return false
+	return validCursorEvents[eventName]
 }
 
 // AllEvents returns all events supported by Cursor
@@ -172,6 +168,10 @@ func (p *CursorPlatform) LoadConfig() (*Config, error) {
 
 // SaveConfig saves the Cursor hooks configuration to disk
 func (p *CursorPlatform) SaveConfig(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
 	configPath, err := p.ConfigPath()
 	if err != nil {
 		return err

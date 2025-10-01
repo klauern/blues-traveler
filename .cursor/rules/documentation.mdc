@@ -1,0 +1,148 @@
+---
+globs: docs/**/*.md
+description: Documentation structure and maintenance guidelines
+---
+
+# Documentation Guidelines
+
+## Documentation Structure
+
+Blues Traveler uses a streamlined documentation structure to avoid duplication and confusion:
+
+```
+docs/
+├── index.md                 # Documentation index - DO NOT duplicate structure here
+├── quick_start.md           # Getting started guide for new users
+├── developer_guide.md       # Complete developer reference (includes architecture)
+├── custom-hooks-guide.md    # Custom hooks user guide and implementation notes
+├── cursor-support.md        # Cursor platform support documentation
+└── archive/                 # Historical documents (completed migrations, old planning)
+```
+
+## Core Principles
+
+### 1. Single Source of Truth
+
+- **One topic = One file**: Each topic should have exactly one canonical documentation file
+- **No duplicate filenames**: Avoid similar names like `custom-hooks.md` vs `custom_hooks.md`
+- **Clear naming**: Use descriptive, consistent naming (hyphens, not underscores)
+
+### 2. Archive vs Delete
+
+When documentation becomes outdated:
+
+- **Archive** if it has historical value (migrations, planning, design decisions)
+  - Move to `docs/archive/` with descriptive subdirectory
+  - Preserve git history with `git mv`
+  - Update cross-references
+
+- **Delete** if it's truly obsolete or incorrect
+  - Only if no historical value and not referenced elsewhere
+  - Content still preserved in git history
+
+### 3. Migration and Planning Docs
+
+- **Implementation plans**: Keep in `docs/archive/` once completed
+- **Research findings**: Archive after implementation
+- **Migration guides**: Archive once migration is complete and production-ready
+- **Status markers**: Mark clearly as ✅ COMPLETE or 🚧 IN PROGRESS
+
+### 4. Avoid These Anti-Patterns
+
+❌ **Don't**:
+- Create multiple files for the same topic
+- Use both hyphens and underscores in similar filenames
+- Leave completed migration docs in active docs/
+- Duplicate architecture/design content across files
+- Keep outdated status markers (update or archive)
+
+✅ **Do**:
+- Merge related content into comprehensive guides
+- Use clear, unique names
+- Archive historical content
+- Cross-reference instead of duplicate
+- Keep status current
+
+## File Purposes
+
+### [index.md](mdc:docs/index.md)
+- Navigation hub for all documentation
+- Should reference all active docs (not archive)
+- Keep descriptions short
+
+### [quick_start.md](mdc:docs/quick_start.md)
+- First-time user experience
+- Installation and basic usage
+- Links to detailed guides
+
+### [developer_guide.md](mdc:docs/developer_guide.md)
+- Complete developer reference
+- Architecture and design decisions (consolidated)
+- Adding hooks, testing, contributing
+- **Includes architecture content** (no separate architecture doc)
+
+### [custom-hooks-guide.md](mdc:docs/custom-hooks-guide.md)
+- User guide for custom hooks
+- Implementation status and technical notes
+- Examples and patterns
+- **Single merged document** (not split into multiple files)
+
+### [cursor-support.md](mdc:docs/cursor-support.md)
+- Canonical Cursor platform documentation
+- Installation, usage, event mapping
+- **Single source** (planning docs archived after completion)
+
+## When Adding New Documentation
+
+1. **Check existing files first**: Can content be added to existing doc?
+2. **Verify uniqueness**: Is there already a file on this topic?
+3. **Update index.md**: Add reference to new documentation
+4. **Use proper naming**: `topic-name.md` (hyphens, lowercase)
+5. **Link related content**: Cross-reference instead of duplicating
+
+## Updating Documentation
+
+- **Keep status current**: Update phase markers, completion status
+- **Archive when complete**: Move planning/migration docs after implementation
+- **Consolidate regularly**: Merge related content that has grown separately
+- **Update cross-references**: When moving or renaming files
+
+## Examples of Good Documentation Hygiene
+
+**Good** ✅:
+```
+docs/
+├── cursor-support.md         # Single comprehensive guide
+└── archive/
+    └── cursor-planning/      # Historical planning docs
+        ├── PLAN.md
+        └── RESEARCH.md
+```
+
+**Bad** ❌:
+```
+docs/
+├── cursor-support.md
+├── cursor_support.md
+├── cursor-docs.md
+├── planning/
+│   └── cursor-plan.md
+└── cursor-wrapper-simplification.md
+```
+
+## Maintenance Checklist
+
+When reviewing documentation:
+
+- [ ] No duplicate filenames (check similar names with hyphens/underscores)
+- [ ] Completed migration docs moved to archive
+- [ ] Status markers are current
+- [ ] No duplicate content across files
+- [ ] Index.md reflects current structure
+- [ ] Cross-references are valid
+- [ ] Historical content in archive/ with context
+
+---
+
+**Last Updated**: 2025-10-01
+**Consolidated**: Reduced from 14 files to 8 core files (58% reduction)
