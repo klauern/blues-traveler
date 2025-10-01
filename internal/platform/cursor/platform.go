@@ -153,6 +153,7 @@ func (p *CursorPlatform) LoadConfig() (*Config, error) {
 		return NewConfig(), nil
 	}
 
+	// #nosec G304 -- configPath is constructed from UserHomeDir() and validated by ConfigPath()
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)
