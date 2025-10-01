@@ -82,6 +82,14 @@ jobs:
         output-format: sarif
         output-file: govulncheck-results.sarif
 
+    - name: Fix SARIF format (deduplicate tags)
+      if: always()
+      run: |
+        if [ -f govulncheck-results.sarif ]; then
+          jq '.runs[].tool.driver.rules[]?.properties.tags |= (if . then unique else . end)' govulncheck-results.sarif > govulncheck-fixed.sarif
+          mv govulncheck-fixed.sarif govulncheck-results.sarif
+        fi
+
     - name: Upload govulncheck SARIF to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
       if: always()
