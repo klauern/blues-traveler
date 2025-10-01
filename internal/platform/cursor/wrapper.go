@@ -10,6 +10,12 @@ import (
 	"github.com/klauern/blues-traveler/internal/constants"
 )
 
+// DEPRECATED: Wrapper scripts are no longer used as of v0.3.0-alpha.
+// The installation now registers blues-traveler commands directly in ~/.cursor/hooks.json
+// with the --cursor-mode flag, eliminating the need for intermediate shell scripts.
+// This file is retained for reference and backward compatibility but is not used
+// in the current implementation.
+
 // WrapperConfig holds the configuration for generating a wrapper script
 type WrapperConfig struct {
 	HookKey     string
