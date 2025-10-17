@@ -37,38 +37,55 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 - Best practices
 - Testing guidelines
 
-### 🏗️ [Architecture Design](unified_pipeline_design.md)
+### 🏗️ [Architecture Documentation](architecture/)
 
 **Technical deep dive** - Understand the internal design and decisions.
 
-- Current architecture
-- Design principles
+- [Unified Pipeline Design](architecture/unified-pipeline.md) - Current architecture
+- [XDG Migration](architecture/xdg-migration.md) - Configuration migration
+- Design principles and patterns
 - Hook execution flow
-- Future considerations
+
+### 📋 [Code Reviews](reviews/)
+
+**Quality assurance** - Code reviews and audit findings.
+
+- [Code Review 2024](reviews/code-review-2024.md) - Comprehensive audit
+- Issues tracked in beads (`.beads/` directory)
 
 ## For AI Assistants
 
-### 🤖 [CLAUDE.md](../CLAUDE.md)
+### 🤖 [AGENTS.md](../AGENTS.md)
 
 **AI assistant guidance** - Specific instructions for working with this codebase.
 
 - Project overview
 - Architecture details
-- Development patterns
+- Development patterns with beads
 - What to do/not do
+- Issue tracking workflow
 
 ## Project Structure
 
 ```
 blues-traveler/
 ├── README.md                 # Main user documentation (urfave/cli v3 based)
-├── CLAUDE.md                 # AI assistant guidance
+├── AGENTS.md                 # AI assistant guidance (formerly CLAUDE.md)
+├── .beads/                   # Issue tracking with beads
 ├── docs/
 │   ├── index.md             # This documentation index
 │   ├── quick_start.md       # Getting started guide
 │   ├── developer_guide.md   # Developer reference
 │   ├── custom_hooks.md      # Custom hooks usage
-│   └── unified_pipeline_design.md  # Architecture details
+│   ├── architecture/        # Architecture documentation
+│   │   ├── README.md        # Architecture index
+│   │   ├── unified-pipeline.md  # Current architecture
+│   │   └── xdg-migration.md     # XDG config migration
+│   ├── reviews/             # Code reviews and audits
+│   │   ├── README.md        # Reviews index
+│   │   └── code-review-2024.md  # 2024 audit
+│   └── development/         # Development workflows
+│       └── beads-workflow.md    # Issue tracking workflow
 ├── internal/
 │   ├── cmd/                 # CLI command implementations
 │   ├── hooks/               # Hook implementations
@@ -120,14 +137,17 @@ blues-traveler hooks list --installed
 ### For Developers
 
 1. Read the [Developer Guide](developer_guide.md)
-2. Review the [Architecture Design](unified_pipeline_design.md)
-3. Examine existing hook implementations in `internal/hooks/`
+2. Review the [Architecture Documentation](architecture/)
+3. Check [Code Reviews](reviews/) for improvement areas
+4. Use beads for issue tracking: `bd list`, `bd ready`, `bd show <id>`
+5. Examine existing hook implementations in `internal/hooks/`
 
 ### For AI Assistants
 
-1. Follow the guidance in [CLAUDE.md](../CLAUDE.md)
+1. Follow the guidance in [AGENTS.md](../AGENTS.md)
 2. Use the [Developer Guide](developer_guide.md) for implementation details
-3. Reference existing code patterns
+3. Track work with beads: `bd list`, `bd create`, `bd update`
+4. Reference existing code patterns
 
 ## Contributing
 

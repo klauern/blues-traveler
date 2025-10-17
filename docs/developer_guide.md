@@ -263,7 +263,17 @@ task test-coverage
 
 ## Development Workflow
 
-### 1. Setup Environment
+### 1. Find Work
+
+```bash
+# See ready-to-work issues
+bd ready
+
+# Pick an issue and claim it
+bd update blues-traveler-X --status in_progress
+```
+
+### 2. Setup Environment
 
 ```bash
 # Install dependencies
@@ -273,7 +283,7 @@ task deps
 task setup-dev
 ```
 
-### 2. Make Changes
+### 3. Make Changes
 
 ```bash
 # Edit code
@@ -281,7 +291,7 @@ task setup-dev
 # Update documentation
 ```
 
-### 3. Verify Changes
+### 4. Verify Changes
 
 ```bash
 # Run all checks
@@ -291,11 +301,15 @@ task check
 task dev
 ```
 
-### 4. Commit and Push
+### 5. Complete Work
 
 ```bash
+# Close the issue
+bd close blues-traveler-X "Implemented and tested"
+
+# Commit and push
 git add .
-git commit -m "feat: add new hook for X"
+git commit -m "feat: add new hook for X (closes blues-traveler-X)"
 git push
 ```
 
@@ -361,9 +375,35 @@ git push
 - Consider backward compatibility
 - Test with different configurations
 
+## Issue Tracking
+
+This project uses **beads** for issue tracking:
+
+```bash
+# Find work to do
+bd ready
+
+# See all open issues
+bd list --status open
+
+# Get issue details
+bd show <issue-id>
+
+# Update issue status
+bd update <issue-id> --status in_progress
+
+# Close completed work
+bd close <issue-id> "Description of what was done"
+```
+
+For detailed workflow documentation, see [Beads Workflow](development/beads-workflow.md).
+
+**Important**: Do NOT create backlog.md or similar files. Use beads for all issue tracking.
+
 ## Resources
 
 - [Go Documentation](https://golang.org/doc/)
 - [urfave/cli v3](https://github.com/urfave/cli)
 - [Claude Code Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)
-- [Project Issues](https://github.com/klauern/blues-traveler/issues)
+- [Beads Workflow](development/beads-workflow.md) - Issue tracking
+- [Project Issues (beads)](.beads/) - Local issue database

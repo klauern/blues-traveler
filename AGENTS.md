@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI assistants (like Claude Code) when working with code in this repository.
 
 ## Project Overview
 
@@ -179,6 +179,54 @@ func (h *MyHook) Run() error {
 - Check `h.IsEnabled()` for configuration-based behavior
 - Implement event handlers in the `Run()` method
 - Use `core.BaseHook` to get common functionality like `Key()`, `Name()`, `Description()`, and `IsEnabled()`
+
+## Issue Tracking with Beads
+
+This project uses **beads** (bd) for issue tracking instead of markdown-based backlog files.
+
+### Key Commands
+
+```bash
+# List all issues
+bd list
+
+# Find issues ready to work on (no blockers)
+bd ready
+
+# Show detailed information about an issue
+bd show <issue-id>
+
+# Create a new issue
+bd create "Issue title" --type feature --priority 2
+
+# Update issue status
+bd update <issue-id> --status in_progress
+
+# Close a completed issue
+bd close <issue-id>
+
+# View project statistics
+bd stats
+```
+
+### Issue Workflow
+
+1. **Find work**: Use `bd ready` to find unblocked issues
+2. **Claim work**: Use `bd update <id> --status in_progress`
+3. **Track dependencies**: Issues can block other issues
+4. **Complete work**: Use `bd close <id>` when done
+
+### For AI Assistants
+
+When working on tasks:
+- Check `bd list --status open` for open issues
+- Use `bd show <id>` to understand issue details and acceptance criteria
+- Update issue status as you work: `bd update <id> --status in_progress`
+- Close issues when complete: `bd close <id>`
+- Create new issues for discovered work
+- Add dependencies between issues when needed: `bd dep <from-id> <to-id>`
+
+Do NOT create or maintain backlog.md files. Use beads instead.
 
 ## Migration Notes
 
