@@ -42,4 +42,11 @@ coverage.html
 # Build artifacts
 dist/
 
+# Beads issue tracking (commit .jsonl, ignore .db and runtime files)
+.beads/*.db
+.beads/*.db-shm
+.beads/*.db-wal
+.beads/daemon.lock
+.beads/daemon.pid
+
 !.cursor/
