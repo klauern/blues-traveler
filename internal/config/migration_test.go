@@ -13,14 +13,14 @@ func TestLegacyConfigDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
@@ -92,14 +92,14 @@ func TestMigrationDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
@@ -183,14 +183,14 @@ func TestActualMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
@@ -294,14 +294,14 @@ func TestMigrationSkipExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
@@ -382,7 +382,7 @@ func TestGetMigrationStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	project := filepath.Join(tempDir, "test-project")
 
@@ -520,7 +520,7 @@ func TestHasLegacyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	project := filepath.Join(tempDir, "test-project")
 

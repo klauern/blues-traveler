@@ -105,6 +105,18 @@ func TestCursorPlatform_MapEventToGeneric(t *testing.T) {
 			wantSupported: true,
 		},
 		{
+			name:          "beforeSubmitPrompt maps to UserPromptSubmit",
+			cursorEvent:   BeforeSubmitPrompt,
+			wantEvent:     core.UserPromptSubmitEvent,
+			wantSupported: true,
+		},
+		{
+			name:          "stop maps to Stop",
+			cursorEvent:   Stop,
+			wantEvent:     core.StopEvent,
+			wantSupported: true,
+		},
+		{
 			name:          "invalid event not supported",
 			cursorEvent:   "invalidEvent",
 			wantEvent:     "",

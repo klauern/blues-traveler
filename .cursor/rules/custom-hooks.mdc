@@ -57,7 +57,7 @@ only: ${TOOL_FILE} matches "*.py" && ${EVENT_NAME} == "PostToolUse"
 | `TOOL_NAME` | Tool being used | `Edit`, `Bash` |
 | `TOOL_FILE` | File being edited | `/path/to/file.go` |
 | `TOOL_OUTPUT_FILE` | Same as TOOL_FILE | `/path/to/file.go` |
-| `FILES_CHANGED` | Changed files (comma-separated) | `main.go,test.go` |
+| `FILES_CHANGED` | Changed files (space-separated) | `main.go test.go` |
 | `TOOL_ARGS` | Raw tool arguments | Command string |
 | `USER_PROMPT` | User's prompt | User input text |
 | `PROJECT_ROOT` | Project directory | `/home/user/project` |

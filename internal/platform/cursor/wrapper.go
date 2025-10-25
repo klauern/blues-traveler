@@ -76,7 +76,7 @@ export WORKSPACE_ROOTS=$(echo "$input" | jq -r '.workspace_roots // [] | join(":
 # Parse event-specific fields based on event type
 case "$EVENT_NAME" in
   beforeShellExecution)
-    export TOOL_NAME="shell"
+    export TOOL_NAME="Bash"
     export TOOL_ARGS=$(echo "$input" | jq -r '.command // ""')
     export CWD=$(echo "$input" | jq -r '.cwd // ""')
     ;;

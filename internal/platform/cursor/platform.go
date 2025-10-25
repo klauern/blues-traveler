@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/klauern/blues-traveler/internal/core"
 	"github.com/klauern/blues-traveler/internal/platform"
@@ -148,12 +149,24 @@ func (p *CursorPlatform) LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	// Validate that configPath is within user's home directory (path traversal protection)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	cleanPath := filepath.Clean(configPath)
+	cleanHome := filepath.Clean(home)
+	// Ensure both paths end with separator for accurate prefix matching
+	if !strings.HasPrefix(cleanPath+string(filepath.Separator), cleanHome+string(filepath.Separator)) {
+		return nil, fmt.Errorf("config path is outside user home directory")
+	}
+
 	// If config doesn't exist, return new empty config
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return NewConfig(), nil
 	}
 
-	// #nosec G304 -- configPath is constructed from UserHomeDir() and validated by ConfigPath()
+	// #nosec G304 -- configPath is constructed from UserHomeDir() and validated above
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)

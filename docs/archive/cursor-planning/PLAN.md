@@ -242,7 +242,7 @@ main.go                    # Platform flag on root cmd
 ## Success Criteria
 
 1. ✅ Can install security hook in Cursor - **COMPLETE**
-2. ⏸️ Hook blocks dangerous commands in Cursor - **Phase 3** (currently allows all)
+2. ✅ Hook blocks dangerous commands in Cursor - **Phase 3 Complete** (JSON transformation implemented)
 3. ✅ Wrapper scripts generate correctly with matchers - **COMPLETE**
 4. ✅ Platform auto-detection works (`.cursor/` vs `.claude/`) - **COMPLETE**
 5. ✅ All existing Claude Code tests pass (zero breaking changes) - **COMPLETE**
@@ -296,7 +296,7 @@ blues-traveler hooks install security --platform cursor --event beforeShellExecu
 
 ---
 
-**Status**: ✅ Phase 2 Complete | 🚧 Phase 3 In Progress
+**Status**: ✅ Phase 2 Complete | ✅ Phase 3 Complete
 **Timeline**: 1-2 weeks to beta release
 **Next**: Implement executeCursorHook for full hook execution in Cursor mode
 

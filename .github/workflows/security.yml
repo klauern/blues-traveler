@@ -85,7 +85,7 @@ jobs:
       if: always()
       run: |
         if [ -f govulncheck-results.sarif ]; then
-          jq '.runs[].tool.driver.rules[]?.properties.tags |= (if . then unique else . end)' govulncheck-results.sarif > govulncheck-fixed.sarif
+          jq 'walk(if type == "object" and (.properties? | type) == "object" and (.properties.tags? | type) == "array" then (.properties.tags |= unique) else . end)' govulncheck-results.sarif > govulncheck-fixed.sarif
           mv govulncheck-fixed.sarif govulncheck-results.sarif
         fi
 

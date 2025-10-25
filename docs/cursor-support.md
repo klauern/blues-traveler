@@ -95,7 +95,7 @@ Cursor JSON fields are mapped to environment variables that blues-traveler hooks
 
 - `command` → `TOOL_ARGS`
 - `cwd` → `CWD`
-- Special: `TOOL_NAME` is set to `"shell"`
+- Special: `TOOL_NAME` is set to `"Bash"`
 
 #### beforeMCPExecution
 

@@ -9,10 +9,10 @@ import (
 func TestNewXDGConfig(t *testing.T) {
 	// Test with XDG_CONFIG_HOME set
 	originalXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDGConfigHome)
+	defer func() { _ = os.Setenv("XDG_CONFIG_HOME", originalXDGConfigHome) }()
 
 	testConfigHome := "/tmp/test-xdg-config"
-	os.Setenv("XDG_CONFIG_HOME", testConfigHome)
+	_ = os.Setenv("XDG_CONFIG_HOME", testConfigHome)
 
 	xdg := NewXDGConfig()
 	expectedBaseDir := filepath.Join(testConfigHome, "blues-traveler")
@@ -21,7 +21,7 @@ func TestNewXDGConfig(t *testing.T) {
 	}
 
 	// Test without XDG_CONFIG_HOME
-	os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Unsetenv("XDG_CONFIG_HOME")
 	xdg = NewXDGConfig()
 	homeDir, _ := os.UserHomeDir()
 	expectedBaseDir = filepath.Join(homeDir, ".config", "blues-traveler")
@@ -93,7 +93,7 @@ func TestRegistryOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -162,7 +162,7 @@ func TestConfigDataOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -219,7 +219,7 @@ func TestTOMLSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -265,7 +265,7 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -299,7 +299,7 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	}
 
 	// Remove the project directory
-	os.RemoveAll(projectDir)
+	_ = os.RemoveAll(projectDir)
 
 	// Run cleanup
 	orphaned, err := xdg.CleanupOrphanedConfigs()
@@ -343,7 +343,7 @@ func TestErrorHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	xdg = &XDGConfig{BaseDir: tempDir}
 	testData := map[string]interface{}{"key": "value"}
@@ -359,7 +359,7 @@ func TestRegistryVersioning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	xdg := &XDGConfig{BaseDir: tempDir}
 
@@ -390,7 +390,7 @@ func TestConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	xdg := &XDGConfig{BaseDir: tempDir}
 
