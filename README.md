@@ -1,26 +1,28 @@
 # Blues Traveler
 
-[![Go Version](https://img.shields.io/badge/go-1.25.0+-blue.svg)](https://golang.org/doc/go1.25)
+[![Go Version](https://img.shields.io/badge/go-1.25.1+-blue.svg)](https://golang.org/doc/go1.25)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> *"The Hook brings you back"* - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
+> _"The Hook brings you back"_ - A [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) management tool
 
-CLI tool for managing and running [Claude Code](https://claude.ai/code) hooks with built-in security, formatting, debugging, and audit capabilities. Powered by `urfave/cli v3` with a static hook registry. Our hooks bring you back to clean, secure, and well-formatted code every time.
+CLI tool for managing and running [Claude Code](https://claude.ai/code) and [Cursor](https://cursor.sh) hooks with built-in security, formatting, debugging, and audit capabilities. Powered by `urfave/cli v3` with a static hook registry. Our hooks bring you back to clean, secure, and well-formatted code every time.
+
+**NEW**: Now supports Cursor IDE! Use `--platform cursor` to install hooks for Cursor. See [docs/cursor-support.md](docs/cursor-support.md) for details.
 
 ## ✨ Features
 
 Blues Traveler provides **pre-built hooks** that integrate seamlessly with Claude Code:
 
-| Hook | Description | Best For |
-|------|-------------|----------|
-| **🛡️ Security** | Blocks dangerous commands (`rm -rf`, `sudo`, etc.) | `PreToolUse` events |
-| **🎨 Format** | Auto-formats code after editing (Go, JS/TS, Python) | `PostToolUse` with Edit/Write |
-| **🐛 Debug** | Logs all tool usage for troubleshooting | Any event type |
-| **📋 Audit** | JSON audit logging for compliance and monitoring | Production environments |
-| **✅ Vet** | Code quality and best practices enforcement | `PostToolUse` with code changes |
-| **🚫 Fetch Blocker** | Blocks web fetches requiring authentication | `PreToolUse` events |
-| **🔍 Find Blocker** | Suggests `fd` instead of `find` for better performance | `PreToolUse` events |
+| Hook                 | Description                                            | Best For                        |
+| -------------------- | ------------------------------------------------------ | ------------------------------- |
+| **🛡️ Security**      | Blocks dangerous commands (`rm -rf`, `sudo`, etc.)     | `PreToolUse` events             |
+| **🎨 Format**        | Auto-formats code after editing (Go, JS/TS, Python)    | `PostToolUse` with Edit/Write   |
+| **🐛 Debug**         | Logs all tool usage for troubleshooting                | Any event type                  |
+| **📋 Audit**         | JSON audit logging for compliance and monitoring       | Production environments         |
+| **✅ Vet**           | Code quality and best practices enforcement            | `PostToolUse` with code changes |
+| **🚫 Fetch Blocker** | Blocks web fetches requiring authentication            | `PreToolUse` events             |
+| **🔍 Find Blocker**  | Suggests `fd` instead of `find` for better performance | `PreToolUse` events             |
 
 Note: Custom hooks can implement all of the above (and more) using your own scripts. Built-ins are provided for quick setup; custom hooks are recommended for most workflows.
 
@@ -375,15 +377,15 @@ Custom hooks support environment variables and simple expressions to control whe
 
 #### Available Environment Variables
 
-| Variable | Available In | Description | Example Value |
-|----------|--------------|-------------|---------------|
-| `EVENT_NAME` | All events | The Claude Code event name | `"PreToolUse"`, `"PostToolUse"` |
-| `TOOL_NAME` | All events | The tool being used | `"Edit"`, `"Write"`, `"Bash"` |
-| `PROJECT_ROOT` | All events | Current working directory | `"/path/to/project"` |
-| `FILES_CHANGED` | PostToolUse only | Space-separated list of changed files | `"src/main.go src/utils.go"` |
-| `TOOL_FILE` | PostToolUse only | First file from FILES_CHANGED (convenience) | `"src/main.go"` |
-| `TOOL_OUTPUT_FILE` | PostToolUse only | Same as TOOL_FILE (for Edit/Write) | `"src/main.go"` |
-| `USER_PROMPT` | UserPromptSubmit only | The user's prompt text | `"Add error handling"` |
+| Variable           | Available In          | Description                                 | Example Value                   |
+| ------------------ | --------------------- | ------------------------------------------- | ------------------------------- |
+| `EVENT_NAME`       | All events            | The Claude Code event name                  | `"PreToolUse"`, `"PostToolUse"` |
+| `TOOL_NAME`        | All events            | The tool being used                         | `"Edit"`, `"Write"`, `"Bash"`   |
+| `PROJECT_ROOT`     | All events            | Current working directory                   | `"/path/to/project"`            |
+| `FILES_CHANGED`    | PostToolUse only      | Space-separated list of changed files       | `"src/main.go src/utils.go"`    |
+| `TOOL_FILE`        | PostToolUse only      | First file from FILES_CHANGED (convenience) | `"src/main.go"`                 |
+| `TOOL_OUTPUT_FILE` | PostToolUse only      | Same as TOOL_FILE (for Edit/Write)          | `"src/main.go"`                 |
+| `USER_PROMPT`      | UserPromptSubmit only | The user's prompt text                      | `"Add error handling"`          |
 
 **Important Notes:**
 
@@ -431,7 +433,12 @@ Add your custom hooks to the `customHooks` section:
 
 ```json
 {
-  "logRotation": { "maxAge": 30, "maxSize": 10, "maxBackups": 5, "compress": true },
+  "logRotation": {
+    "maxAge": 30,
+    "maxSize": 10,
+    "maxBackups": 5,
+    "compress": true
+  },
   "customHooks": {
     "ruby-global": {
       "PreToolUse": {
@@ -497,7 +504,10 @@ Add your custom hooks to the `customHooks` section:
     }
   },
   "blockedUrls": [
-    { "prefix": "https://github.com/*/*/private/*", "suggestion": "Use 'gh api' for private repos" },
+    {
+      "prefix": "https://github.com/*/*/private/*",
+      "suggestion": "Use 'gh api' for private repos"
+    },
     { "prefix": "https://api.company.com/private/*" }
   ]
 }
@@ -519,8 +529,24 @@ For project-specific hooks, create a similar structure in your project config:
 {
   "customHooks": {
     "ruby": {
-      "PreToolUse": { "jobs": [{ "name": "rubocop-check", "run": "bundle exec rubocop ${FILES_CHANGED}", "glob": ["*.rb"] }] },
-      "PostToolUse": { "jobs": [{ "name": "ruby-test", "run": "bundle exec rspec ${FILES_CHANGED}", "glob": ["*_spec.rb"] }] }
+      "PreToolUse": {
+        "jobs": [
+          {
+            "name": "rubocop-check",
+            "run": "bundle exec rubocop ${FILES_CHANGED}",
+            "glob": ["*.rb"]
+          }
+        ]
+      },
+      "PostToolUse": {
+        "jobs": [
+          {
+            "name": "ruby-test",
+            "run": "bundle exec rspec ${FILES_CHANGED}",
+            "glob": ["*_spec.rb"]
+          }
+        ]
+      }
     }
   }
 }
@@ -646,16 +672,16 @@ For detailed documentation, see:
 
 ## 🔧 Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Hook not found | Run `blues-traveler list` to see available hooks |
-| Hook not working | Check if enabled: `blues-traveler list-installed` |
+| Issue                | Solution                                                                           |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| Hook not found       | Run `blues-traveler hooks list` to see available hooks                             |
+| Hook not working     | Check if enabled: `blues-traveler hooks list --installed`                          |
 | Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
-| Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
-| Logs not appearing | Use `--log` flag and check `~/.config/blues-traveler/` directory |
-| Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
-| Config sync issues | Use `--dry-run` to preview changes, check config with `config validate` |
-| Stale hook entries | Run `config sync` - it automatically cleans up removed groups |
+| Format not working   | Ensure formatters installed: `gofmt`, `prettier`, `black`                          |
+| Logs not appearing   | Use `--log` flag and check `~/.config/blues-traveler/` directory                   |
+| Permission denied    | Ensure binary has execute permissions: `chmod +x blues-traveler`                   |
+| Config sync issues   | Use `--dry-run` to preview changes, check config with `config validate`            |
+| Stale hook entries   | Run `config sync` - it automatically cleans up removed groups                      |
 
 ## 🤝 Contributing
 
@@ -681,4 +707,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-*"It doesn't matter what I say, as long as I sing with inflection"* - Hook by Blues Traveler
+_"It doesn't matter what I say, as long as I sing with inflection"_ - Hook by Blues Traveler

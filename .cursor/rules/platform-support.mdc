@@ -1,0 +1,76 @@
+
+# Platform Abstraction System
+
+blues-traveler supports multiple IDE platforms through the [internal/platform/](mdc:internal/platform/) abstraction layer.
+
+## Platform Interface
+
+```go
+type Platform interface {
+    Type() Type
+    Name() string
+    ConfigPath() (string, error)
+    SupportsEvent(event core.EventType) bool
+    MapEventFromGeneric(event core.EventType) []string
+    MapEventToGeneric(platformEvent string) (core.EventType, bool)
+    ValidateEventName(eventName string) bool
+    AllEvents() []PlatformEvent
+}
+```
+
+## Supported Platforms
+
+### Claude Code
+- **Protocol**: Environment variables
+- **Config**: `.claude/settings.json`
+- **Events**: 9 events (all core events)
+- **Matchers**: Regex patterns in config
+- **Implementation**: [internal/platform/claude/](mdc:internal/platform/claude/)
+
+### Cursor
+- **Protocol**: JSON stdin/stdout
+- **Config**: `~/.cursor/hooks.json`
+- **Events**: 6 events (subset of core)
+- **Matchers**: Command-line `--matcher` flag
+- **Implementation**: [internal/platform/cursor/](mdc:internal/platform/cursor/)
+- **Status**: ✅ Phase 3 Complete - See [cursor-implementation.mdc](mdc:.cursor/rules/cursor-implementation.mdc)
+
+## Platform Detection
+
+Detection order in [internal/platform/detect.go](mdc:internal/platform/detect.go):
+
+1. `BLUES_TRAVELER_PLATFORM` environment variable
+2. `.cursor/` directory exists
+3. `.claude/` directory exists
+4. `~/.cursor/hooks.json` exists
+5. Default to Claude Code
+
+## Import Cycle Prevention
+
+Platform instantiation MUST happen in the cmd layer:
+
+```go
+// ✅ CORRECT - in internal/cmd/
+func newPlatformFromType(t platform.Type) platform.Platform {
+    switch t {
+    case platform.Cursor:
+        return cursor.New()
+    case platform.ClaudeCode:
+        return claude.New()
+    }
+}
+
+// ❌ WRONG - creates import cycle if in internal/platform/
+```
+
+## Adding New Platforms
+
+1. Create `internal/platform/<name>/platform.go`
+2. Implement `Platform` interface
+3. Add Type constant to [platform.go](mdc:internal/platform/platform.go)
+4. Update factory in cmd layer (avoid import cycles)
+5. Update detection logic in [detect.go](mdc:internal/platform/detect.go)
+6. Document event mappings and protocol
+
+4. Update platform factory in cmd layer
+5. Update detection logic in [detect.go](mdc:internal/platform/detect.go)

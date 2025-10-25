@@ -1,0 +1,137 @@
+
+# Cursor IDE Implementation
+
+✅ **Phase 3 Complete** - Full hook execution with JSON transformation
+
+## JSON Protocol Transformation
+
+### Architecture Flow
+```text
+Cursor Agent
+    ↓ JSON stdin (Cursor format)
+blues-traveler run <hook> --cursor-mode [--matcher <pattern>]
+    ↓ Transform to Claude Code format
+Hook Execution (cchooks Runner)
+    ↓ JSON response (Cursor format)
+Cursor Agent
+```
+
+### Key Implementation Functions
+
+```go
+// Transform Cursor JSON to Claude Code format
+func transformCursorToClaudeFormat(input cursor.HookInput) ([]byte, error)
+
+// Execute hook with transformed input
+func executeCursorHook(hook Hook, input cursor.HookInput) cursor.HookOutput
+
+// Run hook in Cursor mode (--cursor-mode flag)
+func runHookCursorMode(key string, matcher string, ...) error
+```
+
+## Event Mapping Details
+
+| Cursor Event | Tool Name | Claude Format | Notes |
+|--------------|-----------|---------------|-------|
+| `beforeShellExecution` | "Bash" | PreToolUse | Command in `command` field |
+| `beforeMCPExecution` | (varies) | PreToolUse | Tool name from input |
+| `afterFileEdit` | "Edit" | PostToolUse | File path in `file_path` |
+| `beforeReadFile` | "Read" | PreToolUse | File path in `file_path` |
+| `beforeSubmitPrompt` | N/A | UserPromptSubmit | Prompt in `prompt` field |
+| `stop` | N/A | Stop | Status in `status` field |
+
+## JSON Transformation Logic
+
+### Input Transformation
+```go
+// beforeShellExecution → PreToolUse
+{
+    "hook_event_name": "beforeShellExecution",
+    "command": "rm -rf /"
+}
+↓
+{
+    "event": "pre_tool_use",
+    "tool_name": "Bash",
+    "tool_args": "rm -rf /"
+}
+```
+
+### Output Transformation
+```go
+// Claude response → Cursor response
+{
+    "tool_allowed": false,
+    "tool_denied_message": "Dangerous command"
+}
+↓
+{
+    "permission": "deny",
+    "userMessage": "Dangerous command"
+}
+```
+
+## Matcher Support
+
+The `--matcher` flag enables regex filtering:
+
+```bash
+# Install with matcher
+blues-traveler hooks install security --platform cursor \
+  --event PreToolUse --matcher "rm.*|sudo.*"
+
+# Registered command in hooks.json:
+"command": "/path/to/blues-traveler hooks run security --cursor-mode --matcher \"rm.*|sudo.*\""
+```
+
+### Matcher Check Values
+- `beforeShellExecution`: Matches against command
+- `beforeMCPExecution`: Matches against tool name
+- `afterFileEdit`, `beforeReadFile`: Matches against file path
+- Empty/`*` matcher: Matches all events
+
+## Hook Registration Format
+
+In `~/.cursor/hooks.json`:
+```json
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "/usr/local/bin/blues-traveler hooks run security --cursor-mode --matcher \".*\""
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "/usr/local/bin/blues-traveler hooks run format --cursor-mode"
+      }
+    ]
+  }
+}
+```
+
+## Implementation Notes
+
+1. **Direct Execution**: No wrapper scripts needed - blues-traveler handles JSON directly
+2. **Stdin Replacement**: Creates pipe to feed transformed JSON to cchooks
+3. **All Hooks Work**: Transformation layer makes existing hooks compatible
+4. **Error Handling**: Non-zero exit = deny, zero exit = allow
+
+## Testing Cursor Mode
+
+```bash
+# Test security hook
+echo '{"hook_event_name": "beforeShellExecution", "command": "rm -rf /"}' | \
+  blues-traveler hooks run security --cursor-mode
+
+# Expected output:
+{"permission": "deny", "userMessage": "Command blocked: Dangerous rm command..."}
+
+# Test with matcher
+echo '{"hook_event_name": "beforeShellExecution", "command": "ls -la"}' | \
+  blues-traveler hooks run security --cursor-mode --matcher "rm.*"
+
+# Expected output (no match, so allow):
+{"permission": "allow"}
+```

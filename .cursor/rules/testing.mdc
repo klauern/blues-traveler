@@ -1,0 +1,176 @@
+---
+globs: "*_test.go"
+description: Testing guidelines and patterns for blues-traveler
+---
+# Testing Guidelines
+
+## Test Requirements
+
+When adding new features:
+
+1. **Create tests** following existing patterns
+2. **Test edge cases** and error conditions
+3. **Use table-driven tests** for multiple scenarios
+4. **Mock external dependencies** appropriately
+
+## Running Tests
+
+```bash
+# Run all tests
+task test
+
+# Run specific package
+go test ./internal/hooks/ -v
+
+# Run with coverage
+task test-coverage
+
+# Run tests with race detection
+go test -race ./...
+```
+
+## Test Patterns
+
+### Hook Tests
+
+See examples in [internal/hooks/security_test.go](mdc:internal/hooks/security_test.go):
+
+```go
+func TestMyHook(t *testing.T) {
+    ctx := &core.HookContext{
+        FileSystem: &core.MockFileSystem{},
+        CommandExecutor: &core.MockCommandExecutor{},
+    }
+
+    hook := NewMyHook(ctx)
+
+    // Test hook properties
+    if hook.Key() != "myhook" {
+        t.Errorf("Expected key 'myhook', got '%s'", hook.Key())
+    }
+
+    // Test execution
+    if err := hook.Run(); err != nil {
+        t.Errorf("Hook.Run() failed: %v", err)
+    }
+}
+```
+
+### Table-Driven Tests
+
+```go
+func TestSecurityPatterns(t *testing.T) {
+    tests := []struct {
+        name     string
+        command  string
+        expected bool
+    }{
+        {"safe command", "ls -la", false},
+        {"dangerous rm", "rm -rf /", true},
+        {"sudo command", "sudo rm file", true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := isDangerous(tt.command)
+            if result != tt.expected {
+                t.Errorf("got %v, want %v", result, tt.expected)
+            }
+        })
+    }
+}
+```
+
+### Configuration Tests
+
+See [internal/config/xdg_test.go](mdc:internal/config/xdg_test.go):
+
+```go
+func TestXDGPaths(t *testing.T) {
+    // Setup test environment
+    t.Setenv("XDG_CONFIG_HOME", "/tmp/test-config")
+
+    // Test functionality
+    path := GetConfigDir()
+    expected := "/tmp/test-config/blues-traveler"
+
+    if path != expected {
+        t.Errorf("got %s, want %s", path, expected)
+    }
+}
+```
+
+### Mock Usage
+
+Use mocks from [internal/core/mocks.go](mdc:internal/core/mocks.go):
+
+```go
+type MockFileSystem struct {
+    ReadFileFunc  func(string) ([]byte, error)
+    WriteFileFunc func(string, []byte, os.FileMode) error
+}
+
+func (m *MockFileSystem) ReadFile(path string) ([]byte, error) {
+    if m.ReadFileFunc != nil {
+        return m.ReadFileFunc(path)
+    }
+    return nil, nil
+}
+```
+
+## Test Coverage Goals
+
+- **Core functionality**: 80%+ coverage
+- **Hook implementations**: Test all major code paths
+- **CLI commands**: Test flag parsing and execution
+- **Configuration**: Test loading, precedence, migration
+
+## Common Test Scenarios
+
+### Registry Tests
+
+See [internal/core/registry_test.go](mdc:internal/core/registry_test.go):
+
+- Hook registration and discovery
+- Concurrent access (see [internal/core/registry_concurrent_test.go](mdc:internal/core/registry_concurrent_test.go))
+- Duplicate registration handling
+
+### Settings Tests
+
+See [internal/config/settings.go](mdc:internal/config/settings.go):
+
+- Settings precedence (project vs global)
+- JSON marshaling/unmarshaling
+- Unknown field preservation
+
+### Migration Tests
+
+See [internal/config/migration_test.go](mdc:internal/config/migration_test.go):
+
+- Legacy config discovery
+- XDG migration
+- Backup creation
+- Error handling
+
+## Test Organization
+
+```
+internal/
+├── hooks/
+│   ├── security.go
+│   └── security_test.go      # Test alongside implementation
+├── core/
+│   ├── registry.go
+│   └── registry_test.go
+└── config/
+    ├── xdg.go
+    └── xdg_test.go
+```
+
+## Continuous Integration
+
+All tests must pass before merging:
+
+```bash
+task check  # Runs format, lint, and test
+```

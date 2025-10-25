@@ -24,10 +24,27 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 - Configuration examples
 - Usage patterns
 
+### 🧩 [Custom Hooks Guide](custom-hooks-guide.md)
+
+**Flexible automation** - Define project-specific hooks using YAML/JSON configuration.
+
+- Configuration format and examples
+- Environment variables and expressions
+- Replacing built-in hooks
+- Best practices and patterns
+
+### 🖱️ [Cursor Support](cursor-support.md)
+
+**Cursor IDE integration** - Full support for Cursor hooks alongside Claude Code.
+
+- Platform differences
+- Installation and usage
+- Event mapping
+- Matcher support
+
 ## Developer Resources
 
 ### 🛠️ [Developer Guide](developer_guide.md)
-### 🧩 [Custom Hooks Guide](custom_hooks.md)
 
 **For contributors and developers** - Learn how to extend Blues Traveler.
 
@@ -67,7 +84,7 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 
 ## Project Structure
 
-```
+```text
 blues-traveler/
 ├── README.md                 # Main user documentation (urfave/cli v3 based)
 ├── AGENTS.md                 # AI assistant guidance (formerly CLAUDE.md)
@@ -84,8 +101,13 @@ blues-traveler/
 │   ├── reviews/             # Code reviews and audits
 │   │   ├── README.md        # Reviews index
 │   │   └── code-review-2024.md  # 2024 audit
-│   └── development/         # Development workflows
-│       └── beads-workflow.md    # Issue tracking workflow
+│   ├── development/         # Development workflows
+│   │   └── beads-workflow.md    # Issue tracking workflow
+│   └── archive/             # Historical documents
+│       ├── cobra-to-urfave-cli-migration.md
+│       ├── xdg-migration-spec.md
+│       ├── code_review_2024.md
+│       └── cursor-planning/ # Cursor implementation planning docs
 ├── internal/
 │   ├── cmd/                 # CLI command implementations
 │   ├── hooks/               # Hook implementations
@@ -102,29 +124,39 @@ blues-traveler/
 # List available hooks
 blues-traveler hooks list
 
-# Install a hook
+# Install a hook (auto-detects platform)
 blues-traveler hooks install <hook-name> --event <event-type>
+
+# Install for specific platform
+blues-traveler hooks install <hook-name> --platform cursor --event <event-type>
 
 # Run a hook manually
 blues-traveler hooks run <hook-name> --log
 
 # Check configuration
 blues-traveler hooks list --installed
+
+# Platform detection
+blues-traveler platform detect
 ```
 
-### Key Hooks
+### Key Built-in Hooks
 
 | Hook | Purpose | Best Event |
 |------|---------|------------|
 | `security` | Block dangerous commands | `PreToolUse` |
 | `format` | Auto-format code | `PostToolUse` |
+| `vet` | Code quality checks | `PostToolUse` |
 | `debug` | Log operations | Any event |
 | `audit` | JSON audit logging | Any event |
 
 ### Configuration Files
 
-- **Project**: `./.claude/settings.json`
-- **Global**: `~/.claude/settings.json`
+| Platform | Project | Global |
+|----------|---------|--------|
+| **Claude Code** | `./.claude/settings.json` | `~/.claude/settings.json` |
+| **Cursor** | N/A | `~/.cursor/hooks.json` |
+| **Custom Hooks** | `~/.config/blues-traveler/projects/<name>.yml` | `~/.config/blues-traveler/global.yml` |
 
 ## Getting Help
 
@@ -132,7 +164,8 @@ blues-traveler hooks list --installed
 
 1. Start with the [Quick Start Guide](quick_start.md)
 2. Reference the [Main README](../README.md) for detailed information
-3. Check the troubleshooting sections
+3. Check [Custom Hooks Guide](custom-hooks-guide.md) for advanced automation
+4. See [Cursor Support](cursor-support.md) if using Cursor IDE
 
 ### For Developers
 
@@ -141,6 +174,7 @@ blues-traveler hooks list --installed
 3. Check [Code Reviews](reviews/) for improvement areas
 4. Use beads for issue tracking: `bd list`, `bd ready`, `bd show <id>`
 5. Examine existing hook implementations in `internal/hooks/`
+6. Review test patterns in `*_test.go` files
 
 ### For AI Assistants
 
@@ -165,3 +199,9 @@ Want to improve the documentation?
 - **Consistent Format**: Follow existing patterns
 - **Up-to-Date**: Keep documentation current with code changes
 - **Searchable**: Use descriptive headings and clear structure
+- **Single Source of Truth**: One topic per file, no duplication
+
+---
+
+**Last Updated**: 2025-10-01
+**Cleanup**: Reduced from 14 files to 5 core docs (64% reduction)

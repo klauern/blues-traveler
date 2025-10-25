@@ -1,0 +1,105 @@
+# Configuration System
+
+## Configuration Hierarchy
+
+### 1. XDG-Compliant Paths (Preferred)
+```
+~/.config/blues-traveler/         # Respects XDG_CONFIG_HOME
+├── global.json                   # Global settings
+├── projects/
+│   └── <sanitized-name>.json    # Per-project settings
+└── registry.json                 # Project registry
+```
+
+### 2. Legacy Paths (Fallback)
+- Project: `./.claude/settings.json`
+- Global: `~/.claude/settings.json`
+
+## Settings Structure
+
+```go
+type Settings struct {
+    Plugins map[string]PluginConfig `json:"plugins"`
+    // Preserves unknown fields
+}
+
+type PluginConfig struct {
+    Enabled  *bool                   `json:"enabled,omitempty"`
+    Matchers map[string][]HookMatcher `json:"matchers,omitempty"`
+    // Hook-specific fields...
+}
+```
+
+## Settings Precedence
+
+```go
+// Project settings override global settings
+if cfg, ok := projectSettings.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+    return *cfg.Enabled  // Project wins
+}
+if cfg, ok := globalSettings.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+    return *cfg.Enabled  // Global fallback
+}
+return true  // Default enabled
+```
+
+## Custom Hooks Configuration
+
+YAML format in `~/.config/blues-traveler/global.yml` or `projects/<name>.yml`:
+
+```yaml
+my-project:
+  PreToolUse:
+    jobs:
+      - name: security-check
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "dangerous"; then
+            exit 1
+          fi
+        only: ${TOOL_NAME} == "Bash"
+
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofmt -w ${TOOL_OUTPUT_FILE}
+        only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+        glob: ["*.go"]
+        timeout: 30
+```
+
+## Environment Variables
+
+Custom hooks have access to:
+- `EVENT_NAME` - Current event type
+- `TOOL_NAME` - Tool being used (Edit, Write, Bash, etc.)
+- `TOOL_OUTPUT_FILE` - File path for Edit/Write operations
+- `FILES_CHANGED` - Space-separated changed files
+- `PROJECT_ROOT` - Project root directory
+- `TOOL_ARGS` - Raw tool arguments
+
+## Key Files
+
+- [xdg.go](mdc:internal/config/xdg.go) - XDG path resolution
+- [migration.go](mdc:internal/config/migration.go) - Legacy migration
+- [enhanced_loading.go](mdc:internal/config/enhanced_loading.go) - Config loading
+- [settings.go](mdc:internal/config/settings.go) - Settings management
+- [hooks_config.go](mdc:internal/config/hooks_config.go) - Custom hooks parsing
+
+## Migration Commands
+
+- `blues-traveler config migrate` - Migrate legacy configs to XDG
+- `blues-traveler config list` - Show tracked projects
+- `blues-traveler config status` - Show migration status
+- `blues-traveler config clean` - Remove orphaned configs
+
+## Best Practices
+
+1. **Always respect `XDG_CONFIG_HOME`** environment variable
+2. **Preserve unknown JSON fields** when reading/writing
+3. **Create backups** before migration operations
+4. **Sanitize project paths** for use as filenames
+5. **Keep registry.json in sync** with actual config files
+
+5. **Safe Migration**: Create backups before migrating
+6. **Path Sanitization**: Sanitize project paths for filenames
+7. **Registry Management**: Keep registry.json in sync with actual configs

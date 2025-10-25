@@ -9,17 +9,20 @@ import (
 	"strings"
 )
 
+// HookCommand represents a single hook command with its type and optional timeout
 type HookCommand struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 	Timeout *int   `json:"timeout,omitempty"`
 }
 
+// HookMatcher represents a matcher pattern with associated hook commands
 type HookMatcher struct {
 	Matcher string        `json:"matcher,omitempty"`
 	Hooks   []HookCommand `json:"hooks"`
 }
 
+// HooksConfig represents the hook configuration for all supported event types
 type HooksConfig struct {
 	PreToolUse       []HookMatcher `json:"PreToolUse,omitempty"`
 	PostToolUse      []HookMatcher `json:"PostToolUse,omitempty"`
@@ -38,6 +41,7 @@ type PluginConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
+// Settings represents the complete settings configuration including hooks, plugins, and other preferences
 type Settings struct {
 	Hooks        HooksConfig             `json:"hooks,omitempty"`
 	Plugins      map[string]PluginConfig `json:"plugins,omitempty"`
@@ -45,6 +49,7 @@ type Settings struct {
 	Other        map[string]interface{}  `json:"-"`
 }
 
+// GetSettingsPath returns the path to the settings file based on scope (global or project)
 func GetSettingsPath(global bool) (string, error) {
 	if global {
 		// Global settings: ~/.claude/settings.json
@@ -63,6 +68,7 @@ func GetSettingsPath(global bool) (string, error) {
 	}
 }
 
+// LoadSettings loads settings from the specified path, returning default settings if file doesn't exist
 func LoadSettings(settingsPath string) (*Settings, error) {
 	settings := &Settings{
 		Other: make(map[string]interface{}),
@@ -104,6 +110,7 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 	return settings, nil
 }
 
+// SaveSettings saves the settings to the specified path, creating directories as needed
 func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
@@ -146,6 +153,7 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 	return nil
 }
 
+// IsHooksConfigEmpty checks if all hook arrays in the configuration are empty
 func IsHooksConfigEmpty(hooks HooksConfig) bool {
 	return len(hooks.PreToolUse) == 0 &&
 		len(hooks.PostToolUse) == 0 &&
@@ -174,6 +182,7 @@ func (s *Settings) IsPluginEnabled(key string) bool {
 	return *cfg.Enabled
 }
 
+// AddHookToSettings adds a new hook to the settings configuration for the specified event
 func AddHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
 	hookCmd := HookCommand{
 		Type:    "command",
@@ -212,6 +221,9 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 	case "SessionStart":
 		result = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
 		settings.Hooks.SessionStart = result.Matchers
+	case "SessionEnd":
+		result = mergeHookMatcher(settings.Hooks.SessionEnd, hookMatcher)
+		settings.Hooks.SessionEnd = result.Matchers
 	}
 	return result
 }
@@ -288,6 +300,7 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 	}
 }
 
+// RemoveHookFromSettings removes all hooks with the specified command from the settings
 func RemoveHookFromSettings(settings *Settings, command string) bool {
 	removed := false
 
@@ -299,6 +312,7 @@ func RemoveHookFromSettings(settings *Settings, command string) bool {
 	settings.Hooks.SubagentStop = removeHookFromMatchers(settings.Hooks.SubagentStop, command, &removed)
 	settings.Hooks.PreCompact = removeHookFromMatchers(settings.Hooks.PreCompact, command, &removed)
 	settings.Hooks.SessionStart = removeHookFromMatchers(settings.Hooks.SessionStart, command, &removed)
+	settings.Hooks.SessionEnd = removeHookFromMatchers(settings.Hooks.SessionEnd, command, &removed)
 
 	return removed
 }
@@ -351,6 +365,7 @@ func CountBluesTravelerInSettings(settings *Settings) int {
 	count += countInMatchers(settings.Hooks.SubagentStop)
 	count += countInMatchers(settings.Hooks.PreCompact)
 	count += countInMatchers(settings.Hooks.SessionStart)
+	count += countInMatchers(settings.Hooks.SessionEnd)
 
 	return count
 }
@@ -430,6 +445,7 @@ func RemoveAllBluesTravelerFromSettings(settings *Settings) int {
 	settings.Hooks.SubagentStop = removeFromMatchers(settings.Hooks.SubagentStop)
 	settings.Hooks.PreCompact = removeFromMatchers(settings.Hooks.PreCompact)
 	settings.Hooks.SessionStart = removeFromMatchers(settings.Hooks.SessionStart)
+	settings.Hooks.SessionEnd = removeFromMatchers(settings.Hooks.SessionEnd)
 
 	return removed
 }

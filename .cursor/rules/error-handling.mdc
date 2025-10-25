@@ -1,0 +1,170 @@
+---
+globs: "*.go"
+---
+# Error Handling Patterns
+
+## General Principles
+- Always check errors immediately after function calls
+- Return errors up the call stack with context
+- Handle errors at the appropriate level
+- Log errors where they're handled, not where they occur
+
+## Error Wrapping
+Use `fmt.Errorf` with `%w` verb to wrap errors with context:
+```go
+if err := doSomething(); err != nil {
+    return fmt.Errorf("failed to do something: %w", err)
+}
+```
+
+## Error Handling in Hooks
+```go
+func (h *MyHook) Run() error {
+    if !h.IsEnabled() {
+        return nil // Not an error, just skip
+    }
+
+    if err := h.validateInput(); err != nil {
+        return fmt.Errorf("validation failed: %w", err)
+    }
+
+    // Hook logic...
+    return nil
+}
+```
+
+## CLI Command Error Handling
+In urfave/cli v3 commands, return errors from Action functions:
+```go
+Action: func(ctx context.Context, cmd *cli.Command) error {
+    if err := validateArgs(cmd.Args()); err != nil {
+        return fmt.Errorf("invalid arguments: %w", err)
+    }
+    // Command logic...
+    return nil
+}
+```
+
+## File Operation Errors
+Always handle file operation errors explicitly:
+```go
+data, err := os.ReadFile(path)
+if err != nil {
+    if os.IsNotExist(err) {
+        // Handle missing file case
+        return nil // or default value
+    }
+    return fmt.Errorf("failed to read file %s: %w", path, err)
+}
+```
+
+## Configuration Loading
+Configuration functions should handle missing files gracefully:
+```go
+settings, err := LoadSettings(path)
+if err != nil {
+    // Log warning but continue with defaults
+    fmt.Printf("Warning: %v, using defaults\n", err)
+    settings = DefaultSettings()
+}
+```
+
+## Command Execution
+When executing external commands:
+```go
+output, err := cmd.CombinedOutput()
+if err != nil {
+    return fmt.Errorf("command failed: %v\nOutput: %s", err, output)
+}
+```
+
+## Testing Error Cases
+Always test error paths:
+```go
+func TestFunction_ErrorCase(t *testing.T) {
+    // Arrange: Set up error condition
+
+    // Act
+    err := Function()
+
+    // Assert
+    if err == nil {
+        t.Error("expected error, got nil")
+    }
+    if !strings.Contains(err.Error(), "expected text") {
+        t.Errorf("error = %v, want error containing 'expected text'", err)
+    }
+}
+```
+
+## Input Validation
+Always validate inputs before processing to prevent errors and security issues:
+
+### File Path Validation
+```go
+func processFile(filePath string) error {
+    // 1. Check not empty
+    if filePath == "" {
+        return fmt.Errorf("empty file path")
+    }
+
+    // 2. Check file exists and is accessible
+    if _, err := os.Stat(filePath); err != nil {
+        return fmt.Errorf("file not accessible: %w", err)
+    }
+
+    // 3. Prevent path traversal attacks
+    cleanPath := filepath.Clean(filePath)
+    if cleanPath != filePath {
+        return fmt.Errorf("invalid file path: possible path traversal attempt")
+    }
+
+    // Safe to process
+    return processValidatedFile(cleanPath)
+}
+```
+
+### Tool Availability Checks
+Cache expensive checks (like PATH lookups) using sync.Once:
+```go
+var (
+    prettierOnce      sync.Once
+    prettierAvailable bool
+)
+
+func checkPrettierAvailable() bool {
+    prettierOnce.Do(func() {
+        _, err := exec.LookPath("prettier")
+        prettierAvailable = err == nil
+    })
+    return prettierAvailable
+}
+
+func formatFile(path string) error {
+    if !checkPrettierAvailable() {
+        return fmt.Errorf("prettier not found in PATH")
+    }
+    // Safe to use prettier
+}
+```
+
+### Parsing/Extraction Error Handling
+Log parse errors when they might indicate issues, but don't block operations:
+```go
+edit, err := event.InputAsEdit()
+if err != nil {
+    // Log for debugging but don't block
+    if h.Context().LoggingEnabled {
+        log.Printf("Failed to parse Edit input: %v", err)
+    }
+    return nil  // or return default value
+}
+// Use edit...
+```
+
+## DO NOT
+- Ignore errors with `_` unless explicitly justified
+- Panic in library code (only in main or init)
+- Log and return the same error (choose one)
+- Create errors without context
+- Skip input validation (always validate external inputs)

@@ -1,0 +1,60 @@
+# blues-traveler Architecture Guide
+
+## Project Overview
+[blues-traveler](mdc:README.md) is a CLI tool for managing and running Claude Code hooks. It provides a **static hook registry** with built-in security, formatting, debugging, and audit capabilities.
+
+## Core Architecture Principles
+- **Static Registration**: All hooks are registered at startup via `init()` functions
+- **Independent Execution**: Each hook runs in isolation for security and reliability
+- **No Dynamic Loading**: Prevents security risks and ensures predictable behavior
+- **Simple Lifecycle**: Create → Execute → Cleanup
+
+## Key Components
+
+### CLI Layer ([internal/cmd/](mdc:internal/cmd/))
+- [hooks.go](mdc:internal/cmd/hooks.go): Hook management (list, run, install, etc.)
+- [config_xdg.go](mdc:internal/cmd/config_xdg.go): XDG configuration management
+- [generate.go](mdc:internal/cmd/generate.go): Code generation
+- [platform.go](mdc:internal/cmd/platform.go): Platform detection and info
+- Uses **urfave/cli v3** (NOT Cobra)
+
+### Core ([internal/core/](mdc:internal/core/))
+- [registry.go](mdc:internal/core/registry.go): Static hook registration and management
+- [base.go](mdc:internal/core/base.go): Base hook implementation and interfaces
+- [events.go](mdc:internal/core/events.go): Event type definitions
+- [environment.go](mdc:internal/core/environment.go): Environment variable management
+
+### Hooks ([internal/hooks/](mdc:internal/hooks/))
+- [init.go](mdc:internal/hooks/init.go): Hook registration and built-in hook initialization
+- Each hook implements the `core.Hook` interface
+- Built-in hooks: security, format, debug, audit, vet, fetch-blocker, find-blocker
+
+### Platform Support ([internal/platform/](mdc:internal/platform/))
+- [platform.go](mdc:internal/platform/platform.go): Platform interfaces
+- [detect.go](mdc:internal/platform/detect.go): Auto-detection logic
+- [claude/](mdc:internal/platform/claude/): Claude Code implementation
+- [cursor/](mdc:internal/platform/cursor/): Cursor IDE implementation
+
+### Configuration ([internal/config/](mdc:internal/config/))
+- [settings.go](mdc:internal/config/settings.go): Settings file management (JSON)
+- [xdg.go](mdc:internal/config/xdg.go): XDG Base Directory support
+- [hooks_config.go](mdc:internal/config/hooks_config.go): Custom hooks configuration (YAML/JSON)
+- [migration.go](mdc:internal/config/migration.go): Legacy config migration
+
+## Entry Points
+- [main.go](mdc:main.go): CLI entry point with urfave/cli v3 commands
+- Binary name: `blues-traveler`
+
+## Configuration Files
+- Project settings: `./.claude/settings.json`
+- Global settings: `~/.claude/settings.json`
+- XDG config: `~/.config/blues-traveler/`
+- Platform-specific:
+  - Claude Code: `~/.claude/settings.json`
+  - Cursor: `~/.cursor/hooks/hooks.json`
+
+## Important Patterns
+- Hooks are stateless and created fresh for each execution
+- Use `core.BaseHook` for common functionality
+- Settings hierarchy: project overrides global
+- Platform abstraction enables multi-IDE support

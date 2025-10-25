@@ -11,6 +11,9 @@ import (
 
 	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/core"
+	"github.com/klauern/blues-traveler/internal/platform"
+	"github.com/klauern/blues-traveler/internal/platform/claude"
+	"github.com/klauern/blues-traveler/internal/platform/cursor"
 	"github.com/urfave/cli/v3"
 	yaml "gopkg.in/yaml.v3"
 )
@@ -108,6 +111,11 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 		Description: `Run a specific hook plugin. Executes only that hook's handlers (no unified pipeline).`,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
+				Name:  "cursor-mode",
+				Value: false,
+				Usage: "Run in Cursor mode (JSON I/O over stdin/stdout)",
+			},
+			&cli.BoolFlag{
 				Name:    "log",
 				Aliases: []string{"l"},
 				Value:   false,
@@ -125,6 +133,12 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 				return fmt.Errorf("exactly one argument required: [plugin-key]")
 			}
 			key := args[0]
+
+			// Check for Cursor mode
+			cursorMode := cmd.Bool("cursor-mode")
+			if cursorMode {
+				return runHookCursorMode(key, getPlugin, isPluginEnabled)
+			}
 
 			// Validate plugin exists early
 			p, exists := getPlugin(key)
@@ -186,11 +200,18 @@ func newHooksInstallCommand(getPlugin func(string) (interface {
 ) *cli.Command {
 	return &cli.Command{
 		Name:      "install",
-		Usage:     "Install a hook type into Claude Code settings",
+		Usage:     "Install a hook type into IDE settings (Claude Code or Cursor)",
 		ArgsUsage: "[hook-type]",
-		Description: `Install a hook type into your Claude Code settings.json file.
-This will automatically configure the hook to run for the specified events.`,
+		Description: `Install a hook type into your IDE settings.
+For Claude Code: Updates .claude/settings.json
+For Cursor: Generates wrapper script and updates ~/.cursor/hooks.json`,
 		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "platform",
+				Aliases: []string{"p"},
+				Value:   "",
+				Usage:   "Target platform: claudecode, cursor (auto-detect if not specified)",
+			},
 			&cli.BoolFlag{
 				Name:    "global",
 				Aliases: []string{"g"},
@@ -235,11 +256,13 @@ This will automatically configure the hook to run for the specified events.`,
 			hookType := args[0]
 
 			// Validate plugin exists
-			if _, exists := getPlugin(hookType); !exists {
+			plugin, exists := getPlugin(hookType)
+			if !exists {
 				return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", hookType, strings.Join(pluginKeys(), ", "))
 			}
 
 			// Get flags
+			platformFlag := cmd.String("platform")
 			global := cmd.Bool("global")
 			event := cmd.String("event")
 			matcher := cmd.String("matcher")
@@ -253,90 +276,35 @@ This will automatically configure the hook to run for the specified events.`,
 				return fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", logFormat)
 			}
 
-			// Validate event
-			if !isValidEventType(event) {
-				return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", event, strings.Join(validEventTypes(), ", "))
-			}
-
-			// Get path to this executable
-			execPath, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("failed to get executable path: %v", err)
-			}
-
-			// Create command: blues-traveler hooks run <type>
-			hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
-			if logEnabled {
-				hookCommand += " --log"
-				if logFormat != config.LoggingFormatJSONL {
-					hookCommand += fmt.Sprintf(" --log-format %s", logFormat)
+			// Detect platform
+			var platformType platform.Type
+			if platformFlag != "" {
+				var err error
+				platformType, err = platform.TypeFromString(platformFlag)
+				if err != nil {
+					return fmt.Errorf("invalid platform: %w", err)
 				}
-			}
-
-			// Get settings path
-			settingsPath, err := config.GetSettingsPath(global)
-			if err != nil {
-				return fmt.Errorf("error getting settings path: %v", err)
-			}
-
-			// Load existing settings
-			settings, err := config.LoadSettings(settingsPath)
-			if err != nil {
-				return fmt.Errorf("error loading settings: %v", err)
-			}
-
-			// Add hook to settings
-			var timeout *int
-			if timeoutFlag > 0 {
-				timeout = &timeoutFlag
-			}
-			result := config.AddHookToSettings(settings, event, matcher, hookCommand, timeout)
-
-			// Check for duplicates or replacements
-			isDuplicateNoChange := false
-			if result.WasDuplicate {
-				if strings.Contains(result.DuplicateInfo, "Replaced existing") {
-					fmt.Printf("🔄 %s\n", result.DuplicateInfo)
-				} else {
-					fmt.Printf("⚠️  Hook already installed: %s\n", result.DuplicateInfo)
-					fmt.Printf("No changes made. The hook is already configured for this event.\n")
-					isDuplicateNoChange = true
+			} else {
+				detector := platform.NewDetector()
+				detectedType, err := detector.DetectType()
+				if err != nil {
+					return fmt.Errorf("failed to detect platform: %w", err)
 				}
+				platformType = detectedType
 			}
 
-			// Save settings (only if not a duplicate with no changes)
-			if !isDuplicateNoChange {
-				if err := config.SaveSettings(settingsPath, settings); err != nil {
-					return fmt.Errorf("error saving settings: %v", err)
-				}
-			}
+			// Create platform instance
+			p := newPlatformFromType(platformType)
 
-			scope := "project"
-			if global {
-				scope = "global"
+			// Route to platform-specific installation
+			switch platformType {
+			case platform.Cursor:
+				return installHookCursor(p, hookType, plugin, event, matcher)
+			case platform.ClaudeCode:
+				return installHookClaudeCode(hookType, plugin, global, event, matcher, timeoutFlag, logEnabled, logFormat, isValidEventType)
+			default:
+				return fmt.Errorf("unsupported platform: %s", platformType)
 			}
-
-			// Only show installation success message if not a duplicate
-			if !isDuplicateNoChange {
-				fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
-				fmt.Printf("   Event: %s\n", event)
-				fmt.Printf("   Matcher: %s\n", matcher)
-				fmt.Printf("   Command: %s\n", hookCommand)
-				fmt.Printf("   Settings: %s\n", settingsPath)
-				fmt.Println()
-			}
-
-			// Post-install actions for specific plugins (run even for duplicates)
-			if hookType == "fetch-blocker" {
-				createSampleBlockedUrlsFile(global)
-			}
-
-			// Only show the activation message if not a duplicate
-			if !isDuplicateNoChange {
-				fmt.Println("The hook will be active in new Claude Code sessions.")
-				fmt.Println("Use 'claude /hooks' to verify the configuration.")
-			}
-			return nil
 		},
 	}
 }
@@ -372,7 +340,7 @@ func newHooksUninstallCommand() *cli.Command {
 
 			// Handle 'all' case
 			if hookType == "all" {
-				uninstallAllKlauerHooks(global, cmd.Bool("yes"))
+				uninstallAllBluesTravelerHooks(global, cmd.Bool("yes"))
 				return nil
 			}
 
@@ -501,6 +469,7 @@ func listAvailableHooks(getPlugin func(string) (interface {
 	return nil
 }
 
+// listInstalledHooks displays hooks currently installed in Claude Code settings
 func listInstalledHooks(global bool) error {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
@@ -541,6 +510,7 @@ func listInstalledHooks(global bool) error {
 	return nil
 }
 
+// listEvents displays all available hook events and their descriptions
 func listEvents(allEvents func() []ClaudeCodeEvent) error {
 	fmt.Println("Available Claude Code Hook Events:")
 	fmt.Println()
@@ -738,6 +708,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 	}
 }
 
+// newHooksCustomListCommand creates the custom hooks list command
 func newHooksCustomListCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
@@ -760,6 +731,7 @@ func newHooksCustomListCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomSyncCommand creates the custom hooks sync command
 func newHooksCustomSyncCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "sync",
@@ -929,6 +901,7 @@ func newHooksCustomSyncCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomInitCommand creates the custom hooks init command
 func newHooksCustomInitCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "init",
@@ -1087,6 +1060,7 @@ func newHooksCustomInitCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomValidateCommand creates the custom hooks validate command
 func newHooksCustomValidateCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "validate",
@@ -1105,6 +1079,7 @@ func newHooksCustomValidateCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomShowCommand creates the custom hooks show command
 func newHooksCustomShowCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "show",
@@ -1158,6 +1133,7 @@ func newHooksCustomShowCommand() *cli.Command {
 	}
 }
 
+// newHooksCustomBlockedCommand creates the custom hooks blocked command
 func newHooksCustomBlockedCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "blocked",
@@ -1383,7 +1359,7 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 	fmt.Printf("   Edit this file to add your own blocked URL prefixes.\n")
 }
 
-// Helper functions for the consolidated list command
+// printHookMatchers displays the matchers for a specific event in a formatted list
 func printHookMatchers(eventName string, matchers []config.HookMatcher) {
 	if len(matchers) == 0 {
 		return
@@ -1407,6 +1383,7 @@ func printHookMatchers(eventName string, matchers []config.HookMatcher) {
 	fmt.Println()
 }
 
+// printUninstallExamples shows example commands for uninstalling hooks
 func printUninstallExamples(global bool) {
 	scope := "project"
 	globalFlag := ""
@@ -1441,7 +1418,8 @@ func printUninstallExamples(global bool) {
 	fmt.Printf("   from ALL events (PreToolUse, PostToolUse, etc.)\n")
 }
 
-func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
+// uninstallAllBluesTravelerHooks removes all blues-traveler hooks from settings
+func uninstallAllBluesTravelerHooks(global bool, skipConfirmation bool) {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
 	if err != nil {
@@ -1509,4 +1487,418 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 		globalFlag = " --global"
 	}
 	fmt.Printf("\nUse 'hooks list --installed%s' to verify the changes.\n", globalFlag)
+}
+
+// newPlatformFromType creates a Platform instance from a Type
+// This helper exists in cmd to avoid import cycles in the platform package
+func newPlatformFromType(t platform.Type) platform.Platform {
+	switch t {
+	case platform.Cursor:
+		return cursor.New()
+	case platform.ClaudeCode:
+		return claude.New()
+	default:
+		return claude.New()
+	}
+}
+
+// runHookCursorMode runs a hook in Cursor mode (JSON I/O over stdin/stdout)
+func runHookCursorMode(key string, getPlugin func(string) (interface {
+	Run() error
+	Description() string
+}, bool), isPluginEnabled func(string) bool,
+) error {
+	// Read JSON input from stdin
+	var input cursor.HookInput
+	decoder := json.NewDecoder(os.Stdin)
+
+	if err := decoder.Decode(&input); err != nil {
+		// Output error as JSON response
+		output := cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to parse hook input: %v", err),
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		os.Exit(3)
+	}
+
+	// Validate plugin exists
+	p, exists := getPlugin(key)
+	if !exists {
+		output := cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Hook '%s' not found", key),
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		os.Exit(3)
+	}
+
+	// Check if plugin is enabled
+	if !isPluginEnabled(key) {
+		// Disabled hooks should allow (not interfere)
+		output := cursor.HookOutput{
+			Permission: "allow",
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(output)
+		return nil
+	}
+
+	// Set up environment variables from JSON input
+	setupCursorEnvironment(input)
+
+	// Execute the hook in Cursor-specific mode
+	// We call the hook directly but need to handle the response ourselves
+	// since we can't use the cchooks Runner (it reads stdin which we've consumed)
+	output := executeCursorHook(p, input)
+
+	// Write JSON response to stdout
+	encoder := json.NewEncoder(os.Stdout)
+	if err := encoder.Encode(output); err != nil {
+		// Can't write response, exit with error
+		os.Exit(3)
+	}
+
+	// Exit with code 3 if denied
+	if output.Permission == "deny" {
+		os.Exit(3)
+	}
+
+	return nil
+}
+
+// installHookClaudeCode installs a hook for Claude Code platform
+func installHookClaudeCode(hookType string, plugin interface {
+	Run() error
+	Description() string
+}, global bool, event string, matcher string, timeoutFlag int, logEnabled bool, logFormat string, isValidEventType func(string) bool,
+) error {
+	// Validate event
+	if !isValidEventType(event) {
+		return fmt.Errorf("invalid event '%s' for Claude Code", event)
+	}
+
+	// Get path to this executable
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %v", err)
+	}
+
+	// Create command: blues-traveler hooks run <type>
+	hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
+	if logEnabled {
+		hookCommand += " --log"
+		if logFormat != config.LoggingFormatJSONL {
+			hookCommand += fmt.Sprintf(" --log-format %s", logFormat)
+		}
+	}
+
+	// Get settings path
+	settingsPath, err := config.GetSettingsPath(global)
+	if err != nil {
+		return fmt.Errorf("error getting settings path: %v", err)
+	}
+
+	// Load existing settings
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		return fmt.Errorf("error loading settings: %v", err)
+	}
+
+	// Add hook to settings
+	var timeout *int
+	if timeoutFlag > 0 {
+		timeout = &timeoutFlag
+	}
+	result := config.AddHookToSettings(settings, event, matcher, hookCommand, timeout)
+
+	// Check for duplicates or replacements
+	isDuplicateNoChange := false
+	if result.WasDuplicate {
+		if strings.Contains(result.DuplicateInfo, "Replaced existing") {
+			fmt.Printf("🔄 %s\n", result.DuplicateInfo)
+		} else {
+			fmt.Printf("⚠️  Hook already installed: %s\n", result.DuplicateInfo)
+			fmt.Printf("No changes made. The hook is already configured for this event.\n")
+			isDuplicateNoChange = true
+		}
+	}
+
+	// Save settings (only if not a duplicate with no changes)
+	if !isDuplicateNoChange {
+		if err := config.SaveSettings(settingsPath, settings); err != nil {
+			return fmt.Errorf("error saving settings: %v", err)
+		}
+	}
+
+	scope := "project"
+	if global {
+		scope = "global"
+	}
+
+	// Only show installation success message if not a duplicate
+	if !isDuplicateNoChange {
+		fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
+		fmt.Printf("   Event: %s\n", event)
+		fmt.Printf("   Matcher: %s\n", matcher)
+		fmt.Printf("   Command: %s\n", hookCommand)
+		fmt.Printf("   Settings: %s\n", settingsPath)
+		fmt.Println()
+	}
+
+	// Post-install actions for specific plugins (run even for duplicates)
+	if hookType == "fetch-blocker" {
+		createSampleBlockedUrlsFile(global)
+	}
+
+	// Only show the activation message if not a duplicate
+	if !isDuplicateNoChange {
+		fmt.Println("The hook will be active in new Claude Code sessions.")
+		fmt.Println("Use 'claude /hooks' to verify the configuration.")
+	}
+	return nil
+}
+
+// installHookCursor installs a hook for Cursor platform
+func installHookCursor(p platform.Platform, hookType string, plugin interface {
+	Run() error
+	Description() string
+}, event string, matcher string,
+) error {
+	// Validate event is supported by Cursor
+	genericEvent := core.EventType(event)
+	if !p.SupportsEvent(genericEvent) {
+		return fmt.Errorf("event '%s' is not supported by Cursor platform", event)
+	}
+
+	// Map generic event to Cursor-specific events
+	cursorEvents := p.MapEventFromGeneric(genericEvent)
+	if len(cursorEvents) == 0 {
+		return fmt.Errorf("event '%s' cannot be mapped to Cursor events", event)
+	}
+
+	// Get path to this executable
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %v", err)
+	}
+
+	// Load Cursor config
+	cursorPlatform, ok := p.(*cursor.CursorPlatform)
+	if !ok {
+		return fmt.Errorf("platform is not Cursor")
+	}
+
+	cfg, err := cursorPlatform.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load Cursor config: %w", err)
+	}
+
+	installedCount := 0
+	installedEvents := []string{}
+
+	// Build the command to register in Cursor hooks.json
+	// Format: /path/to/blues-traveler hooks run <hook> --cursor-mode
+	// Note: Matcher filtering happens inside blues-traveler (passed via stdin JSON matching logic)
+	command := fmt.Sprintf("%s hooks run %s --cursor-mode", execPath, hookType)
+
+	// Install hook for each mapped Cursor event
+	for _, cursorEvent := range cursorEvents {
+		// Check if hook already exists in config
+		if !cfg.HasHook(cursorEvent, command) {
+			// Add hook to Cursor config
+			cfg.AddHook(cursorEvent, command)
+			installedCount++
+			installedEvents = append(installedEvents, cursorEvent)
+		}
+	}
+
+	// Save Cursor config if changes were made
+	if installedCount > 0 {
+		if err := cursorPlatform.SaveConfig(cfg); err != nil {
+			return fmt.Errorf("failed to save Cursor config: %w", err)
+		}
+
+		configPath, _ := cursorPlatform.ConfigPath()
+		fmt.Printf("✅ Successfully installed %s hook for Cursor\n", hookType)
+		fmt.Printf("   Generic Event: %s\n", event)
+		fmt.Printf("   Cursor Events: %s\n", strings.Join(installedEvents, ", "))
+		fmt.Printf("   Command: %s\n", command)
+		fmt.Printf("   Config: %s\n", configPath)
+		fmt.Println()
+		fmt.Println("The hook will be active in new Cursor sessions.")
+	} else {
+		fmt.Printf("⚠️  Hook '%s' is already installed for all mapped Cursor events\n", hookType)
+		fmt.Println("No changes made.")
+	}
+
+	return nil
+}
+
+// executeCursorHook executes a hook in Cursor mode without using the cchooks Runner
+// which would try to read from stdin (already consumed)
+func executeCursorHook(hook interface {
+	Run() error
+	Description() string
+}, input cursor.HookInput,
+) cursor.HookOutput {
+	// Transform Cursor JSON to Claude Code format
+	claudeJSON, err := transformCursorToClaudeFormat(input)
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to transform input: %v", err),
+		}
+	}
+
+	// Set up a pipe to feed the transformed JSON to the hook's stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	// Create a pipe with the transformed JSON input
+	r, w, err := os.Pipe()
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: fmt.Sprintf("Failed to create pipe: %v", err),
+		}
+	}
+	defer func() { _ = r.Close() }() // Ignore close error in defer
+
+	// Replace stdin with our pipe
+	os.Stdin = r
+
+	// Write JSON in a goroutine
+	go func() {
+		defer func() { _ = w.Close() }() // Ignore close error in defer
+		_, _ = w.Write(claudeJSON)       // Ignore write error, hook will fail if needed
+	}()
+
+	// Execute the hook
+	err = hook.Run()
+	// Convert error to Cursor response
+	if err != nil {
+		return cursor.HookOutput{
+			Permission:  "deny",
+			UserMessage: err.Error(),
+		}
+	}
+
+	return cursor.HookOutput{
+		Permission: "allow",
+	}
+}
+
+// transformCursorToClaudeFormat converts Cursor JSON to Claude Code format
+// that cchooks can understand
+func transformCursorToClaudeFormat(input cursor.HookInput) ([]byte, error) {
+	// Base event structure
+	event := map[string]interface{}{
+		"conversation_id": input.ConversationID,
+		"generation_id":   input.GenerationID,
+		"workspace_roots": input.WorkspaceRoots,
+	}
+
+	// Map Cursor event to Claude Code event and add event-specific fields
+	switch input.HookEventName {
+	case cursor.BeforeShellExecution:
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = "Bash"
+		event["tool_parameters"] = map[string]interface{}{
+			"command": input.Command,
+		}
+		if input.CWD != "" {
+			event["cwd"] = input.CWD
+		}
+
+	case cursor.BeforeMCPExecution:
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = input.ToolName
+		// Parse tool_input if it's JSON
+		var toolParams interface{}
+		if err := json.Unmarshal([]byte(input.ToolInput), &toolParams); err == nil {
+			event["tool_parameters"] = toolParams
+		} else {
+			event["tool_parameters"] = map[string]interface{}{
+				"input": input.ToolInput,
+			}
+		}
+		if input.URL != "" {
+			event["mcp_url"] = input.URL
+		}
+
+	case cursor.AfterFileEdit:
+		event["hook_event_name"] = "PostToolUse"
+		event["tool_name"] = "Edit"
+		event["tool_parameters"] = map[string]interface{}{
+			"file_path": input.FilePath,
+			"edits":     input.Edits,
+		}
+
+	case cursor.BeforeReadFile:
+		event["hook_event_name"] = "PreToolUse"
+		event["tool_name"] = "Read"
+		event["tool_parameters"] = map[string]interface{}{
+			"file_path": input.FilePath,
+		}
+
+	case cursor.BeforeSubmitPrompt:
+		event["hook_event_name"] = "UserPromptSubmit"
+		event["user_prompt"] = input.Prompt
+		event["attachments"] = input.Attachments
+
+	case cursor.Stop:
+		event["hook_event_name"] = "Stop"
+		event["status"] = input.Status
+
+	default:
+		return nil, fmt.Errorf("unsupported Cursor event: %s", input.HookEventName)
+	}
+
+	return json.Marshal(event)
+}
+
+// setupCursorEnvironment maps Cursor JSON input to environment variables
+// that blues-traveler hooks expect
+func setupCursorEnvironment(input cursor.HookInput) {
+	// Common fields (ignore errors as these are best-effort environment setup)
+	_ = os.Setenv("CONVERSATION_ID", input.ConversationID)
+	_ = os.Setenv("GENERATION_ID", input.GenerationID)
+	_ = os.Setenv("EVENT_NAME", input.HookEventName)
+	_ = os.Setenv("WORKSPACE_ROOTS", strings.Join(input.WorkspaceRoots, ":"))
+
+	// Event-specific fields (all Setenv calls ignore errors - best effort)
+	switch input.HookEventName {
+	case cursor.BeforeShellExecution:
+		_ = os.Setenv("TOOL_NAME", "Bash")
+		_ = os.Setenv("TOOL_ARGS", input.Command)
+		_ = os.Setenv("CWD", input.CWD)
+
+	case cursor.BeforeMCPExecution:
+		_ = os.Setenv("TOOL_NAME", input.ToolName)
+		_ = os.Setenv("TOOL_ARGS", input.ToolInput)
+		if input.URL != "" {
+			_ = os.Setenv("MCP_URL", input.URL)
+		}
+
+	case cursor.AfterFileEdit:
+		_ = os.Setenv("TOOL_NAME", "Edit")
+		_ = os.Setenv("FILE_PATH", input.FilePath)
+		if editsJSON, err := json.Marshal(input.Edits); err == nil {
+			_ = os.Setenv("FILE_EDITS", string(editsJSON))
+		}
+
+	case cursor.BeforeReadFile:
+		_ = os.Setenv("TOOL_NAME", "Read")
+		_ = os.Setenv("FILE_PATH", input.FilePath)
+		_ = os.Setenv("FILE_CONTENT", input.Content)
+
+	case cursor.BeforeSubmitPrompt:
+		_ = os.Setenv("USER_PROMPT", input.Prompt)
+		if attachmentsJSON, err := json.Marshal(input.Attachments); err == nil {
+			_ = os.Setenv("PROMPT_ATTACHMENTS", string(attachmentsJSON))
+		}
+
+	case cursor.Stop:
+		_ = os.Setenv("STOP_STATUS", input.Status)
+	}
 }

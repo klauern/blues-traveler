@@ -1,0 +1,99 @@
+
+# Documentation Guide
+
+## Project Documentation Structure
+
+### Core Documentation
+- [README.md](mdc:README.md) - Project overview and quick start
+- [CLAUDE.md](mdc:CLAUDE.md) - AI assistant guidance (always keep updated!)
+- [AGENTS.md](mdc:AGENTS.md) - Built-in hooks reference
+
+### User Guides
+- [docs/quick_start.md](mdc:docs/quick_start.md) - Getting started guide
+- [docs/developer_guide.md](mdc:docs/developer_guide.md) - Development guidelines
+- [docs/custom-hooks-guide.md](mdc:docs/custom-hooks-guide.md) - Custom hooks tutorial
+
+### Platform Documentation
+- [docs/cursor-support.md](mdc:docs/cursor-support.md) - Cursor IDE integration
+- [docs/archive/cursor-planning/](mdc:docs/archive/cursor-planning/) - Cursor implementation history
+
+### Cursor Rules (This Directory)
+- [architecture.mdc](mdc:.cursor/rules/architecture.mdc) - Core architecture & principles
+- [platform-support.mdc](mdc:.cursor/rules/platform-support.mdc) - Multi-IDE platform details
+- [configuration.mdc](mdc:.cursor/rules/configuration.mdc) - Config system & XDG paths
+- [hook-implementation.mdc](mdc:.cursor/rules/hook-implementation.mdc) - Hook development guide
+- [custom-hooks.mdc](mdc:.cursor/rules/custom-hooks.mdc) - YAML/JSON hooks system
+- [cli-commands.mdc](mdc:.cursor/rules/cli-commands.mdc) - urfave/cli v3 patterns
+- [testing.mdc](mdc:.cursor/rules/testing.mdc) - Testing guidelines
+- [development-workflow.mdc](mdc:.cursor/rules/development-workflow.mdc) - Contributing guide
+- [cursor-implementation.mdc](mdc:.cursor/rules/cursor-implementation.mdc) - Cursor-specific details
+
+## Documentation Standards
+
+### Code Examples
+- Use realistic, working examples
+- Include imports and error handling
+- Follow Go idioms and project patterns
+
+### File References
+- Use MDC links: `[file.go](mdc:path/to/file.go)`
+- Use relative paths from workspace root
+- Link to specific sections when helpful
+
+### Version Information
+- Document version requirements (Go 1.23.0+)
+- Note deprecations with migration paths
+- Update CLAUDE.md when architecture changes
+
+### Formatting
+- Use consistent heading levels
+- Include tables for comparisons
+- Add code fences with language hints
+
+## Maintenance Checklist
+
+When making changes:
+1. ✅ Update affected documentation
+2. ✅ Keep CLAUDE.md in sync
+3. ✅ Update examples to match code
+4. ✅ Check all MDC links still work
+5. ✅ Ensure consistency across docs
+
+## Common Documentation Patterns
+
+### Feature Documentation
+1. **What**: Clear description
+2. **Why**: Use case/problem solved
+3. **How**: Implementation details
+4. **Example**: Working code sample
+5. **Reference**: Links to code/specs
+
+### API Documentation
+```go
+// FunctionName does X with Y to produce Z.
+//
+// Parameters:
+//   - param1: description
+//   - param2: description
+//
+// Returns:
+//   - result: description
+//   - error: when this happens
+//
+// Example:
+//   result, err := FunctionName(x, y)
+//   if err != nil {
+//       // handle error
+//   }
+func FunctionName(param1 Type1, param2 Type2) (Result, error) {
+```
+
+### Configuration Documentation
+- Show both YAML and JSON formats
+- Include all fields with descriptions
+- Provide real-world examples
+- Note defaults and constraints
+
+
+**Last Updated**: 2025-10-01
+**Consolidated**: Reduced from 14 files to 8 core files (58% reduction)

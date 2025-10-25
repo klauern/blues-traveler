@@ -17,7 +17,7 @@ jobs:
   gosec:
     name: Gosec Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.0'
+        go-version-file: go.mod
         cache: true
 
     - name: Download dependencies
@@ -35,6 +35,14 @@ jobs:
       uses: securego/gosec@master
       with:
         args: '-no-fail -fmt sarif -out results.sarif ./...'
+
+    - name: Fix SARIF format (remove invalid fixes field)
+      if: always()
+      run: |
+        if [ -f results.sarif ]; then
+          jq 'del(.runs[].results[].fixes)' results.sarif > results-fixed.sarif
+          mv results-fixed.sarif results.sarif
+        fi
 
     - name: Upload SARIF file to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
@@ -60,7 +68,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.0'
+        go-version-file: go.mod
         cache: true
 
     - name: Download dependencies
@@ -69,10 +77,17 @@ jobs:
     - name: Run govulncheck
       uses: golang/govulncheck-action@v1
       with:
-        go-version-input: '1.25.0'
         go-package: './...'
         output-format: sarif
         output-file: govulncheck-results.sarif
+
+    - name: Fix SARIF format (deduplicate tags)
+      if: always()
+      run: |
+        if [ -f govulncheck-results.sarif ]; then
+          jq 'walk(if type == "object" and (.properties? | type) == "object" and (.properties.tags? | type) == "array" then (.properties.tags |= unique) else . end)' govulncheck-results.sarif > govulncheck-fixed.sarif
+          mv govulncheck-fixed.sarif govulncheck-results.sarif
+        fi
 
     - name: Upload govulncheck SARIF to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
@@ -96,12 +111,22 @@ jobs:
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
+      with:
+        merge-multiple: false
+      continue-on-error: true
+      id: download
+
+    - name: Retry download on failure
+      if: steps.download.outcome == 'failure'
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: false
 
     - name: Security scan summary
       run: |
         echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         echo "### Gosec Results" >> $GITHUB_STEP_SUMMARY
         if [ -f gosec-results/results.sarif ]; then
           issues=$(jq '.runs[0].results | length' gosec-results/results.sarif 2>/dev/null || echo "0")
@@ -109,7 +134,7 @@ jobs:
         else
           echo "- No results file found" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Govulncheck Results" >> $GITHUB_STEP_SUMMARY
         if [ -f govulncheck-results/govulncheck-results.sarif ]; then
@@ -118,7 +143,7 @@ jobs:
         else
           echo "- No results file found" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Recommendation" >> $GITHUB_STEP_SUMMARY
         echo "Review the Security tab in your repository for detailed findings and recommendations." >> $GITHUB_STEP_SUMMARY

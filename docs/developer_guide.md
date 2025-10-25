@@ -9,6 +9,7 @@ Blues Traveler uses a **static hook registry** architecture for security and rel
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   CLI Commands  │───▶│  Hook Registry   │───▶│  Hook Impls     │
+│ (urfave/cli)   │    │                  │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
@@ -18,6 +19,13 @@ Blues Traveler uses a **static hook registry** architecture for security and rel
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
+### Key Design Decisions
+
+1. **Static Registration**: All hooks are registered at startup via `init()` functions
+2. **Independent Execution**: Each hook runs in isolation for security and reliability
+3. **No Dynamic Loading**: Prevents security risks and ensures predictable behavior
+4. **Simple Lifecycle**: Create → Execute → Cleanup
+
 ### Key Components
 
 - **CLI Layer** (`internal/cmd/`): urfave/cli v3 command implementations
@@ -25,6 +33,59 @@ Blues Traveler uses a **static hook registry** architecture for security and rel
 - **Hooks** (`internal/hooks/`): Concrete hook implementations
 - **Settings** (`internal/config/`): Configuration management
 - **Core** (`internal/core/`): Event handling and execution
+
+### Benefits of This Architecture
+
+#### Security
+
+- No dynamic code loading
+- Predictable execution environment
+- Controlled hook lifecycle
+
+#### Reliability
+
+- No runtime registration errors
+- Consistent behavior across runs
+- Easy to test and debug
+
+#### Simplicity
+
+- Clear execution model
+- Straightforward debugging
+- Minimal complexity
+
+## Hook Execution Flow
+
+### 1. Command Execution
+
+```bash
+blues-traveler run security
+```
+
+### 2. Hook Lookup
+
+The command looks up the hook in the registry:
+
+```go
+hook, exists := registry.Create("security")
+if !exists {
+    return fmt.Errorf("hook 'security' not found")
+}
+```
+
+### 3. Hook Execution
+
+The hook's `Run()` method is called:
+
+```go
+if err := hook.Run(); err != nil {
+    return fmt.Errorf("hook execution failed: %v", err)
+}
+```
+
+### 4. Cleanup
+
+The hook instance is discarded after execution
 
 ## Adding a New Hook
 
@@ -145,6 +206,7 @@ func (h *MyHook) Run() error {
 ```
 
 This gives you:
+
 - `Key()`: Returns the hook identifier
 - `Name()`: Returns the human-readable name
 - `Description()`: Returns the hook description
@@ -160,12 +222,32 @@ This gives you:
 
 ## Event Handling
 
-Hooks can handle different Claude Code events:
+Each hook can implement handlers for different Claude Code and Cursor events:
 
 - **PreToolUse**: Before tool execution (e.g., security checks)
 - **PostToolUse**: After tool execution (e.g., formatting, validation)
 - **UserPromptSubmit**: When user submits a prompt
 - **SessionStart/End**: Session lifecycle events
+
+### Example Hook Structure
+
+```go
+type SecurityHook struct {
+    *core.BaseHook
+}
+
+func (h *SecurityHook) Run() error {
+    // Create runner for this hook
+    runner := cchooks.NewRunner()
+
+    // Add event handlers
+    runner.OnPreToolUse(h.handlePreToolUse)
+    runner.OnPostToolUse(h.handlePostToolUse)
+
+    // Execute
+    return runner.Run()
+}
+```
 
 ### Event Context
 
@@ -400,6 +482,26 @@ For detailed workflow documentation, see [Beads Workflow](development/beads-work
 
 **Important**: Do NOT create backlog.md or similar files. Use beads for all issue tracking.
 
+## Future Considerations
+
+If coordinated multi-hook sequencing is needed later:
+
+- Prefer explicit, user-configured pipeline specification
+- Provide opt-in composition rather than implicit aggregation
+- Consider metrics and timeout instrumentation
+- Maintain the current security and reliability guarantees
+
+## Architecture Evolution
+
+The current architecture is simpler and more secure than previous versions:
+
+- **Removed**: Complex pipeline aggregation logic
+- **Simplified**: Direct hook execution model
+- **Improved**: Better security and reliability
+- **Maintained**: All existing CLI commands and functionality
+
+No migration steps are required for users upgrading from previous versions.
+
 ## Resources
 
 - [Go Documentation](https://golang.org/doc/)
@@ -407,3 +509,4 @@ For detailed workflow documentation, see [Beads Workflow](development/beads-work
 - [Claude Code Hooks](https://docs.anthropic.com/en/docs/claude-code/hooks)
 - [Beads Workflow](development/beads-workflow.md) - Issue tracking
 - [Project Issues (beads)](.beads/) - Local issue database
+- [Architecture Documentation](architecture/) - Design documentation

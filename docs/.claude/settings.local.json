@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(/Users/nklauer/dev/go/blues-traveler/internal/hooks/**)"
-    ],
-    "deny": [],
-    "ask": []
-  }
-}

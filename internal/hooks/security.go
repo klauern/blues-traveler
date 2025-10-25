@@ -33,6 +33,7 @@ func (h *SecurityHook) Run() error {
 	return nil
 }
 
+// preToolUseHandler handles pre-tool-use events and blocks dangerous commands
 func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	// Log detailed event data if logging is enabled
 	if h.Context().LoggingEnabled {
@@ -205,10 +206,11 @@ func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
 		return false, ""
 	}
 
-	// Dangerous root/system targets
-	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/Volumes"}
+	// Dangerous root/system targets (all lowercase for case-insensitive comparison)
+	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
 	for _, tgt := range targets {
-		lt := strings.ToLower(tgt)
+		// Strip surrounding quotes before comparison
+		lt := strings.Trim(strings.ToLower(tgt), "\"'")
 		if lt == "/" {
 			return true, "blocked rm: targets filesystem root"
 		}
@@ -274,7 +276,8 @@ func (h *SecurityHook) detectRecursiveOwnershipOrPerm(tokens []string) (bool, st
 		if strings.HasPrefix(t, "-") {
 			continue
 		}
-		lt := strings.ToLower(t)
+		// Strip surrounding quotes before comparison
+		lt := strings.Trim(strings.ToLower(t), "\"'")
 		if lt == "/" || strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/library") {
 			return true, "blocked recursive " + tokens[0] + " on critical path " + t
 		}
@@ -290,14 +293,38 @@ func (h *SecurityHook) detectPotentialExfil(tokens []string, cmdLower string) (b
 
 	switch tokens[0] {
 	case "scp", "rsync":
-		// broad patterns originating at root
-		if strings.Contains(cmdLower, " / ") || strings.Contains(cmdLower, " /etc") || strings.Contains(cmdLower, " /var") {
-			return true, "blocked potential mass file transfer (" + tokens[0] + ") from system paths"
+		// Check for system paths in arguments (token-based to avoid false positives)
+		for _, t := range tokens[1:] {
+			// Skip flags
+			if strings.HasPrefix(t, "-") {
+				continue
+			}
+			// Strip surrounding quotes before comparison
+			lt := strings.Trim(strings.ToLower(t), "\"'")
+			// Check if argument is a system path
+			if lt == "/" || strings.HasPrefix(lt, "/etc") || strings.HasPrefix(lt, "/var") ||
+				strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/usr") {
+				return true, "blocked potential mass file transfer (" + tokens[0] + ") from system paths"
+			}
 		}
 	case "curl":
-		// simplistic heuristic: uploading from system path via -T
-		if strings.Contains(cmdLower, "-t /etc") || strings.Contains(cmdLower, "-t /var") {
-			return true, "blocked curl upload of system files"
+		// Check for -t flag followed by system paths (lowercase because tokens are lowercased)
+		for i, t := range tokens {
+			if t == "-t" || strings.HasPrefix(t, "-t") {
+				// Check next token or remainder of current token
+				var uploadPath string
+				if t == "-t" && i+1 < len(tokens) {
+					// Strip surrounding quotes from the path
+					uploadPath = strings.Trim(strings.ToLower(tokens[i+1]), "\"' ")
+				} else if len(t) > 2 {
+					// Strip surrounding quotes from the path
+					uploadPath = strings.Trim(strings.ToLower(t[2:]), "\"' ")
+				}
+				if strings.HasPrefix(uploadPath, "/etc") || strings.HasPrefix(uploadPath, "/var") ||
+					strings.HasPrefix(uploadPath, "/system") {
+					return true, "blocked curl upload of system files"
+				}
+			}
 		}
 	}
 	return false, ""

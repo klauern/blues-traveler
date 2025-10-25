@@ -23,13 +23,13 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	xdgTempDir, err := os.MkdirTemp("", "xdg-enhanced-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	// Create test project
 	project := filepath.Join(tempDir, "test-project")
@@ -151,13 +151,13 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	legacyTempDir, err := os.MkdirTemp("", "legacy-global-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create legacy temp dir: %v", err)
 	}
-	defer os.RemoveAll(legacyTempDir)
+	defer func() { _ = os.RemoveAll(legacyTempDir) }()
 
 	// Test LoadXDGOnly strategy
 	loader := NewEnhancedConfigLoader(LoadXDGOnly)
@@ -196,13 +196,13 @@ func TestSaveConfigWithXDG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	tempDir, err := os.MkdirTemp("", "save-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -268,13 +268,13 @@ func TestGetConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	tempDir, err := os.MkdirTemp("", "path-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	project := filepath.Join(tempDir, "test-project")
 
@@ -340,13 +340,13 @@ func TestIsProjectRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	defer func() { _ = os.RemoveAll(xdgTempDir) }()
 
 	tempDir, err := os.MkdirTemp("", "registered-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}

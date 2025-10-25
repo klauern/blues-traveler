@@ -15,8 +15,12 @@ import (
 
 var (
 	// Cache command availability to avoid repeated PATH lookups
-	gofumptOnce      sync.Once
-	gofumptAvailable bool
+	gofumptOnce       sync.Once
+	gofumptAvailable  bool
+	prettierOnce      sync.Once
+	prettierAvailable bool
+	uvxOnce           sync.Once
+	uvxAvailable      bool
 )
 
 // checkGofumptAvailable checks if gofumpt is available in PATH (cached)
@@ -26,6 +30,39 @@ func checkGofumptAvailable() bool {
 		gofumptAvailable = err == nil
 	})
 	return gofumptAvailable
+}
+
+// checkPrettierAvailable checks if prettier is available in PATH (cached)
+func checkPrettierAvailable() bool {
+	prettierOnce.Do(func() {
+		_, err := exec.LookPath("prettier")
+		prettierAvailable = err == nil
+	})
+	return prettierAvailable
+}
+
+// SetAvailabilityForTesting forces availability flags for testing
+func SetAvailabilityForTesting(gofumpt, prettier, uvx bool) {
+	gofumptOnce.Do(func() {})
+	prettierOnce.Do(func() {})
+	uvxOnce.Do(func() {})
+	gofumptAvailable = gofumpt
+	prettierAvailable = prettier
+	uvxAvailable = uvx
+}
+
+// GetAvailabilityForTesting returns current availability flags for testing
+func GetAvailabilityForTesting() (gofumpt, prettier, uvx bool) {
+	return gofumptAvailable, prettierAvailable, uvxAvailable
+}
+
+// checkUvxAvailable checks if uvx is available in PATH (cached)
+func checkUvxAvailable() bool {
+	uvxOnce.Do(func() {
+		_, err := exec.LookPath("uvx")
+		uvxAvailable = err == nil
+	})
+	return uvxAvailable
 }
 
 // FormatHook implements code formatting logic
@@ -51,6 +88,7 @@ func (h *FormatHook) Run() error {
 	return nil
 }
 
+// postToolUseHandler handles post-tool-use events and formats edited files
 func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Format code files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
@@ -59,12 +97,20 @@ func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.Post
 		switch event.ToolName {
 		case "Edit":
 			edit, err := event.InputAsEdit()
-			if err == nil {
+			if err != nil {
+				if h.Context().LoggingEnabled {
+					log.Printf("Failed to parse Edit input: %v", err)
+				}
+			} else {
 				filePath = edit.FilePath
 			}
 		case "Write":
 			write, err := event.InputAsWrite()
-			if err == nil {
+			if err != nil {
+				if h.Context().LoggingEnabled {
+					log.Printf("Failed to parse Write input: %v", err)
+				}
+			} else {
 				filePath = write.FilePath
 			}
 		}
@@ -90,22 +136,42 @@ func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.Post
 	return cchooks.Allow()
 }
 
+// formatFile formats a file based on its extension
 func (h *FormatHook) formatFile(filePath string) error {
-	ext := strings.ToLower(filepath.Ext(filePath))
+	// Validate file path
+	if filePath == "" {
+		return fmt.Errorf("empty file path")
+	}
+
+	// Check if file exists and is accessible
+	if _, err := h.Context().FileSystem.Stat(filePath); err != nil {
+		return fmt.Errorf("file not accessible: %w", err)
+	}
+
+	// Clean the path to prevent path traversal
+	cleanPath := filepath.Clean(filePath)
+	// Only reject paths that escape the workspace (start with ".." or "../")
+	if cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("invalid file path: path traversal attempt detected")
+	}
+
+	// Use cleanPath for all subsequent operations
+	ext := strings.ToLower(filepath.Ext(cleanPath))
 
 	switch ext {
 	case ".go":
-		return h.formatGoFile(filePath)
+		return h.formatGoFile(cleanPath)
 	case ".js", ".ts", ".jsx", ".tsx":
-		return h.formatJSFile(filePath)
+		return h.formatJSFile(cleanPath)
 	case ".py":
-		return h.formatPythonFile(filePath)
+		return h.formatPythonFile(cleanPath)
 	case ".yml", ".yaml":
-		return h.formatYAMLFile(filePath)
+		return h.formatYAMLFile(cleanPath)
 	}
 	return nil
 }
 
+// formatGoFile formats a Go file using gofumpt or gofmt
 func (h *FormatHook) formatGoFile(filePath string) error {
 	var output []byte
 	var err error
@@ -128,17 +194,33 @@ func (h *FormatHook) formatGoFile(filePath string) error {
 	return nil
 }
 
+// formatJSFile formats a JavaScript/TypeScript file using prettier
 func (h *FormatHook) formatJSFile(filePath string) error {
+	return h.formatWithPrettier(filePath, "JS/TS")
+}
+
+// formatWithPrettier formats a file using prettier (shared by JS and YAML)
+func (h *FormatHook) formatWithPrettier(filePath string, fileType string) error {
+	if !checkPrettierAvailable() {
+		return fmt.Errorf("prettier not found in PATH (required for %s formatting)", fileType)
+	}
+
 	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
 	if err != nil {
 		log.Printf("prettier error on %s: %s", filePath, output)
 		return fmt.Errorf("prettier failed: %s", output)
 	}
-	fmt.Printf("Formatted JS/TS file: %s\n", filePath)
+	fmt.Printf("Formatted %s file: %s\n", fileType, filePath)
 	return nil
 }
 
+// formatPythonFile formats a Python file using ruff
 func (h *FormatHook) formatPythonFile(filePath string) error {
+	// Check if uvx is available (required for ruff)
+	if !checkUvxAvailable() {
+		return fmt.Errorf("uvx not found in PATH (required for ruff Python formatting)")
+	}
+
 	// Run ruff format first
 	output, err := h.Context().CommandExecutor.ExecuteCommand("uvx", "ruff", "format", filePath)
 	if err != nil {
@@ -157,12 +239,7 @@ func (h *FormatHook) formatPythonFile(filePath string) error {
 	return nil
 }
 
+// formatYAMLFile formats a YAML file using prettier
 func (h *FormatHook) formatYAMLFile(filePath string) error {
-	output, err := h.Context().CommandExecutor.ExecuteCommand("prettier", "--write", filePath)
-	if err != nil {
-		log.Printf("prettier error on %s: %s", filePath, output)
-		return fmt.Errorf("prettier failed: %s", output)
-	}
-	fmt.Printf("Formatted YAML file: %s\n", filePath)
-	return nil
+	return h.formatWithPrettier(filePath, "YAML")
 }

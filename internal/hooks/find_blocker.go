@@ -32,6 +32,7 @@ func (h *FindBlockerHook) Run() error {
 	return nil
 }
 
+// preToolUseHandler handles pre-tool-use events and blocks find commands
 func (h *FindBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	// Log detailed event data if logging is enabled
 	if h.Context().LoggingEnabled {
@@ -131,7 +132,12 @@ func (h *FindBlockerHook) containsFindInPipeline(command string) bool {
 }
 
 // isInQuotedString performs a simple check if the pattern is within quotes
-// This is a basic implementation - a full parser would be more accurate
+//
+// Limitations:
+// - Does not handle escaped quotes (e.g., \' or \")
+// - May produce false positives/negatives with mixed quoting styles (e.g., 'don't')
+// - Does not account for nested quotes or quotes in comments/heredocs
+// - A full shell parser would be more accurate, but this simple approach works for common cases
 func (h *FindBlockerHook) isInQuotedString(command, pattern string) bool {
 	index := strings.Index(command, pattern)
 	if index == -1 {
@@ -148,13 +154,19 @@ func (h *FindBlockerHook) isInQuotedString(command, pattern string) bool {
 }
 
 // generateFdSuggestion creates helpful fd command suggestions based on common find patterns
+//
+// Pattern matching order is important:
+// - More specific patterns (e.g., -type f with -name) should be checked first
+// - Generic patterns (e.g., just -name) should be checked later
+// - This ensures users get the most relevant suggestion for their specific command
+// - Early returns prevent less specific suggestions from overriding better ones
 func (h *FindBlockerHook) generateFdSuggestion(findCommand string) string {
 	cmd := strings.TrimSpace(findCommand)
 
 	baseMessage := fmt.Sprintf("Command blocked: 'find' usage detected. Use 'fd' instead for better performance and usability.\n\nOriginal: %s", cmd)
 
 	// Try to provide specific suggestions based on the command
-	// Check for more specific patterns first (order matters)
+	// Check for more specific patterns first (more specific → more generic)
 	if strings.Contains(cmd, "-type f") {
 		return fmt.Sprintf("%s\n\nSuggestion: Use 'fd --type f pattern' for files only", baseMessage)
 	}

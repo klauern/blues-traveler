@@ -1,0 +1,145 @@
+---
+description: Development workflow and best practices for contributing to blues-traveler
+---
+# Development Workflow
+
+See [docs/developer_guide.md](mdc:docs/developer_guide.md) and [docs/code_review_2024.md](mdc:docs/code_review_2024.md) for detailed guidance.
+
+## Quick Start for Development
+
+```bash
+# Build the binary
+task build
+
+# Run all checks (format, lint, test)
+task check
+
+# Development workflow (format, lint, test, build)
+task dev
+
+# Run tests with coverage
+task test-coverage
+```
+
+## Task Commands
+
+See [Taskfile.yml](mdc:Taskfile.yml) for all available tasks:
+
+```bash
+task format          # Format Go code with gofumpt
+task lint            # Run golangci-lint (or go vet fallback)
+task test            # Run all tests
+task test-coverage   # Run tests with coverage report
+task build           # Build the binary
+task dev             # Complete dev workflow
+task check           # Run all checks
+```
+
+## Code Formatting
+
+Preferred formatter: `gofumpt`
+
+```bash
+# Format code
+task format
+
+# Or manually
+gofumpt -l -w .
+```
+
+## Adding a New Hook
+
+1. **Create implementation** in `internal/hooks/myhook.go`
+2. **Register hook** in [internal/hooks/init.go](mdc:internal/hooks/init.go)
+3. **Add tests** in `internal/hooks/myhook_test.go`
+4. **Update documentation**:
+   - [README.md](mdc:README.md) - Add to features list
+   - [AGENTS.md](mdc:AGENTS.md) - Add to built-in hooks table
+   - [docs/index.md](mdc:docs/index.md) - Update key hooks reference
+
+## Adding a New CLI Command
+
+1. **Create command** in `internal/cmd/mycommand.go`
+2. **Use urfave/cli v3** patterns (see [.cursor/rules/cli-commands.mdc](mdc:.cursor/rules/cli-commands.mdc))
+3. **Register command** in [main.go](mdc:main.go)
+4. **Add tests** in `internal/cmd/mycommand_test.go`
+5. **Update help text** and documentation
+
+## Commit Guidelines
+
+Use conventional commits: <https://www.conventionalcommits.org/en/v1.0.0/>
+
+```bash
+feat: add new hook for X
+fix: resolve issue with Y
+docs: update README with Z
+test: add tests for W
+refactor: simplify V
+chore: update dependencies
+```
+
+## Code Review Checklist
+
+- [ ] All tests pass (`task test`)
+- [ ] Code is formatted (`task format`)
+- [ ] Linter passes (`task lint`)
+- [ ] Documentation updated
+- [ ] Conventional commit message
+- [ ] No breaking changes (or clearly documented)
+- [ ] Backwards compatibility maintained
+
+## Key Implementation Notes
+
+### From Code Review 2024
+
+See [docs/code_review_2024.md](mdc:docs/code_review_2024.md):
+
+#### ✅ Implemented Fixes
+
+1. Settings precedence logic (project overrides global)
+2. CLI text consistency using `constants.BinaryName`
+3. Debug log security (0600 permissions, `.claude/hooks/debug.log`)
+4. Security hook pattern improvements
+5. Non-interactive uninstall with `--yes` flag
+
+#### 🔄 Recommended Improvements
+
+1. Log rotation integration (lumberjack configured but not wired)
+2. External tool detection (prettier, uvx, ruff, fd)
+3. Settings precedence tests
+4. Diagnose command for tool availability
+
+## Testing Strategy
+
+1. **Unit tests**: Test individual components
+2. **Integration tests**: Test command workflows
+3. **Table-driven tests**: Test multiple scenarios
+4. **Mock external dependencies**: Use mocks from [internal/core/mocks.go](mdc:internal/core/mocks.go)
+
+## Documentation Standards
+
+When updating docs:
+
+- Keep [AGENTS.md](mdc:AGENTS.md) in sync with [CLAUDE.md](mdc:CLAUDE.md)
+- Update [docs/index.md](mdc:docs/index.md) for navigation
+- Add examples to [docs/quick_start.md](mdc:docs/quick_start.md) for user features
+- Technical details go in [docs/developer_guide.md](mdc:docs/developer_guide.md)
+- Architecture decisions in [docs/unified_pipeline_design.md](mdc:docs/unified_pipeline_design.md)
+
+## Dependencies
+
+Key dependencies (see [go.mod](mdc:go.mod)):
+
+- `github.com/brads3290/cchooks` - Claude Code hooks library
+- `github.com/urfave/cli/v3` - CLI framework
+- `gopkg.in/yaml.v3` - YAML parsing
+- `github.com/natefinch/lumberjack` - Log rotation
+
+Go version: 1.25.1+
+
+## Resources
+
+- [Go Documentation](https://golang.org/doc/)
+- [urfave/cli v3](https://github.com/urfave/cli)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [Project Issues](https://github.com/klauern/blues-traveler/issues)

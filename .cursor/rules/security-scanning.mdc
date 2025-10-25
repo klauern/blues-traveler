@@ -1,0 +1,96 @@
+---
+description: Guidelines for security scanning, gosec warnings, and suppression directives
+---
+
+# Security Scanning and gosec
+
+This project uses `gosec` for security scanning in CI/CD. Understanding when and how to suppress warnings is critical.
+
+## gosec in CI/CD
+
+See [.github/workflows/security.yml](mdc:.github/workflows/security.yml) for the security scan configuration:
+
+```yaml
+- name: Run Gosec Security Scanner
+  uses: securego/gosec@master
+  with:
+    args: -severity medium -exclude=G204 ./...
+```
+
+### Current Exclusions
+
+- **G204**: Command injection - Excluded because we intentionally execute shell commands (it's a hook runner)
+
+## When to Suppress Warnings
+
+Use `#nosec` directives **ONLY** when:
+
+1. **False Positive**: The warning doesn't apply to your specific use case
+2. **Controlled Input**: The file path, command, or data comes from trusted sources
+3. **Validated Path**: Paths are constructed from known safe sources (e.g., `UserHomeDir()`)
+4. **Required Functionality**: The operation is essential and already secured
+
+## How to Suppress Warnings
+
+### Format
+
+```go
+// #nosec G304 -- justification explaining why this is safe
+data, err := os.ReadFile(configPath)
+```
+
+### Best Practices
+
+1. **Always include justification**: Explain WHY the warning is a false positive
+2. **Specify the rule**: Use `G304` instead of just `#nosec`
+3. **Be specific**: Reference the actual security controls in place
+
+### Example: Safe File Read
+
+```go
+// #nosec G304 -- configPath is constructed from UserHomeDir() and validated by ConfigPath()
+data, err := os.ReadFile(configPath)
+```
+
+### Example: Required Command Execution
+
+```go
+// #nosec G204 -- command is from trusted hook registry, not user input
+cmd := exec.Command("gofumpt", "-w", filePath)
+```
+
+## Common gosec Rules
+
+| Rule | Description | When to Suppress |
+|------|-------------|------------------|
+| G101 | Hardcoded credentials | Never - fix the code |
+| G204 | Command injection | When command is from trusted source |
+| G304 | File path injection | When path is validated/controlled |
+| G301 | Directory permissions | When 0755 is required (executables) |
+| G306 | File permissions | When 0644/0600 is appropriate |
+
+## Security-Critical Areas
+
+**NEVER suppress these without careful review:**
+
+1. Password/credential handling
+2. User input processing
+3. External data parsing
+4. Network requests
+5. File uploads
+
+## Verification
+
+Before suppressing a warning:
+
+1. Review the actual code path
+2. Verify input validation exists
+3. Check if path sanitization is needed
+4. Consider if there's a safer alternative
+5. Document the security controls in the comment
+
+## References
+
+- [gosec Rules](https://github.com/securego/gosec#available-rules)
+- [CWE Database](https://cwe.mitre.org/)
+- [internal/platform/cursor/platform.go](mdc:internal/platform/cursor/platform.go) - Example of proper suppression

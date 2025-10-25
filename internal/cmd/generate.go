@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// NewGenerateCmd creates the generate command for code generation
 func NewGenerateCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "generate",

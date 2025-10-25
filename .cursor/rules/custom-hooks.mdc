@@ -1,0 +1,135 @@
+# Custom Hooks System
+
+Custom hooks enable project-specific automation without modifying blues-traveler code.
+
+## Configuration Format
+
+### YAML Structure
+```yaml
+group-name:
+  EventName:
+    jobs:
+      - name: job-name
+        run: command or script
+        only: condition expression
+        skip: skip condition
+        glob: ["*.ext"]
+        timeout: 30
+        workdir: /path
+        env:
+          KEY: value
+```
+
+### Job Fields
+
+**Required:**
+- `name` - Unique identifier
+- `run` - Command/script to execute
+
+**Optional:**
+- `only` - Run condition (expression)
+- `skip` - Skip condition (expression)
+- `glob` - File patterns filter
+- `timeout` - Seconds (default: 30)
+- `workdir` - Working directory
+- `env` - Additional environment
+
+## Expression Language
+
+### Operators
+- `==`, `!=` - Equality
+- `&&`, `||`, `!` - Logical
+- `regex` - Regex match: `${VAR} regex "pattern"`
+- `matches` - Glob match: `${VAR} matches "*.go"`
+
+### Examples
+```yaml
+only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+skip: ${FILES_CHANGED} regex ".*_test\\.go$"
+only: ${TOOL_FILE} matches "*.py" && ${EVENT_NAME} == "PostToolUse"
+```
+
+## Available Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `EVENT_NAME` | Current event | `PreToolUse` |
+| `TOOL_NAME` | Tool being used | `Edit`, `Bash` |
+| `TOOL_FILE` | File being edited | `/path/to/file.go` |
+| `TOOL_OUTPUT_FILE` | Same as TOOL_FILE | `/path/to/file.go` |
+| `FILES_CHANGED` | Changed files (space-separated) | `main.go test.go` |
+| `TOOL_ARGS` | Raw tool arguments | Command string |
+| `USER_PROMPT` | User's prompt | User input text |
+| `PROJECT_ROOT` | Project directory | `/home/user/project` |
+
+## CLI Commands
+
+```bash
+# Validate configuration
+blues-traveler hooks custom validate
+
+# Sync all custom hooks
+blues-traveler hooks custom sync
+
+# Sync specific group
+blues-traveler hooks custom sync my-project
+
+# Install custom hook group
+blues-traveler hooks custom install my-project --event PostToolUse
+
+# List available groups
+blues-traveler hooks custom list
+
+# Show group configuration
+blues-traveler hooks custom show my-project
+```
+
+## Common Patterns
+
+### Security Check
+```yaml
+security:
+  PreToolUse:
+    jobs:
+      - name: block-dangerous
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|curl.*sh)"; then
+            echo "Dangerous command blocked"
+            exit 1
+          fi
+        only: ${TOOL_NAME} == "Bash"
+```
+
+### Auto-Format
+```yaml
+formatters:
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofumpt -w ${TOOL_FILE}
+        glob: ["*.go"]
+      - name: format-python
+        run: ruff format ${TOOL_FILE}
+        glob: ["*.py"]
+```
+
+### Test Runner
+```yaml
+testing:
+  PostToolUse:
+    jobs:
+      - name: test-affected
+        run: go test ./...
+        only: ${FILES_CHANGED} regex "\\.go$"
+        skip: ${FILES_CHANGED} regex "_test\\.go$"
+        timeout: 120
+```
+
+## Implementation
+
+- Config parsing: [internal/config/hooks_config.go](mdc:internal/config/hooks_config.go)
+- Runtime execution: [internal/hooks/config_hook.go](mdc:internal/hooks/config_hook.go)
+- Expression evaluation: [internal/core/expressions.go](mdc:internal/core/expressions.go)
+
+5. **Test with `--dry-run`** before syncing
+6. **Use project-specific configs** rather than global when possible

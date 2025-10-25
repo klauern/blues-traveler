@@ -1,0 +1,61 @@
+---
+description: Documentation standards and requirements for blues-traveler code
+---
+# Documentation Standards for blues-traveler
+
+## Go Documentation Requirements
+
+### Exported Types and Functions
+- **All exported types, functions, methods, and constants MUST have documentation comments**
+- Documentation comments must start with the name of the item being documented
+- Maintain at least 80% docstring coverage (enforced by CodeRabbit)
+
+### Documentation Format
+```go
+// TypeName represents what this type does
+type TypeName struct {
+    // Field documentation if exported
+    Field string
+}
+
+// FunctionName does something specific and returns something
+func FunctionName(param string) error {
+    // implementation
+}
+
+// MethodName implements InterfaceName.MethodName for specific purpose
+func (t *TypeName) MethodName() error {
+    // implementation
+}
+```
+
+### Package Documentation
+- Each package should have a package-level comment in a `doc.go` file or at the top of the main file
+- Package comments should describe the package's purpose and main types
+
+### Interface Documentation
+- Document what the interface represents, not just what methods it has
+- Document each method in the interface
+- When implementing interface methods, reference the interface: `// MethodName implements Interface.MethodName`
+
+### Constants and Variables
+```go
+const (
+    // ConstantName describes what this constant represents
+    ConstantName = "value"
+)
+```
+
+### Test Documentation
+- Test functions don't require documentation comments unless they're testing complex scenarios
+- Use descriptive test names: `TestFunctionName_ScenarioDescription`
+
+## Command Documentation
+- CLI commands must have clear `Usage` and `Description` fields
+- Flag descriptions should explain the purpose and valid values
+- Use `ArgsUsage` to document positional arguments
+
+## Markdown Documentation
+- Keep README.md updated with new features
+- Update AGENTS.md and CLAUDE.md in sync (they should match)
+- Use code blocks with language hints for examples

@@ -34,22 +34,36 @@ func (h *VetHook) Run() error {
 	return nil
 }
 
+// extractFilePath extracts the file path from Edit or Write events
+func (h *VetHook) extractFilePath(event *cchooks.PostToolUseEvent) (string, error) {
+	switch event.ToolName {
+	case "Edit":
+		edit, err := event.InputAsEdit()
+		if err != nil {
+			return "", err
+		}
+		return edit.FilePath, nil
+	case "Write":
+		write, err := event.InputAsWrite()
+		if err != nil {
+			return "", err
+		}
+		return write.FilePath, nil
+	default:
+		return "", fmt.Errorf("unsupported tool: %s", event.ToolName)
+	}
+}
+
+// postToolUseHandler handles post-tool-use events and runs type checking on modified files
 func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Type check Python files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
-		var filePath string
-
-		switch event.ToolName {
-		case "Edit":
-			edit, err := event.InputAsEdit()
-			if err == nil {
-				filePath = edit.FilePath
+		filePath, err := h.extractFilePath(event)
+		if err != nil {
+			if h.Context().LoggingEnabled {
+				h.LogHookEvent("file_path_extraction_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
 			}
-		case "Write":
-			write, err := event.InputAsWrite()
-			if err == nil {
-				filePath = write.FilePath
-			}
+			return cchooks.Allow()
 		}
 
 		if filePath != "" && h.isPythonFile(filePath) {
@@ -73,11 +87,13 @@ func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToo
 	return cchooks.Allow()
 }
 
+// isPythonFile checks if a file is a Python file based on its extension
 func (h *VetHook) isPythonFile(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	return ext == ".py"
 }
 
+// typeCheckFile runs type checking on a Python file using ty
 func (h *VetHook) typeCheckFile(filePath string) error {
 	output, err := h.Context().CommandExecutor.ExecuteCommand("uvx", "ty", "check", filePath)
 	if err != nil {
