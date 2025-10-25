@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -40,6 +39,16 @@ func checkPrettierAvailable() bool {
 		prettierAvailable = err == nil
 	})
 	return prettierAvailable
+}
+
+// SetAvailabilityForTesting forces availability flags for testing
+func SetAvailabilityForTesting(gofumpt, prettier, uvx bool) {
+	gofumptOnce.Do(func() {})
+	prettierOnce.Do(func() {})
+	uvxOnce.Do(func() {})
+	gofumptAvailable = gofumpt
+	prettierAvailable = prettier
+	uvxAvailable = uvx
 }
 
 // checkUvxAvailable checks if uvx is available in PATH (cached)
@@ -130,7 +139,7 @@ func (h *FormatHook) formatFile(filePath string) error {
 	}
 
 	// Check if file exists and is accessible
-	if _, err := os.Stat(filePath); err != nil {
+	if _, err := h.Context().FileSystem.Stat(filePath); err != nil {
 		return fmt.Errorf("file not accessible: %w", err)
 	}
 

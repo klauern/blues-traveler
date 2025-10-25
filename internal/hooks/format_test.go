@@ -32,9 +32,15 @@ func TestFormatHook(t *testing.T) {
 }
 
 func TestFormatHookGoFile(t *testing.T) {
+	// Set availability for testing
+	SetAvailabilityForTesting(true, false, false)
+
 	mockCmd := core.NewMockCommandExecutor()
+	mockFS := core.NewMockFileSystem()
+	mockFS.Files["test.go"] = []byte("package main\n")
+
 	ctx := &core.HookContext{
-		FileSystem:      core.NewMockFileSystem(),
+		FileSystem:      mockFS,
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
@@ -55,9 +61,14 @@ func TestFormatHookGoFile(t *testing.T) {
 }
 
 func TestFormatHookJavaScriptFile(t *testing.T) {
+	// Set availability for testing
+	SetAvailabilityForTesting(false, true, false)
+
 	mockCmd := core.NewMockCommandExecutor()
+	mockFS := core.NewMockFileSystem()
+
 	ctx := &core.HookContext{
-		FileSystem:      core.NewMockFileSystem(),
+		FileSystem:      mockFS,
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
@@ -70,6 +81,9 @@ func TestFormatHookJavaScriptFile(t *testing.T) {
 
 	for _, file := range files {
 		t.Run(file, func(t *testing.T) {
+			// Add file to mock filesystem
+			mockFS.Files[file] = []byte("const x = 1;\n")
+
 			_ = hook.formatFile(file)
 
 			// Check that prettier was called
@@ -81,9 +95,15 @@ func TestFormatHookJavaScriptFile(t *testing.T) {
 }
 
 func TestFormatHookPythonFile(t *testing.T) {
+	// Set availability for testing
+	SetAvailabilityForTesting(false, false, true)
+
 	mockCmd := core.NewMockCommandExecutor()
+	mockFS := core.NewMockFileSystem()
+	mockFS.Files["test.py"] = []byte("def main():\n    pass\n")
+
 	ctx := &core.HookContext{
-		FileSystem:      core.NewMockFileSystem(),
+		FileSystem:      mockFS,
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
@@ -101,9 +121,14 @@ func TestFormatHookPythonFile(t *testing.T) {
 }
 
 func TestFormatHookYAMLFile(t *testing.T) {
+	// Set availability for testing
+	SetAvailabilityForTesting(false, true, false)
+
 	mockCmd := core.NewMockCommandExecutor()
+	mockFS := core.NewMockFileSystem()
+
 	ctx := &core.HookContext{
-		FileSystem:      core.NewMockFileSystem(),
+		FileSystem:      mockFS,
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
@@ -116,6 +141,9 @@ func TestFormatHookYAMLFile(t *testing.T) {
 
 	for _, file := range files {
 		t.Run(file, func(t *testing.T) {
+			// Add file to mock filesystem
+			mockFS.Files[file] = []byte("key: value\n")
+
 			_ = hook.formatFile(file)
 
 			// Check that prettier was called
