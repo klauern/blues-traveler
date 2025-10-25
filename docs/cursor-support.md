@@ -7,6 +7,7 @@
 
 - **blues-traveler**: Must be installed and available in your PATH
 - **Cursor IDE**: Version that supports hooks (usually the latest version)
+- **jq**: Required for JSON processing in Cursor hook scripts (install via `brew install jq` or your package manager)
 
 ## Overview
 

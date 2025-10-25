@@ -299,7 +299,8 @@ func (h *SecurityHook) detectPotentialExfil(tokens []string, cmdLower string) (b
 			if strings.HasPrefix(t, "-") {
 				continue
 			}
-			lt := strings.ToLower(t)
+			// Strip surrounding quotes before comparison
+			lt := strings.Trim(strings.ToLower(t), "\"'")
 			// Check if argument is a system path
 			if lt == "/" || strings.HasPrefix(lt, "/etc") || strings.HasPrefix(lt, "/var") ||
 				strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/usr") {
@@ -307,15 +308,17 @@ func (h *SecurityHook) detectPotentialExfil(tokens []string, cmdLower string) (b
 			}
 		}
 	case "curl":
-		// Check for -T flag followed by system paths
+		// Check for -t flag followed by system paths (lowercase because tokens are lowercased)
 		for i, t := range tokens {
-			if t == "-T" || strings.HasPrefix(t, "-T") {
+			if t == "-t" || strings.HasPrefix(t, "-t") {
 				// Check next token or remainder of current token
 				var uploadPath string
-				if t == "-T" && i+1 < len(tokens) {
-					uploadPath = strings.ToLower(tokens[i+1])
+				if t == "-t" && i+1 < len(tokens) {
+					// Strip surrounding quotes from the path
+					uploadPath = strings.Trim(strings.ToLower(tokens[i+1]), "\"' ")
 				} else if len(t) > 2 {
-					uploadPath = strings.ToLower(t[2:])
+					// Strip surrounding quotes from the path
+					uploadPath = strings.Trim(strings.ToLower(t[2:]), "\"' ")
 				}
 				if strings.HasPrefix(uploadPath, "/etc") || strings.HasPrefix(uploadPath, "/var") ||
 					strings.HasPrefix(uploadPath, "/system") {

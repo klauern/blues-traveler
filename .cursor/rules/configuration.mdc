@@ -73,7 +73,7 @@ Custom hooks have access to:
 - `EVENT_NAME` - Current event type
 - `TOOL_NAME` - Tool being used (Edit, Write, Bash, etc.)
 - `TOOL_OUTPUT_FILE` - File path for Edit/Write operations
-- `FILES_CHANGED` - Comma-separated changed files
+- `FILES_CHANGED` - Space-separated changed files
 - `PROJECT_ROOT` - Project root directory
 - `TOOL_ARGS` - Raw tool arguments
 

@@ -51,6 +51,11 @@ func SetAvailabilityForTesting(gofumpt, prettier, uvx bool) {
 	uvxAvailable = uvx
 }
 
+// GetAvailabilityForTesting returns current availability flags for testing
+func GetAvailabilityForTesting() (gofumpt, prettier, uvx bool) {
+	return gofumptAvailable, prettierAvailable, uvxAvailable
+}
+
 // checkUvxAvailable checks if uvx is available in PATH (cached)
 func checkUvxAvailable() bool {
 	uvxOnce.Do(func() {
@@ -145,21 +150,23 @@ func (h *FormatHook) formatFile(filePath string) error {
 
 	// Clean the path to prevent path traversal
 	cleanPath := filepath.Clean(filePath)
-	if cleanPath != filePath {
-		return fmt.Errorf("invalid file path: possible path traversal attempt")
+	// Only reject paths that escape the workspace (start with ".." or "../")
+	if cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("invalid file path: path traversal attempt detected")
 	}
 
-	ext := strings.ToLower(filepath.Ext(filePath))
+	// Use cleanPath for all subsequent operations
+	ext := strings.ToLower(filepath.Ext(cleanPath))
 
 	switch ext {
 	case ".go":
-		return h.formatGoFile(filePath)
+		return h.formatGoFile(cleanPath)
 	case ".js", ".ts", ".jsx", ".tsx":
-		return h.formatJSFile(filePath)
+		return h.formatJSFile(cleanPath)
 	case ".py":
-		return h.formatPythonFile(filePath)
+		return h.formatPythonFile(cleanPath)
 	case ".yml", ".yaml":
-		return h.formatYAMLFile(filePath)
+		return h.formatYAMLFile(cleanPath)
 	}
 	return nil
 }

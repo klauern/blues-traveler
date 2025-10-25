@@ -32,6 +32,10 @@ func TestFormatHook(t *testing.T) {
 }
 
 func TestFormatHookGoFile(t *testing.T) {
+	// Capture and restore availability state for test isolation
+	gofumpt, prettier, uvx := GetAvailabilityForTesting()
+	defer SetAvailabilityForTesting(gofumpt, prettier, uvx)
+
 	// Set availability for testing
 	SetAvailabilityForTesting(true, false, false)
 
@@ -61,6 +65,10 @@ func TestFormatHookGoFile(t *testing.T) {
 }
 
 func TestFormatHookJavaScriptFile(t *testing.T) {
+	// Capture and restore availability state for test isolation
+	gofumpt, prettier, uvx := GetAvailabilityForTesting()
+	defer SetAvailabilityForTesting(gofumpt, prettier, uvx)
+
 	// Set availability for testing
 	SetAvailabilityForTesting(false, true, false)
 
@@ -95,6 +103,10 @@ func TestFormatHookJavaScriptFile(t *testing.T) {
 }
 
 func TestFormatHookPythonFile(t *testing.T) {
+	// Capture and restore availability state for test isolation
+	gofumpt, prettier, uvx := GetAvailabilityForTesting()
+	defer SetAvailabilityForTesting(gofumpt, prettier, uvx)
+
 	// Set availability for testing
 	SetAvailabilityForTesting(false, false, true)
 
@@ -121,6 +133,10 @@ func TestFormatHookPythonFile(t *testing.T) {
 }
 
 func TestFormatHookYAMLFile(t *testing.T) {
+	// Capture and restore availability state for test isolation
+	gofumpt, prettier, uvx := GetAvailabilityForTesting()
+	defer SetAvailabilityForTesting(gofumpt, prettier, uvx)
+
 	// Set availability for testing
 	SetAvailabilityForTesting(false, true, false)
 
