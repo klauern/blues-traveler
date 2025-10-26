@@ -49,6 +49,8 @@ Note: Custom hooks can implement similar behavior using your own scripts. Prefer
 
 ## Development Commands
 
+**IMPORTANT**: Use Taskfile tasks for tests, building, formatting, etc.
+
 ### Build and Test
 
 ```bash

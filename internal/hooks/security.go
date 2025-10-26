@@ -114,7 +114,11 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 	// Run all security checks
 	if blocked, reason, checkType := h.runSecurityChecks(tokens, cmdLower); blocked {
 		h.logSecurityEvent("security_block", bash.Command, reason, checkType)
-		return cchooks.Block(reason)
+		// User-friendly message + technical details for agent
+		return core.BlockWithMessages(
+			"This command was blocked for security reasons.",
+			fmt.Sprintf("Blocked: %s (check_type: %s)", reason, checkType),
+		)
 	}
 
 	// Log approved commands if logging is enabled

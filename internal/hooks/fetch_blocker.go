@@ -128,12 +128,13 @@ func (h *FetchBlockerHook) checkAndBlockURL(url string, blockedPrefixes []Blocke
 		}, nil)
 	}
 
-	// Build block message
-	message := fmt.Sprintf("URL blocked: matches prefix '%s'", matchedPrefix)
+	// Build block messages
+	userMsg := "This URL requires authentication or an alternative access method."
+	agentMsg := fmt.Sprintf("URL blocked: matches prefix '%s'", matchedPrefix)
 	if suggestion != "" {
-		message += fmt.Sprintf(". %s", suggestion)
+		agentMsg += fmt.Sprintf(". %s", suggestion)
 	}
-	return cchooks.Block(message)
+	return core.BlockWithMessages(userMsg, agentMsg)
 }
 
 // loadBlockedPrefixes loads URL prefixes from the blocked URLs file

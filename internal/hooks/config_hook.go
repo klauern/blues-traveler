@@ -131,7 +131,10 @@ func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent
 	env := h.envProvider.GetEnvironment(string(core.PreToolUseEvent), c)
 
 	if err := h.executeIfShouldRun(env); err != nil {
-		return cchooks.Block(err.Error())
+		// User-friendly message + technical details for agent
+		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
+		agentMsg := err.Error()
+		return core.BlockWithMessages(userMsg, agentMsg)
 	}
 	return cchooks.Approve()
 }
@@ -141,7 +144,10 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 	env := h.envProvider.GetEnvironment(string(core.PostToolUseEvent), c)
 
 	if err := h.executeIfShouldRun(env); err != nil {
-		return cchooks.PostBlock(err.Error())
+		// User-friendly message + technical details for agent
+		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
+		agentMsg := err.Error()
+		return core.PostBlockWithMessages(userMsg, agentMsg)
 	}
 	return cchooks.Allow()
 }

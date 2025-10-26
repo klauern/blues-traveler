@@ -66,7 +66,10 @@ func (h *FormatHook) postToolUseHandler(_ context.Context, event *cchooks.PostTo
 	h.logFormatEvent(event.ToolName, filePath)
 
 	if err := h.formatFile(filePath); err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("Formatting failed for %s: %v", filePath, err))
+		// User-friendly message + technical details for agent
+		userMsg := fmt.Sprintf("Code formatting failed for %s", filepath.Base(filePath))
+		agentMsg := fmt.Sprintf("Formatting failed for %s: %v", filePath, err)
+		return core.PostBlockWithMessages(userMsg, agentMsg)
 	}
 
 	return cchooks.Allow()

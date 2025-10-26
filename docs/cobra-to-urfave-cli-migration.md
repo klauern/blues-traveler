@@ -201,7 +201,7 @@ func main() {
 ## Documentation Updates
 After migration, update:
 - README.md references to CLI framework
-- CLAUDE.md instruction about not referencing Cobra
+- AGENTS.md instruction about not referencing Cobra
 - Any developer documentation mentioning Cobra
 
 ## Migration Status: ✅ COMPLETED

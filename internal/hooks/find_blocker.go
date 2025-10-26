@@ -71,7 +71,11 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 				"suggestion": suggestion,
 			}, nil)
 		}
-		return cchooks.Block(suggestion)
+		// User-friendly message + detailed fd suggestions for agent
+		return core.BlockWithMessages(
+			"The 'find' command was blocked. Please use 'fd' instead for better performance.",
+			suggestion,
+		)
 	}
 
 	// Log approved commands if logging is enabled
