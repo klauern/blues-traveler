@@ -9,6 +9,12 @@ import (
 	"github.com/klauern/blues-traveler/internal/config"
 )
 
+// Scope constants
+const (
+	ScopeProject = "project"
+	ScopeGlobal  = "global"
+)
+
 // listAvailableHooks lists all available hook plugins
 func listAvailableHooks(getPlugin func(string) (interface {
 	Run() error
@@ -75,18 +81,22 @@ func listInstalledHooks(global bool) error {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
 	if err != nil {
-		return fmt.Errorf("error getting settings path: %v", err)
+		scope := ScopeProject
+		if global {
+			scope = ScopeGlobal
+		}
+		return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Ensure you're in a project directory or use --global flag for global settings", scope, err)
 	}
 
 	// Load existing settings
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
-		return fmt.Errorf("error loading settings: %v", err)
+		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Check if the settings file exists and is valid YAML/JSON", settingsPath, err)
 	}
 
-	scope := "project"
+	scope := ScopeProject
 	if global {
-		scope = "global"
+		scope = ScopeGlobal
 	}
 
 	fmt.Printf("Installed hooks (%s settings):\n", scope)
@@ -167,10 +177,10 @@ func printHookMatchers(eventName string, matchers []config.HookMatcher) {
 
 // printUninstallExamples prints examples of how to uninstall hooks
 func printUninstallExamples(global bool) {
-	scope := "project"
+	scope := ScopeProject
 	globalFlag := ""
 	if global {
-		scope = "global"
+		scope = ScopeGlobal
 		globalFlag = " --global"
 	}
 
@@ -448,9 +458,9 @@ func printInstallSuccess(groupName, scope string, installed int, settingsPath st
 // getScopeName returns the scope name for display
 func getScopeName(useGlobal bool) string {
 	if useGlobal {
-		return "global"
+		return ScopeGlobal
 	}
-	return "project"
+	return ScopeProject
 }
 
 // blockedURLHelpers contains helper functions for blocked URL management

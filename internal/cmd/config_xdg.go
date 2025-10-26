@@ -509,12 +509,16 @@ func NewConfigLogCmd() *cli.Command {
 
 			configPath, err := config.GetLogConfigPath(global)
 			if err != nil {
-				return fmt.Errorf("error getting config path: %v", err)
+				scope := "project"
+				if global {
+					scope = "global"
+				}
+				return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
 			}
 
 			logConfig, err := config.LoadLogConfig(configPath)
 			if err != nil {
-				return fmt.Errorf("error loading config: %v", err)
+				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON/TOML format", configPath, err)
 			}
 
 			if show {
@@ -548,7 +552,7 @@ func NewConfigLogCmd() *cli.Command {
 			}
 
 			if err := config.SaveLogConfig(configPath, logConfig); err != nil {
-				return fmt.Errorf("error saving config: %v", err)
+				return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
 			}
 
 			scope := "project"

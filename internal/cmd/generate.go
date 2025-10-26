@@ -55,7 +55,7 @@ and optionally a test file. The hook will need to be registered manually in the 
 
 			// Validate hook name
 			if err := generator.ValidateHookName(hookName); err != nil {
-				return fmt.Errorf("error validating hook name: %v", err)
+				return fmt.Errorf("invalid hook name '%s': %w\n  Suggestion: Hook names must be valid Go identifiers (alphanumeric and underscores only)", hookName, err)
 			}
 
 			// Set default description if not provided
@@ -81,7 +81,7 @@ and optionally a test file. The hook will need to be registered manually in the 
 
 			// Generate hook
 			if err := gen.GenerateHook(hookName, description, hookType, includeTest); err != nil {
-				return fmt.Errorf("error generating hook: %v", err)
+				return fmt.Errorf("failed to generate hook '%s': %w\n  Suggestion: Check write permissions in the output directory '%s'", hookName, err, outputDir)
 			}
 
 			fmt.Printf("\n✅ Successfully generated hook '%s'\n", hookName)

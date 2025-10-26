@@ -23,13 +23,21 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	xdgTempDir, err := os.MkdirTemp("", "xdg-enhanced-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Create test project
 	project := filepath.Join(tempDir, "test-project")
@@ -151,13 +159,21 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	legacyTempDir, err := os.MkdirTemp("", "legacy-global-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create legacy temp dir: %v", err)
 	}
-	defer os.RemoveAll(legacyTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(legacyTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Test LoadXDGOnly strategy
 	loader := NewEnhancedConfigLoader(LoadXDGOnly)
@@ -196,13 +212,21 @@ func TestSaveConfigWithXDG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "save-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -268,13 +292,21 @@ func TestGetConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "path-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	project := filepath.Join(tempDir, "test-project")
 
@@ -340,13 +372,21 @@ func TestIsProjectRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "registered-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}

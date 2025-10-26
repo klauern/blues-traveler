@@ -70,20 +70,20 @@ func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 
 	// Log specific tool details
 	switch event.ToolName {
-	case "Bash":
+	case ToolBash:
 		if bash, err := event.AsBash(); err == nil {
 			h.logger.Printf("  Command: %s", bash.Command)
 			details["command"] = bash.Command
 			details["description"] = bash.Description
 		}
-	case "Edit":
+	case ToolEdit:
 		if edit, err := event.AsEdit(); err == nil {
 			h.logger.Printf("  File: %s", edit.FilePath)
 			details["file_path"] = edit.FilePath
 			details["old_string_length"] = len(edit.OldString)
 			details["new_string_length"] = len(edit.NewString)
 		}
-	case "Write":
+	case ToolWrite:
 		if write, err := event.AsWrite(); err == nil {
 			h.logger.Printf("  File: %s", write.FilePath)
 			details["file_path"] = write.FilePath
