@@ -11,27 +11,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// newHooksCustomInitCommand creates the init command for custom hooks
-func newHooksCustomInitCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "init",
-		Usage: "Create a sample hooks configuration file",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{Name: "global", Aliases: []string{"g"}, Usage: "Create in ~/.claude"},
-			&cli.BoolFlag{Name: "overwrite", Usage: "Overwrite existing file if present"},
-			&cli.StringFlag{Name: "group", Aliases: []string{"G"}, Value: "example", Usage: "Group name for this config"},
-			&cli.StringFlag{Name: "name", Aliases: []string{"n"}, Usage: "Filename for per-group config (writes .claude/hooks/<name>.yml)"},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			global := cmd.Bool("global")
-			overwrite := cmd.Bool("overwrite")
-			group := cmd.String("group")
-			fileName := cmd.String("name")
-
-			var sample string
-			if global {
-				// Minimal global config - no example hooks to avoid accidental installation
-				sample = fmt.Sprintf(`# Global hooks configuration for group '%s'
+// generateSampleConfig creates the sample configuration content
+func generateSampleConfig(global bool, group string) string {
+	if global {
+		return fmt.Sprintf(`# Global hooks configuration for group '%s'
 # This is your personal global configuration. Add real hooks here.
 # See README.md in this directory for documentation and examples.
 %s:
@@ -43,9 +26,9 @@ func newHooksCustomInitCommand() *cli.Command {
   #       run: ./my-script.sh
   #       glob: ["*.go"]
 `, group, group)
-			} else {
-				// Project config with comprehensive examples for learning
-				sample = fmt.Sprintf(`# Sample hooks configuration for group '%s'
+	}
+
+	return fmt.Sprintf(`# Sample hooks configuration for group '%s'
 %s:
   PreToolUse:
     jobs:
@@ -92,75 +75,114 @@ func newHooksCustomInitCommand() *cli.Command {
       - name: session-end-sample
         run: echo "SessionEnd EVENT=${EVENT_NAME}"
 `, group, group)
-			}
+}
 
-			// If --name provided, create .claude/hooks/<name>.yml; else .claude/hooks.yml
+// writePerGroupConfig writes a per-group config file to .claude/hooks/<name>.yml
+func writePerGroupConfig(global bool, fileName string, sample string, overwrite bool) (string, error) {
+	dir, err := config.EnsureClaudeDir(global)
+	if err != nil {
+		return "", err
+	}
+
+	hooksDir := filepath.Join(dir, "hooks")
+	if err := os.MkdirAll(hooksDir, 0o750); err != nil {
+		return "", err
+	}
+
+	// Sanitize: ensure .yml extension
+	base := fileName
+	if !strings.HasSuffix(strings.ToLower(base), ".yml") && !strings.HasSuffix(strings.ToLower(base), ".yaml") {
+		base = base + ".yml"
+	}
+
+	target := filepath.Join(hooksDir, base)
+	if !overwrite {
+		if _, err := os.Stat(target); err == nil {
+			fmt.Printf("File already exists: %s (use --overwrite to replace)\n", target)
+			return target, nil
+		}
+	}
+
+	if err := os.WriteFile(target, []byte(sample), 0o600); err != nil {
+		return "", err
+	}
+
+	return target, nil
+}
+
+// writeGlobalDefaultConfig creates a minimal global configuration
+func writeGlobalDefaultConfig(overwrite bool) (string, error) {
+	configPath, err := config.GetLogConfigPath(true)
+	if err != nil {
+		return "", err
+	}
+
+	// Load existing config or create default
+	logCfg, err := config.LoadLogConfig(configPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Check for existing config without overwrite
+	if !overwrite && logCfg.CustomHooks != nil && len(logCfg.CustomHooks) > 0 {
+		fmt.Printf("File already exists: %s (use --overwrite to replace)\n", configPath)
+		return configPath, nil
+	}
+
+	// Create minimal hooks structure (empty)
+	logCfg.CustomHooks = config.CustomHooksConfig{}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
+		return "", err
+	}
+
+	// Save the minimal config
+	if err := config.SaveLogConfig(configPath, logCfg); err != nil {
+		return "", err
+	}
+
+	return configPath, nil
+}
+
+// newHooksCustomInitCommand creates the init command for custom hooks
+func newHooksCustomInitCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "init",
+		Usage: "Create a sample hooks configuration file",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "global", Aliases: []string{"g"}, Usage: "Create in ~/.claude"},
+			&cli.BoolFlag{Name: "overwrite", Usage: "Overwrite existing file if present"},
+			&cli.StringFlag{Name: "group", Aliases: []string{"G"}, Value: "example", Usage: "Group name for this config"},
+			&cli.StringFlag{Name: "name", Aliases: []string{"n"}, Usage: "Filename for per-group config (writes .claude/hooks/<name>.yml)"},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			global := cmd.Bool("global")
+			overwrite := cmd.Bool("overwrite")
+			group := cmd.String("group")
+			fileName := cmd.String("name")
+
+			sample := generateSampleConfig(global, group)
+
 			var path string
+			var err error
+
+			// If --name provided, create .claude/hooks/<name>.yml
 			if fileName != "" {
-				dir, err := config.EnsureClaudeDir(global)
+				path, err = writePerGroupConfig(global, fileName, sample, overwrite)
 				if err != nil {
 					return err
 				}
-				hooksDir := filepath.Join(dir, "hooks")
-				if err := os.MkdirAll(hooksDir, 0o750); err != nil {
+			} else if global {
+				path, err = writeGlobalDefaultConfig(overwrite)
+				if err != nil {
 					return err
 				}
-				// sanitize minimal: ensure .yml extension
-				base := fileName
-				if !strings.HasSuffix(strings.ToLower(base), ".yml") && !strings.HasSuffix(strings.ToLower(base), ".yaml") {
-					base = base + ".yml"
-				}
-				target := filepath.Join(hooksDir, base)
-				if !overwrite {
-					if _, err := os.Stat(target); err == nil {
-						fmt.Printf("File already exists: %s (use --overwrite to replace)\n", target)
-						return nil
-					}
-				}
-				if err := os.WriteFile(target, []byte(sample), 0o600); err != nil {
-					return err
-				}
-				path = target
 			} else {
-				if global {
-					// For global configs, create minimal config directly
-					configPath, err := config.GetLogConfigPath(global)
-					if err != nil {
-						return err
-					}
-
-					// Load existing config or create default
-					logCfg, err := config.LoadLogConfig(configPath)
-					if err != nil {
-						return err
-					}
-
-					// Check for existing config without overwrite
-					if !overwrite && logCfg.CustomHooks != nil && len(logCfg.CustomHooks) > 0 {
-						fmt.Printf("File already exists: %s (use --overwrite to replace)\n", configPath)
-						return nil
-					}
-
-					// Create minimal hooks structure (empty)
-					logCfg.CustomHooks = config.CustomHooksConfig{}
-
-					// Ensure directory exists
-					if err := os.MkdirAll(filepath.Dir(configPath), 0o750); err != nil {
-						return err
-					}
-
-					// Save the minimal config
-					if err := config.SaveLogConfig(configPath, logCfg); err != nil {
-						return err
-					}
-					path = configPath
-				} else {
-					// For project configs, use existing sample logic
-					var werr error
-					path, werr = config.WriteSampleHooksConfig(global, sample, overwrite)
-					if werr != nil {
-						return werr
-					}
+				// For project configs, use existing sample logic
+				path, err = config.WriteSampleHooksConfig(global, sample, overwrite)
+				if err != nil {
+					return err
 				}
 			}
 

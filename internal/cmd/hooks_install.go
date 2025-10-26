@@ -11,6 +11,152 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// installFlags holds the parsed command flags
+type installFlags struct {
+	global     bool
+	event      string
+	matcher    string
+	timeout    int
+	logEnabled bool
+	logFormat  string
+}
+
+// parseInstallFlags extracts and validates flags from the command
+func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
+	flags := installFlags{
+		global:     cmd.Bool("global"),
+		event:      cmd.String("event"),
+		matcher:    cmd.String("matcher"),
+		timeout:    cmd.Int("timeout"),
+		logEnabled: cmd.Bool("log"),
+		logFormat:  cmd.String("log-format"),
+	}
+
+	if flags.logFormat == "" {
+		flags.logFormat = config.LoggingFormatJSONL
+	}
+
+	if flags.logEnabled && !config.IsValidLoggingFormat(flags.logFormat) {
+		return flags, fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", flags.logFormat)
+	}
+
+	return flags, nil
+}
+
+// buildInstallHookCommand constructs the hook command string for install
+func buildInstallHookCommand(hookType string, flags installFlags) (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %v", err)
+	}
+
+	hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
+	if flags.logEnabled {
+		hookCommand += " --log"
+		if flags.logFormat != config.LoggingFormatJSONL {
+			hookCommand += fmt.Sprintf(" --log-format %s", flags.logFormat)
+		}
+	}
+
+	return hookCommand, nil
+}
+
+// handleDuplicateHookResult processes duplicate detection results
+func handleDuplicateHookResult(result config.MergeResult) bool {
+	if !result.WasDuplicate {
+		return false
+	}
+
+	if strings.Contains(result.DuplicateInfo, "Replaced existing") {
+		fmt.Printf("🔄 %s\n", result.DuplicateInfo)
+		return false
+	}
+
+	fmt.Printf("⚠️  Hook already installed: %s\n", result.DuplicateInfo)
+	fmt.Printf("No changes made. The hook is already configured for this event.\n")
+	return true
+}
+
+// printHookInstallSuccess displays success message
+func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, settingsPath string) {
+	fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
+	fmt.Printf("   Event: %s\n", event)
+	fmt.Printf("   Matcher: %s\n", matcher)
+	fmt.Printf("   Command: %s\n", hookCommand)
+	fmt.Printf("   Settings: %s\n", settingsPath)
+	fmt.Println()
+}
+
+// installHookAction performs the hook installation
+func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
+	// Validate event
+	if !isValidEventType(flags.event) {
+		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
+	}
+
+	// Build hook command
+	hookCommand, err := buildInstallHookCommand(hookType, flags)
+	if err != nil {
+		return err
+	}
+
+	// Get settings path
+	settingsPath, err := config.GetSettingsPath(flags.global)
+	if err != nil {
+		scope := ScopeProject
+		if flags.global {
+			scope = ScopeGlobal
+		}
+		return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
+	}
+
+	// Load existing settings
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
+	}
+
+	// Add hook to settings
+	var timeout *int
+	if flags.timeout > 0 {
+		timeout = &flags.timeout
+	}
+	result := config.AddHookToSettings(settings, flags.event, flags.matcher, hookCommand, timeout)
+
+	// Check for duplicates or replacements
+	isDuplicateNoChange := handleDuplicateHookResult(result)
+
+	// Save settings (only if not a duplicate with no changes)
+	if !isDuplicateNoChange {
+		if err := config.SaveSettings(settingsPath, settings); err != nil {
+			return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
+		}
+	}
+
+	scope := "project"
+	if flags.global {
+		scope = "global"
+	}
+
+	// Only show installation success message if not a duplicate
+	if !isDuplicateNoChange {
+		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
+	}
+
+	// Post-install actions for specific plugins (run even for duplicates)
+	if hookType == "fetch-blocker" {
+		createSampleBlockedUrlsFile(flags.global)
+	}
+
+	// Only show the activation message if not a duplicate
+	if !isDuplicateNoChange {
+		fmt.Println("The hook will be active in new Claude Code sessions.")
+		fmt.Println("Use 'claude /hooks' to verify the configuration.")
+	}
+
+	return nil
+}
+
 // newHooksInstallCommand creates the install command
 func newHooksInstallCommand(getPlugin func(string) (interface {
 	Run() error
@@ -72,108 +218,13 @@ This will automatically configure the hook to run for the specified events.`,
 				return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", hookType, strings.Join(pluginKeys(), ", "))
 			}
 
-			// Get flags
-			global := cmd.Bool("global")
-			event := cmd.String("event")
-			matcher := cmd.String("matcher")
-			timeoutFlag := cmd.Int("timeout")
-			logEnabled := cmd.Bool("log")
-			logFormat := cmd.String("log-format")
-			if logFormat == "" {
-				logFormat = config.LoggingFormatJSONL
-			}
-			if logEnabled && !config.IsValidLoggingFormat(logFormat) {
-				return fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", logFormat)
-			}
-
-			// Validate event
-			if !isValidEventType(event) {
-				return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", event, strings.Join(validEventTypes(), ", "))
-			}
-
-			// Get path to this executable
-			execPath, err := os.Executable()
+			// Parse and validate flags
+			flags, err := parseInstallFlags(cmd)
 			if err != nil {
-				return fmt.Errorf("failed to get executable path: %v", err)
+				return err
 			}
 
-			// Create command: blues-traveler hooks run <type>
-			hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
-			if logEnabled {
-				hookCommand += " --log"
-				if logFormat != config.LoggingFormatJSONL {
-					hookCommand += fmt.Sprintf(" --log-format %s", logFormat)
-				}
-			}
-
-			// Get settings path
-			settingsPath, err := config.GetSettingsPath(global)
-			if err != nil {
-				scope := ScopeProject
-				if global {
-					scope = ScopeGlobal
-				}
-				return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
-			}
-
-			// Load existing settings
-			settings, err := config.LoadSettings(settingsPath)
-			if err != nil {
-				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
-			}
-
-			// Add hook to settings
-			var timeout *int
-			if timeoutFlag > 0 {
-				timeout = &timeoutFlag
-			}
-			result := config.AddHookToSettings(settings, event, matcher, hookCommand, timeout)
-
-			// Check for duplicates or replacements
-			isDuplicateNoChange := false
-			if result.WasDuplicate {
-				if strings.Contains(result.DuplicateInfo, "Replaced existing") {
-					fmt.Printf("🔄 %s\n", result.DuplicateInfo)
-				} else {
-					fmt.Printf("⚠️  Hook already installed: %s\n", result.DuplicateInfo)
-					fmt.Printf("No changes made. The hook is already configured for this event.\n")
-					isDuplicateNoChange = true
-				}
-			}
-
-			// Save settings (only if not a duplicate with no changes)
-			if !isDuplicateNoChange {
-				if err := config.SaveSettings(settingsPath, settings); err != nil {
-					return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
-				}
-			}
-
-			scope := "project"
-			if global {
-				scope = "global"
-			}
-
-			// Only show installation success message if not a duplicate
-			if !isDuplicateNoChange {
-				fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
-				fmt.Printf("   Event: %s\n", event)
-				fmt.Printf("   Matcher: %s\n", matcher)
-				fmt.Printf("   Command: %s\n", hookCommand)
-				fmt.Printf("   Settings: %s\n", settingsPath)
-				fmt.Println()
-			}
-
-			// Post-install actions for specific plugins (run even for duplicates)
-			if hookType == "fetch-blocker" {
-				createSampleBlockedUrlsFile(global)
-			}
-
-			// Only show the activation message if not a duplicate
-			if !isDuplicateNoChange {
-				fmt.Println("The hook will be active in new Claude Code sessions.")
-				fmt.Println("Use 'claude /hooks' to verify the configuration.")
-			}
-			return nil
+			return installHookAction(hookType, flags, isValidEventType, validEventTypes)
 		},
 	}
 }

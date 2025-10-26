@@ -241,38 +241,68 @@ func isBluesTravelerCommand(command string) bool {
 	return strings.Contains(command, "blues-traveler run")
 }
 
+// checkExactDuplicate checks if a hook command is an exact duplicate
+func checkExactDuplicate(existingHook HookCommand, newHook HookCommand, matcherName string) *MergeResult {
+	if existingHook.Command == newHook.Command {
+		return &MergeResult{
+			Matchers:      nil,
+			WasDuplicate:  true,
+			DuplicateInfo: fmt.Sprintf("Hook command '%s' already exists for matcher '%s'", newHook.Command, matcherName),
+		}
+	}
+	return nil
+}
+
+// checkBluesTravelerConflict checks if two blues-traveler hooks conflict
+func checkBluesTravelerConflict(existingHook HookCommand, newHook HookCommand, matcherName string, matcherIndex, hookIndex int, existing []HookMatcher) *MergeResult {
+	if !isBluesTravelerCommand(existingHook.Command) || !isBluesTravelerCommand(newHook.Command) {
+		return nil
+	}
+
+	existingType := extractHookType(existingHook.Command)
+	newType := extractHookType(newHook.Command)
+
+	if existingType != "" && existingType == newType {
+		// Replace the existing hook with the new one
+		existing[matcherIndex].Hooks[hookIndex] = newHook
+		return &MergeResult{
+			Matchers:      existing,
+			WasDuplicate:  true,
+			DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcherName),
+		}
+	}
+
+	return nil
+}
+
+// checkHookConflicts checks for conflicts between existing and new hooks
+func checkHookConflicts(existing []HookMatcher, new HookMatcher, matcherIndex int) *MergeResult {
+	for j, existingHook := range existing[matcherIndex].Hooks {
+		for _, newHook := range new.Hooks {
+			// Exact duplicate check
+			if result := checkExactDuplicate(existingHook, newHook, existing[matcherIndex].Matcher); result != nil {
+				result.Matchers = existing
+				return result
+			}
+
+			// Check if both are blues-traveler commands with the same hook type
+			if result := checkBluesTravelerConflict(existingHook, newHook, existing[matcherIndex].Matcher, matcherIndex, j, existing); result != nil {
+				return result
+			}
+		}
+	}
+	return nil
+}
+
 func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 	// Look for existing matcher
 	for i, matcher := range existing {
 		if matcher.Matcher == new.Matcher {
-			// Check for blues-traveler command conflicts within this matcher
-			for j, existingHook := range existing[i].Hooks {
-				for _, newHook := range new.Hooks {
-					// Exact duplicate check
-					if existingHook.Command == newHook.Command {
-						return MergeResult{
-							Matchers:      existing,
-							WasDuplicate:  true,
-							DuplicateInfo: fmt.Sprintf("Hook command '%s' already exists for matcher '%s'", newHook.Command, matcher.Matcher),
-						}
-					}
-
-					// Check if both are blues-traveler commands with the same hook type
-					if isBluesTravelerCommand(existingHook.Command) && isBluesTravelerCommand(newHook.Command) {
-						existingType := extractHookType(existingHook.Command)
-						newType := extractHookType(newHook.Command)
-						if existingType != "" && existingType == newType {
-							// Replace the existing hook with the new one
-							existing[i].Hooks[j] = newHook
-							return MergeResult{
-								Matchers:      existing,
-								WasDuplicate:  true,
-								DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcher.Matcher),
-							}
-						}
-					}
-				}
+			// Check for conflicts
+			if result := checkHookConflicts(existing, new, i); result != nil {
+				return *result
 			}
+
 			// No conflicts found, append to existing matcher
 			existing[i].Hooks = append(existing[i].Hooks, new.Hooks...)
 			return MergeResult{
@@ -281,6 +311,7 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 			}
 		}
 	}
+
 	// No existing matcher found, add new one
 	return MergeResult{
 		Matchers:     append(existing, new),

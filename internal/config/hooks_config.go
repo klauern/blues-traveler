@@ -38,95 +38,114 @@ type HookGroup map[string]*EventConfig
 // HooksConfig is the root structure: GroupName -> HookGroup
 type CustomHooksConfig map[string]HookGroup
 
+// isValidHookConfigFile checks if a file should be included as a hook config
+func isValidHookConfigFile(name string) bool {
+	if name == constants.ConfigFileName {
+		return false // skip app config files
+	}
+	low := strings.ToLower(name)
+	return strings.HasSuffix(low, ".yml") || strings.HasSuffix(low, ".yaml")
+}
+
+// collectPerGroupFiles collects per-group config files from a directory
+func collectPerGroupFiles(hooksDir string) []string {
+	var paths []string
+
+	entries, err := os.ReadDir(hooksDir)
+	if err != nil {
+		return paths
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if isValidHookConfigFile(e.Name()) {
+			names = append(names, e.Name())
+		}
+	}
+
+	sort.Strings(names)
+	for _, n := range names {
+		paths = append(paths, filepath.Join(hooksDir, n))
+	}
+
+	return paths
+}
+
+// addProjectPaths adds project-scoped config paths
+func addProjectPaths(baseDir string) []string {
+	var paths []string
+
+	// Prefer new canonical file under hooks/
+	paths = append(paths,
+		filepath.Join(baseDir, "hooks", "hooks.yml"),
+		filepath.Join(baseDir, "hooks", "hooks.yaml"),
+	)
+
+	// Legacy locations for backward compatibility
+	paths = append(paths,
+		filepath.Join(baseDir, "hooks.yml"),
+		filepath.Join(baseDir, "hooks.yaml"),
+		filepath.Join(baseDir, "hooks.json"),
+	)
+
+	// Per-group files in .claude/hooks/
+	paths = append(paths, collectPerGroupFiles(filepath.Join(baseDir, "hooks"))...)
+
+	// Local override last in project scope
+	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
+
+	return paths
+}
+
+// addGlobalPaths adds global-scoped config paths
+func addGlobalPaths(baseDir string) []string {
+	var paths []string
+
+	paths = append(paths,
+		filepath.Join(baseDir, "hooks", "hooks.yml"),
+		filepath.Join(baseDir, "hooks", "hooks.yaml"),
+	)
+
+	// Legacy top-level
+	paths = append(paths,
+		filepath.Join(baseDir, "hooks.yml"),
+		filepath.Join(baseDir, "hooks.yaml"),
+		filepath.Join(baseDir, "hooks.json"),
+	)
+
+	// Per-group files in ~/.claude/hooks/
+	paths = append(paths, collectPerGroupFiles(filepath.Join(baseDir, "hooks"))...)
+
+	// Global local override last
+	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
+
+	return paths
+}
+
 // candidateConfigPaths returns the list of possible config file locations in
 // priority order (earlier paths have higher precedence).
 // The loader will merge from lowest to highest priority so earlier entries win.
 func candidateConfigPaths() ([]string, error) {
-	var paths []string
-
-	// Project scope
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current directory: %v", err)
 	}
-	proj := filepath.Join(cwd, ".claude")
-	// Prefer new canonical file under hooks/
-	paths = append(paths,
-		filepath.Join(proj, "hooks", "hooks.yml"),
-		filepath.Join(proj, "hooks", "hooks.yaml"),
-	)
-	// Legacy locations for backward compatibility
-	paths = append(paths,
-		filepath.Join(proj, "hooks.yml"),
-		filepath.Join(proj, "hooks.yaml"),
-		filepath.Join(proj, "hooks.json"),
-	)
-	// Per-group files in .claude/hooks/
-	projGroups := filepath.Join(proj, "hooks")
-	if entries, err := os.ReadDir(projGroups); err == nil {
-		// deterministic order
-		names := make([]string, 0, len(entries))
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			low := strings.ToLower(name)
-			if name == constants.ConfigFileName {
-				continue // skip app config files
-			}
-			if strings.HasSuffix(low, ".yml") || strings.HasSuffix(low, ".yaml") {
-				names = append(names, name)
-			}
-		}
-		sort.Strings(names)
-		for _, n := range names {
-			paths = append(paths, filepath.Join(projGroups, n))
-		}
-	}
-	// Local override last in project scope
-	paths = append(paths, filepath.Join(proj, "hooks-local.yml"))
 
-	// Global scope
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %v", err)
 	}
-	glob := filepath.Join(home, ".claude")
-	paths = append(paths,
-		filepath.Join(glob, "hooks", "hooks.yml"),
-		filepath.Join(glob, "hooks", "hooks.yaml"),
-	)
-	// Legacy top-level
-	paths = append(paths,
-		filepath.Join(glob, "hooks.yml"),
-		filepath.Join(glob, "hooks.yaml"),
-		filepath.Join(glob, "hooks.json"),
-	)
-	// Per-group files in ~/.claude/hooks/
-	globGroups := filepath.Join(glob, "hooks")
-	if entries, err := os.ReadDir(globGroups); err == nil {
-		names := make([]string, 0, len(entries))
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			low := strings.ToLower(name)
-			if name == constants.ConfigFileName {
-				continue
-			}
-			if strings.HasSuffix(low, ".yml") || strings.HasSuffix(low, ".yaml") {
-				names = append(names, name)
-			}
-		}
-		sort.Strings(names)
-		for _, n := range names {
-			paths = append(paths, filepath.Join(globGroups, n))
-		}
-	}
-	// Global local override last
-	paths = append(paths, filepath.Join(glob, "hooks-local.yml"))
+
+	var paths []string
+
+	// Project scope
+	paths = append(paths, addProjectPaths(filepath.Join(cwd, ".claude"))...)
+
+	// Global scope
+	paths = append(paths, addGlobalPaths(filepath.Join(home, ".claude"))...)
 
 	return paths, nil
 }

@@ -24,7 +24,7 @@ func EvalExpression(expr string, vars map[string]string) (bool, error) {
 	expanded := expandVars(s, vars)
 	// Tokenize by || first (lowest precedence)
 	orParts := splitRespectingQuotes(expanded, "||")
-	any := false
+	anyMatch := false
 	for _, orp := range orParts {
 		andParts := splitRespectingQuotes(orp, "&&")
 		all := true
@@ -35,9 +35,9 @@ func EvalExpression(expr string, vars map[string]string) (bool, error) {
 			}
 			all = all && v
 		}
-		any = any || all
+		anyMatch = anyMatch || all
 	}
-	return any, nil
+	return anyMatch, nil
 }
 
 func expandVars(s string, vars map[string]string) string {

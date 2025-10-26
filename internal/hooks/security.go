@@ -33,22 +33,66 @@ func (h *SecurityHook) Run() error {
 	return nil
 }
 
-func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	// Log detailed event data if logging is enabled
-	if h.Context().LoggingEnabled {
-		details := make(map[string]interface{})
-		rawData := make(map[string]interface{})
-		rawData["tool_name"] = event.ToolName
+// securityCheck represents a single security check
+type securityCheck struct {
+	checkType string
+	check     func([]string, string) (bool, string)
+}
 
-		if event.ToolName == "Bash" {
-			if bash, err := event.AsBash(); err == nil {
-				details["command"] = bash.Command
-				details["description"] = bash.Description
-			}
-		}
-
-		h.LogHookEvent("pre_tool_use_security_check", event.ToolName, rawData, details)
+// logSecurityEvent logs a security event with standard formatting
+func (h *SecurityHook) logSecurityEvent(eventType, command, reason, checkType string) {
+	if !h.Context().LoggingEnabled {
+		return
 	}
+
+	h.LogHookEvent(eventType, "Bash", map[string]interface{}{
+		"command":    command,
+		"reason":     reason,
+		"check_type": checkType,
+	}, nil)
+}
+
+// logPreToolUseCheck logs the initial pre-tool-use check
+func (h *SecurityHook) logPreToolUseCheck(event *cchooks.PreToolUseEvent) {
+	if !h.Context().LoggingEnabled {
+		return
+	}
+
+	details := make(map[string]interface{})
+	rawData := map[string]interface{}{"tool_name": event.ToolName}
+
+	if event.ToolName == "Bash" {
+		if bash, err := event.AsBash(); err == nil {
+			details["command"] = bash.Command
+			details["description"] = bash.Description
+		}
+	}
+
+	h.LogHookEvent("pre_tool_use_security_check", event.ToolName, rawData, details)
+}
+
+// runSecurityChecks executes all security checks and returns the first match
+func (h *SecurityHook) runSecurityChecks(command string, tokens []string, cmdLower string) (bool, string, string) {
+	checks := []securityCheck{
+		{"static_patterns", func(t []string, c string) (bool, string) { return h.checkStaticPatterns(c) }},
+		{"macos_patterns", func(t []string, c string) (bool, string) { return h.checkMacOSPatterns(c) }},
+		{"dangerous_rm", func(t []string, c string) (bool, string) { return h.detectDangerousRm(t) }},
+		{"volume_wipe", func(t []string, c string) (bool, string) { return h.detectVolumeWipe(t) }},
+		{"recursive_ownership_perm", func(t []string, c string) (bool, string) { return h.detectRecursiveOwnershipOrPerm(t) }},
+		{"potential_exfil", func(t []string, c string) (bool, string) { return h.detectPotentialExfil(t, c) }},
+	}
+
+	for _, check := range checks {
+		if blocked, reason := check.check(tokens, cmdLower); blocked {
+			return true, reason, check.checkType
+		}
+	}
+
+	return false, "", ""
+}
+
+func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	h.logPreToolUseCheck(event)
 
 	if event.ToolName != "Bash" {
 		return cchooks.Approve()
@@ -65,70 +109,9 @@ func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.Pre
 	cmdLower := strings.ToLower(bash.Command)
 	tokens := strings.Fields(cmdLower)
 
-	// Check various security patterns
-	if blocked, reason := h.checkStaticPatterns(cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "static_patterns",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.checkMacOSPatterns(cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "macos_patterns",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectDangerousRm(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "dangerous_rm",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectVolumeWipe(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "volume_wipe",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectRecursiveOwnershipOrPerm(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "recursive_ownership_perm",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectPotentialExfil(tokens, cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "potential_exfil",
-			}, nil)
-		}
+	// Run all security checks
+	if blocked, reason, checkType := h.runSecurityChecks(bash.Command, tokens, cmdLower); blocked {
+		h.logSecurityEvent("security_block", bash.Command, reason, checkType)
 		return cchooks.Block(reason)
 	}
 
