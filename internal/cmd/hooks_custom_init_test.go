@@ -107,7 +107,7 @@ func TestSanitizeFileName(t *testing.T) {
 					isWindowsAbsoluteCase := runtime.GOOS == "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "absolute paths not allowed")
 					isUnixBackslashCase := runtime.GOOS != "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "path separators not allowed")
 
-					if !(isWindowsAbsoluteCase || isUnixBackslashCase) {
+					if !isWindowsAbsoluteCase && !isUnixBackslashCase {
 						t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", tt.fileName, err, tt.errMsg)
 					}
 				}

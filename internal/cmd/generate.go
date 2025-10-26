@@ -40,7 +40,7 @@ and optionally a test file. The hook will need to be registered manually in the 
 				Usage:   "Output directory (default: internal/hooks)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
 			if len(args) != 1 {
 				return fmt.Errorf("exactly one argument required: [hook-name]")

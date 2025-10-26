@@ -159,7 +159,7 @@ func DefaultHookContext() *HookContext {
 
 // defaultIsPluginEnabled is the default implementation - always returns true
 // This will be replaced by the main package when registering hooks
-func defaultIsPluginEnabled(pluginKey string) bool {
+func defaultIsPluginEnabled(_ string) bool {
 	return true
 }
 
@@ -180,7 +180,7 @@ func (h *BaseHook) CreateRawHandler() func(context.Context, string) *cchooks.Raw
 		return nil
 	}
 
-	return func(ctx context.Context, rawJSON string) *cchooks.RawResponse {
+	return func(_ context.Context, rawJSON string) *cchooks.RawResponse {
 		// Parse the raw JSON to extract basic event information
 		var rawEvent map[string]interface{}
 		if err := json.Unmarshal([]byte(rawJSON), &rawEvent); err != nil {

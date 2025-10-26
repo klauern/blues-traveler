@@ -217,7 +217,7 @@ func TestGetEventAliases(t *testing.T) {
 	}
 }
 
-func TestAllClaudeCodeEvents_HasCursorAliases(t *testing.T) {
+func TestAllClaudeCodeEvents_HasCursorAliases(_ *testing.T) {
 	events := AllClaudeCodeEvents()
 
 	// Ensure all events have the CursorAliases field

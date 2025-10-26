@@ -35,21 +35,33 @@ func TestRunDoctorCheck_NoConfiguration(t *testing.T) {
 	_ = os.Chdir(cwd)
 }
 
-func TestRunDoctorCheck_WithHooksConfig(t *testing.T) {
-	// Setup temp project with .claude
+// setupDoctorTest sets up a temporary test environment with a hooks config
+func setupDoctorTest(t *testing.T, hooksConfig string) func() {
+	t.Helper()
 	cwd, _ := os.Getwd()
-	t.Cleanup(func() {
+	cleanup := func() {
 		_ = os.Chdir(cwd)
 		// On Windows, give a moment for file handles to be released
 		if runtime.GOOS == "windows" {
 			time.Sleep(10 * time.Millisecond)
 		}
-	})
+	}
+	t.Cleanup(cleanup)
+
 	dir := t.TempDir()
 	_ = os.Chdir(dir)
 	_ = os.MkdirAll(filepath.Join(dir, ".claude"), 0o755)
 
-	// Write a sample hooks.yml
+	if _, err := btconfig.WriteSampleHooksConfig(false, hooksConfig, true); err != nil {
+		t.Fatalf("write hooks.yml: %v", err)
+	}
+
+	return func() {
+		_ = os.Chdir(cwd)
+	}
+}
+
+func TestRunDoctorCheck_WithHooksConfig(t *testing.T) {
 	hooks := `test-group:
   PreToolUse:
     jobs:
@@ -57,35 +69,16 @@ func TestRunDoctorCheck_WithHooksConfig(t *testing.T) {
         run: echo "test"
         glob: ["*"]
 `
-	if _, err := btconfig.WriteSampleHooksConfig(false, hooks, true); err != nil {
-		t.Fatalf("write hooks.yml: %v", err)
-	}
+	cleanup := setupDoctorTest(t, hooks)
+	defer cleanup()
 
-	// Run doctor check
 	err := runDoctorCheck(false)
 	if err != nil {
 		t.Errorf("runDoctorCheck failed: %v", err)
 	}
-
-	// Ensure we're back in original directory before cleanup
-	_ = os.Chdir(cwd)
 }
 
 func TestRunDoctorCheck_VerboseMode(t *testing.T) {
-	// Setup temp project with .claude
-	cwd, _ := os.Getwd()
-	t.Cleanup(func() {
-		_ = os.Chdir(cwd)
-		// On Windows, give a moment for file handles to be released
-		if runtime.GOOS == "windows" {
-			time.Sleep(10 * time.Millisecond)
-		}
-	})
-	dir := t.TempDir()
-	_ = os.Chdir(dir)
-	_ = os.MkdirAll(filepath.Join(dir, ".claude"), 0o755)
-
-	// Write a sample hooks.yml with multiple groups
 	hooks := `test-group-1:
   PreToolUse:
     jobs:
@@ -99,18 +92,13 @@ test-group-2:
         run: echo "test2"
         glob: ["*.md"]
 `
-	if _, err := btconfig.WriteSampleHooksConfig(false, hooks, true); err != nil {
-		t.Fatalf("write hooks.yml: %v", err)
-	}
+	cleanup := setupDoctorTest(t, hooks)
+	defer cleanup()
 
-	// Run doctor check in verbose mode
 	err := runDoctorCheck(true)
 	if err != nil {
 		t.Errorf("runDoctorCheck with verbose failed: %v", err)
 	}
-
-	// Ensure we're back in original directory before cleanup
-	_ = os.Chdir(cwd)
 }
 
 func TestCountHooksByEvent(t *testing.T) {

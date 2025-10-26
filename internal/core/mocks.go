@@ -232,14 +232,14 @@ func TestHookContext(settingsChecker func(string) bool) *HookContext {
 // TestEvent helpers for creating test events
 
 // NewMockPreToolUseEvent creates a mock PreToolUseEvent for testing
-func NewMockPreToolUseEvent(toolName string) *cchooks.PreToolUseEvent {
+func NewMockPreToolUseEvent(_ string) *cchooks.PreToolUseEvent {
 	// This would need to be implemented based on the cchooks library structure
 	// For now, returning nil as we'd need to examine the cchooks library more closely
 	return nil
 }
 
 // NewMockPostToolUseEvent creates a mock PostToolUseEvent for testing
-func NewMockPostToolUseEvent(toolName string) *cchooks.PostToolUseEvent {
+func NewMockPostToolUseEvent(_ string) *cchooks.PostToolUseEvent {
 	// This would need to be implemented based on the cchooks library structure
 	// For now, returning nil as we'd need to examine the cchooks library more closely
 	return nil

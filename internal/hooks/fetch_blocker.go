@@ -36,7 +36,7 @@ func (h *FetchBlockerHook) Run() error {
 	return nil
 }
 
-func (h *FetchBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	h.logEventDetails(event)
 
 	// Only check WebFetch calls
@@ -99,12 +99,12 @@ func (h *FetchBlockerHook) logLoadError(toolName string, err error) {
 
 // loadAllBlockedPrefixes loads blocked prefixes from config and files
 func (h *FetchBlockerHook) loadAllBlockedPrefixes() ([]BlockedPrefix, error) {
-	blockedPrefixes, err := h.loadBlockedFromConfig()
-	if err == nil && len(blockedPrefixes) == 0 {
+	blockedPrefixes := h.loadBlockedFromConfig()
+	if len(blockedPrefixes) == 0 {
 		// Fallback to files if not configured in JSON
 		return h.loadBlockedPrefixes()
 	}
-	return blockedPrefixes, err
+	return blockedPrefixes, nil
 }
 
 // checkAndBlockURL checks if a URL should be blocked and returns appropriate response
@@ -200,7 +200,7 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 	return []BlockedPrefix{}, nil
 }
 
-func (h *FetchBlockerHook) loadBlockedFromConfig() ([]BlockedPrefix, error) {
+func (h *FetchBlockerHook) loadBlockedFromConfig() []BlockedPrefix {
 	// Project then global
 	for _, global := range []bool{false, true} {
 		cfgPath, err := config.GetLogConfigPath(global)
@@ -218,9 +218,9 @@ func (h *FetchBlockerHook) loadBlockedFromConfig() ([]BlockedPrefix, error) {
 		for _, b := range lc.BlockedURLs {
 			out = append(out, BlockedPrefix{Prefix: b.Prefix, Suggestion: b.Suggestion})
 		}
-		return out, nil
+		return out
 	}
-	return []BlockedPrefix{}, nil
+	return []BlockedPrefix{}
 }
 
 // BlockedPrefix represents a blocked URL prefix with optional suggestion
@@ -240,11 +240,9 @@ func (h *FetchBlockerHook) isURLBlocked(url string, blockedPrefixes []BlockedPre
 			if strings.HasPrefix(url, prefixWithoutWildcard) {
 				return true, prefix, blocked.Suggestion
 			}
-		} else {
+		} else if strings.HasPrefix(url, prefix) {
 			// Exact prefix match
-			if strings.HasPrefix(url, prefix) {
-				return true, prefix, blocked.Suggestion
-			}
+			return true, prefix, blocked.Suggestion
 		}
 	}
 

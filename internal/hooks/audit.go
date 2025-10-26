@@ -52,7 +52,7 @@ func (h *AuditHook) Run() error {
 	return nil
 }
 
-func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *AuditHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	entry := AuditEntry{
 		Event:    "pre_tool_use",
 		ToolName: event.ToolName,
@@ -103,7 +103,7 @@ func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 	return cchooks.Approve()
 }
 
-func (h *AuditHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *AuditHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	entry := AuditEntry{
 		Event:    "post_tool_use",
 		ToolName: event.ToolName,

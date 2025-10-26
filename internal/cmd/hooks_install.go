@@ -143,9 +143,9 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 		}
 	}
 
-	scope := "project"
+	scope := ScopeProject
 	if flags.global {
-		scope = "global"
+		scope = ScopeGlobal
 	}
 
 	// Only show installation success message if not a duplicate
@@ -216,7 +216,7 @@ This will automatically configure the hook to run for the specified events.`,
 				Usage: "Log output format: jsonl or pretty (default jsonl)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
 			if len(args) != 1 {
 				return fmt.Errorf("exactly one argument required: [hook-type]")
@@ -260,7 +260,7 @@ func newHooksUninstallCommand() *cli.Command {
 				Usage:   "Skip interactive confirmation for 'uninstall all'",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
 			if len(args) != 1 {
 				return fmt.Errorf("exactly one argument required: [hook-type|all]")

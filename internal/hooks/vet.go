@@ -34,7 +34,7 @@ func (h *VetHook) Run() error {
 	return nil
 }
 
-func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *VetHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Type check Python files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
 		var filePath string

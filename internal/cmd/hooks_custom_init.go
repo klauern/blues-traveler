@@ -99,7 +99,7 @@ func sanitizeFileName(fileName string) (string, error) {
 
 	// Ensure .yml or .yaml extension
 	if !strings.HasSuffix(strings.ToLower(base), ".yml") && !strings.HasSuffix(strings.ToLower(base), ".yaml") {
-		base = base + ".yml"
+		base += ".yml"
 	}
 
 	return base, nil
@@ -184,7 +184,7 @@ func newHooksCustomInitCommand() *cli.Command {
 			&cli.StringFlag{Name: "group", Aliases: []string{"G"}, Value: "example", Usage: "Group name for this config"},
 			&cli.StringFlag{Name: "name", Aliases: []string{"n"}, Usage: "Filename for per-group config (writes .claude/hooks/<name>.yml)"},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			global := cmd.Bool("global")
 			overwrite := cmd.Bool("overwrite")
 			group := cmd.String("group")

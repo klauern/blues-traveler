@@ -69,10 +69,8 @@ func TestParseSyncOptions_EventValidation(t *testing.T) {
 				if tt.errContains == "" {
 					t.Error("Expected error contains string not specified in test")
 				}
-			} else {
-				if tt.wantErr {
-					t.Errorf("Expected error for event %q, but validation would pass", tt.eventFilter)
-				}
+			} else if tt.wantErr {
+				t.Errorf("Expected error for event %q, but validation would pass", tt.eventFilter)
 			}
 		})
 	}

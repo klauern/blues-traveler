@@ -57,7 +57,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 				Usage:   "Search all common project directories instead of just current directory",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			dryRun := cmd.Bool("dry-run")
 			verbose := cmd.Bool("verbose")
 			all := cmd.Bool("all")
@@ -140,7 +140,7 @@ func NewConfigListCmd() *cli.Command {
 				Usage: "Show only project paths (useful for scripting)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			verbose := cmd.Bool("verbose")
 			pathsOnly := cmd.Bool("paths-only")
 
@@ -228,7 +228,7 @@ func NewConfigEditCmd() *cli.Command {
 				Usage:   "Override default editor (uses $EDITOR environment variable by default)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			xdg := config.NewXDGConfig()
 
 			configPath, err := determineConfigPath(cmd, xdg)
@@ -367,7 +367,7 @@ func NewConfigCleanCmd() *cli.Command {
 				Usage:   "Show what would be cleaned without making changes",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			dryRun := cmd.Bool("dry-run")
 
 			xdg := config.NewXDGConfig()
@@ -440,7 +440,7 @@ func NewConfigStatusCmd() *cli.Command {
 				Usage:   "Check status for specific project path (defaults to current directory)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			projectPath := cmd.String("project")
 
 			// Use current directory if no project specified
@@ -544,7 +544,7 @@ func NewConfigLogCmd() *cli.Command {
 				Usage: "Show current log rotation settings",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			global := cmd.Bool("global")
 			maxAge := cmd.Int("max-age")
 			maxSize := cmd.Int("max-size")

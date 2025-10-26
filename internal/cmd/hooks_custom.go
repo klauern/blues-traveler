@@ -34,7 +34,7 @@ func newHooksCustomListCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "list",
 		Usage: "List available custom hook groups",
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			cfg, err := config.LoadHooksConfig()
 			if err != nil {
 				return fmt.Errorf("load error: %v", err)
@@ -57,7 +57,7 @@ func newHooksCustomValidateCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "validate",
 		Usage: "Validate hooks.yml syntax",
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			cfg, err := config.LoadHooksConfig()
 			if err != nil {
 				return fmt.Errorf("load error: %v", err)
@@ -80,7 +80,7 @@ func newHooksCustomShowCommand() *cli.Command {
 			&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Value: "yaml", Usage: "Output format: yaml or json"},
 			&cli.BoolFlag{Name: "global", Aliases: []string{"g"}, Usage: "Prefer global config when showing embedded sections"},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			// Load merged hooks config (project over global, including embedded and legacy)
 			hooksCfg, err := config.LoadHooksConfig()
 			if err != nil {

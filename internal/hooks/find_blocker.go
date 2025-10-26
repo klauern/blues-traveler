@@ -32,7 +32,7 @@ func (h *FindBlockerHook) Run() error {
 	return nil
 }
 
-func (h *FindBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	// Log detailed event data if logging is enabled
 	if h.Context().LoggingEnabled {
 		details := make(map[string]interface{})

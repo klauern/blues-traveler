@@ -51,7 +51,7 @@ func (h *FormatHook) Run() error {
 	return nil
 }
 
-func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *FormatHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Format code files after editing
 	if event.ToolName == "Edit" || event.ToolName == "Write" {
 		var filePath string

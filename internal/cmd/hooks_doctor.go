@@ -26,7 +26,7 @@ func NewDoctorCommand() *cli.Command {
 				Usage:   "Show detailed configuration information",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			verbose := cmd.Bool("verbose")
 			return runDoctorCheck(verbose)
 		},

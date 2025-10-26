@@ -1,3 +1,4 @@
+// Package cmd provides tests for configuration synchronization functionality
 package cmd
 
 import (
@@ -12,7 +13,7 @@ import (
 )
 
 // setupTestEnv creates a temporary directory with .claude structure for testing
-func setupTestEnv(t *testing.T) (string, func()) {
+func setupTestEnv(t *testing.T) func() {
 	t.Helper()
 
 	// Save original directory
@@ -41,7 +42,7 @@ func setupTestEnv(t *testing.T) (string, func()) {
 		}
 	}
 
-	return tempDir, cleanup
+	return cleanup
 }
 
 // createConfigWithGroup creates a blues-traveler config with the specified group
@@ -346,7 +347,7 @@ func countHooksInSettings(t *testing.T, groupName string) int {
 
 // This test WILL FAIL initially, exposing the bug where removed groups aren't cleaned up
 func TestConfigSync_RemoveEntireGroup_ShouldCleanupSettings(t *testing.T) {
-	_, cleanup := setupTestEnv(t)
+	cleanup := setupTestEnv(t)
 	defer cleanup()
 
 	groupName := "python-tools"
@@ -385,7 +386,7 @@ func TestConfigSync_RemoveEntireGroup_ShouldCleanupSettings(t *testing.T) {
 
 // This test WILL FAIL initially, exposing the bug with empty configs
 func TestConfigSync_EmptyConfig_ShouldCleanupAllCustomHooks(t *testing.T) {
-	_, cleanup := setupTestEnv(t)
+	cleanup := setupTestEnv(t)
 	defer cleanup()
 
 	// Step 1: Create config with multiple groups
@@ -426,7 +427,7 @@ func TestConfigSync_EmptyConfig_ShouldCleanupAllCustomHooks(t *testing.T) {
 
 // This test WILL FAIL initially, exposing the bug with group-specific sync
 func TestConfigSync_GroupFilter_RemovedGroup_ShouldCleanup(t *testing.T) {
-	_, cleanup := setupTestEnv(t)
+	cleanup := setupTestEnv(t)
 	defer cleanup()
 
 	targetGroup := "target-group"

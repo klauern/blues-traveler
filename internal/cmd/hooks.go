@@ -72,7 +72,7 @@ func newHooksListCommand(getPlugin func(string) (interface {
 				Usage:   "Show global settings (~/.claude/settings.json) when using --installed",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			installed := cmd.Bool("installed")
 			events := cmd.Bool("events")
 			global := cmd.Bool("global")
@@ -115,7 +115,7 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 				Usage: "Log output format: jsonl or pretty (default jsonl)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			args := cmd.Args().Slice()
 			if len(args) != 1 {
 				return fmt.Errorf("exactly one argument required: [plugin-key]")

@@ -72,13 +72,13 @@ func (h *SecurityHook) logPreToolUseCheck(event *cchooks.PreToolUseEvent) {
 }
 
 // runSecurityChecks executes all security checks and returns the first match
-func (h *SecurityHook) runSecurityChecks(command string, tokens []string, cmdLower string) (bool, string, string) {
+func (h *SecurityHook) runSecurityChecks(_ string, tokens []string, cmdLower string) (bool, string, string) {
 	checks := []securityCheck{
-		{"static_patterns", func(t []string, c string) (bool, string) { return h.checkStaticPatterns(c) }},
-		{"macos_patterns", func(t []string, c string) (bool, string) { return h.checkMacOSPatterns(c) }},
-		{"dangerous_rm", func(t []string, c string) (bool, string) { return h.detectDangerousRm(t) }},
-		{"volume_wipe", func(t []string, c string) (bool, string) { return h.detectVolumeWipe(t) }},
-		{"recursive_ownership_perm", func(t []string, c string) (bool, string) { return h.detectRecursiveOwnershipOrPerm(t) }},
+		{"static_patterns", func(_ []string, c string) (bool, string) { return h.checkStaticPatterns(c) }},
+		{"macos_patterns", func(_ []string, c string) (bool, string) { return h.checkMacOSPatterns(c) }},
+		{"dangerous_rm", func(t []string, _ string) (bool, string) { return h.detectDangerousRm(t) }},
+		{"volume_wipe", func(t []string, _ string) (bool, string) { return h.detectVolumeWipe(t) }},
+		{"recursive_ownership_perm", func(t []string, _ string) (bool, string) { return h.detectRecursiveOwnershipOrPerm(t) }},
 		{"potential_exfil", func(t []string, c string) (bool, string) { return h.detectPotentialExfil(t, c) }},
 	}
 
@@ -91,7 +91,7 @@ func (h *SecurityHook) runSecurityChecks(command string, tokens []string, cmdLow
 	return false, "", ""
 }
 
-func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	h.logPreToolUseCheck(event)
 
 	if event.ToolName != "Bash" {

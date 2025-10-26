@@ -166,7 +166,7 @@ func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON
 // and executing the configured job when the event name matches this hook's event.
 func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResponse {
-	return func(ctx context.Context, rawJSON string) *cchooks.RawResponse {
+	return func(_ context.Context, rawJSON string) *cchooks.RawResponse {
 		var rawEvent map[string]interface{}
 		if err := json.Unmarshal([]byte(rawJSON), &rawEvent); err != nil {
 			return nil

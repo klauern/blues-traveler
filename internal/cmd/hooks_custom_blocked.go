@@ -29,7 +29,7 @@ func createBlockedListCommand() *cli.Command {
 		Name:  "list",
 		Usage: "List blocked URL prefixes",
 		Flags: []cli.Flag{&cli.BoolFlag{Name: "global", Aliases: []string{"g"}}},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			path, lc, err := loadLogConfigForBlockedURLs(cmd.Bool("global"))
 			if err != nil {
 				return err
@@ -50,7 +50,7 @@ func createBlockedAddCommand() *cli.Command {
 			&cli.StringFlag{Name: "suggestion", Aliases: []string{"s"}},
 		},
 		ArgsUsage: "<prefix>",
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			prefix, err := validateSingleArgument(cmd.Args().Slice())
 			if err != nil {
 				return err
@@ -84,7 +84,7 @@ func createBlockedRemoveCommand() *cli.Command {
 		Usage:     "Remove a blocked URL prefix",
 		Flags:     []cli.Flag{&cli.BoolFlag{Name: "global", Aliases: []string{"g"}}},
 		ArgsUsage: "<prefix>",
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			prefix, err := validateSingleArgument(cmd.Args().Slice())
 			if err != nil {
 				return err
@@ -117,7 +117,7 @@ func createBlockedClearCommand() *cli.Command {
 		Name:  "clear",
 		Usage: "Clear all blocked URL prefixes",
 		Flags: []cli.Flag{&cli.BoolFlag{Name: "global", Aliases: []string{"g"}}},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			useGlobal := cmd.Bool("global")
 			path, lc, err := loadLogConfigForBlockedURLs(useGlobal)
 			if err != nil {

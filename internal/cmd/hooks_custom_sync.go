@@ -25,7 +25,7 @@ func newHooksCustomSyncCommand(isValidEventType func(string) bool, validEventTyp
 			&cli.StringFlag{Name: "post-matcher", Value: "Edit,Write", Usage: "Matcher for PostToolUse when not overridden"},
 			&cli.IntFlag{Name: "timeout", Aliases: []string{"t"}, Usage: "Override timeout in seconds for installed commands"},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			opts, err := parseSyncOptions(cmd, isValidEventType, validEventTypes)
 			if err != nil {
 				return err

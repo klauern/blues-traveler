@@ -69,7 +69,7 @@ func (h *DebugHook) ensureLogger() {
 	h.logger = log.New(h.logFile, "", log.LstdFlags)
 }
 
-func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *DebugHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	h.ensureLogger()
 	if h.logger != nil {
 		h.logger.Printf("PRE-TOOL: %s", event.ToolName)
@@ -135,7 +135,7 @@ func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 	return cchooks.Approve()
 }
 
-func (h *DebugHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *DebugHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	h.ensureLogger()
 	if h.logger != nil {
 		h.logger.Printf("POST-TOOL: %s", event.ToolName)

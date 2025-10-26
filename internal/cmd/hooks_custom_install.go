@@ -26,7 +26,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 			&cli.BoolFlag{Name: "prune", Usage: "Remove previously installed commands for this group before installing"},
 		},
 		ArgsUsage: "<group-name>",
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			if cmd.Bool("list") {
 				return handleListGroups()
 			}
