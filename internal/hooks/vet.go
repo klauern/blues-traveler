@@ -49,7 +49,10 @@ func (h *VetHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolU
 	h.logVetEvent(event.ToolName, filePath)
 
 	if err := h.typeCheckFile(filePath); err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("Vetting failed for %s: %v", filePath, err))
+		// User-friendly message + technical details for agent
+		userMsg := fmt.Sprintf("Code quality check failed for %s", filepath.Base(filePath))
+		agentMsg := fmt.Sprintf("Type checking failed for %s: %v", filePath, err)
+		return core.PostBlockWithMessages(userMsg, agentMsg)
 	}
 
 	return cchooks.Allow()

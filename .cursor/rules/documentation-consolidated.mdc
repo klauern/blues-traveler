@@ -9,8 +9,8 @@ description: Documentation structure, Go doc requirements, markdown standards, a
 
 ### Core Documentation
 - [README.md](mdc:README.md) - Project overview and quick start
-- [CLAUDE.md](mdc:CLAUDE.md) - AI assistant guidance (always keep updated!)
-- [AGENTS.md](mdc:AGENTS.md) - Same as CLAUDE.md (keep synchronized)
+- [AGENTS.md](mdc:AGENTS.md) - AI assistant guidance (always keep updated!)
+- [CLAUDE.md](mdc:CLAUDE.md) - Symlink to AGENTS.md (follows agents.md spec)
 
 ### User Guides
 - [docs/quick_start.md](mdc:docs/quick_start.md) - Getting started guide
@@ -121,7 +121,7 @@ const (
 
 When making changes:
 1. ✅ Update affected documentation
-2. ✅ Keep AGENTS.md and CLAUDE.md in sync
+2. ✅ Update AGENTS.md (CLAUDE.md symlinks to it)
 3. ✅ Update examples to match code
 4. ✅ Check all MDC links still work
 5. ✅ Ensure consistency across docs
