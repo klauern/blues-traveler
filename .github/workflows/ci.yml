@@ -33,20 +33,13 @@ jobs:
       run: go install mvdan.cc/gofumpt@latest
 
     - name: Install golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v2
-        install-mode: goinstall
+      uses: golangci/golangci-lint-action@v8
 
     - name: Download dependencies
       run: go mod download
 
     - name: Verify dependencies
       run: go mod verify
-
-
-    - name: Run golangci-lint
-      run: golangci-lint run --timeout=5m
 
     - name: Run tests
       run: |
@@ -80,7 +73,7 @@ jobs:
   format-check:
     name: Format Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -116,7 +109,7 @@ jobs:
   security-check:
     name: Security Check
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
