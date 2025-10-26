@@ -11,6 +11,15 @@ import (
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
+// Tool name constants
+const (
+	ToolBash  = "Bash"
+	ToolEdit  = "Edit"
+	ToolWrite = "Write"
+	ToolRead  = "Read"
+	ToolGlob  = "Glob"
+)
+
 // AuditHook implements comprehensive audit logging
 type AuditHook struct {
 	*core.BaseHook
@@ -51,18 +60,18 @@ func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 
 	// Add tool-specific details
 	switch event.ToolName {
-	case "Bash":
+	case ToolBash:
 		if bash, err := event.AsBash(); err == nil {
 			entry.Details["command"] = bash.Command
 			entry.Details["description"] = bash.Description
 		}
-	case "Edit":
+	case ToolEdit:
 		if edit, err := event.AsEdit(); err == nil {
 			entry.Details["file_path"] = edit.FilePath
 			entry.Details["old_string_length"] = len(edit.OldString)
 			entry.Details["new_string_length"] = len(edit.NewString)
 		}
-	case "Write":
+	case ToolWrite:
 		if write, err := event.AsWrite(); err == nil {
 			entry.Details["file_path"] = write.FilePath
 			entry.Details["content_length"] = len(write.Content)

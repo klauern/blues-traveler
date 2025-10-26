@@ -109,13 +109,17 @@ This will automatically configure the hook to run for the specified events.`,
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
-				return fmt.Errorf("error getting settings path: %v", err)
+				scope := ScopeProject
+				if global {
+					scope = ScopeGlobal
+				}
+				return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
 			}
 
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				return fmt.Errorf("error loading settings: %v", err)
+				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
 			}
 
 			// Add hook to settings
@@ -140,7 +144,7 @@ This will automatically configure the hook to run for the specified events.`,
 			// Save settings (only if not a duplicate with no changes)
 			if !isDuplicateNoChange {
 				if err := config.SaveSettings(settingsPath, settings); err != nil {
-					return fmt.Errorf("error saving settings: %v", err)
+					return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
 				}
 			}
 
@@ -221,13 +225,17 @@ func newHooksUninstallCommand() *cli.Command {
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
-				return fmt.Errorf("error getting settings path: %v", err)
+				scope := ScopeProject
+				if global {
+					scope = ScopeGlobal
+				}
+				return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
 			}
 
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				return fmt.Errorf("error loading settings: %v", err)
+				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
 			}
 
 			// Remove hook from settings

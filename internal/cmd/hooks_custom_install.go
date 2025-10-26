@@ -52,7 +52,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 			installed := installGroupHooks(settings, (*cfg)[opts.groupName], opts)
 
 			if err := config.SaveSettings(settingsPath, settings); err != nil {
-				return fmt.Errorf("error saving settings: %v", err)
+				return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Verify file permissions and available disk space", settingsPath, err)
 			}
 
 			printInstallSuccess(opts.groupName, getScopeName(opts.useGlobal), installed, settingsPath)
@@ -65,7 +65,7 @@ func newHooksCustomInstallCommand(isValidEventType func(string) bool, validEvent
 func handleListGroups() error {
 	cfg, err := config.LoadHooksConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load hooks config: %v", err)
+		return fmt.Errorf("failed to load hooks.yml config: %w\n  Suggestion: Ensure hooks.yml exists in .claude/ directory and is valid YAML", err)
 	}
 	return listCustomHookGroups(cfg)
 }

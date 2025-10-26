@@ -12,6 +12,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Config format constants
+const (
+	FormatJSON = "json"
+	FormatTOML = "toml"
+)
+
 // XDGConfig handles XDG Base Directory Specification compliant configuration
 type XDGConfig struct {
 	BaseDir string
@@ -56,7 +62,7 @@ func (x *XDGConfig) GetConfigDir() string {
 // GetGlobalConfigPath returns the path to the global configuration file
 func (x *XDGConfig) GetGlobalConfigPath(format string) string {
 	if format == "" {
-		format = "json"
+		format = FormatJSON
 	}
 	return filepath.Join(x.BaseDir, fmt.Sprintf("global.%s", format))
 }
@@ -99,7 +105,7 @@ func (x *XDGConfig) SanitizeProjectPath(projectPath string) string {
 // GetProjectConfigPath returns the path to a project's configuration file
 func (x *XDGConfig) GetProjectConfigPath(projectPath, format string) string {
 	if format == "" {
-		format = "json"
+		format = FormatJSON
 	}
 	sanitized := x.SanitizeProjectPath(projectPath)
 	filename := fmt.Sprintf("%s.%s", sanitized, format)
@@ -243,11 +249,11 @@ func (x *XDGConfig) LoadProjectConfig(projectPath string) (map[string]interface{
 	var configData map[string]interface{}
 
 	switch config.ConfigFormat {
-	case "json":
+	case FormatJSON:
 		if err := json.Unmarshal(data, &configData); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON config: %w", err)
 		}
-	case "toml":
+	case FormatTOML:
 		if err := toml.Unmarshal(data, &configData); err != nil {
 			return nil, fmt.Errorf("failed to parse TOML config: %w", err)
 		}
@@ -261,7 +267,7 @@ func (x *XDGConfig) LoadProjectConfig(projectPath string) (map[string]interface{
 // SaveProjectConfig saves configuration data for a specific project
 func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]interface{}, format string) error {
 	if format == "" {
-		format = "json"
+		format = FormatJSON
 	}
 
 	if err := x.EnsureDirectories(); err != nil {
@@ -274,12 +280,12 @@ func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]
 	var err error
 
 	switch format {
-	case "json":
+	case FormatJSON:
 		data, err = json.MarshalIndent(configData, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON config: %w", err)
 		}
-	case "toml":
+	case FormatTOML:
 		var buf strings.Builder
 		encoder := toml.NewEncoder(&buf)
 		if err := encoder.Encode(configData); err != nil {
@@ -306,7 +312,7 @@ func (x *XDGConfig) SaveProjectConfig(projectPath string, configData map[string]
 // LoadGlobalConfig loads the global configuration
 func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, error) {
 	if format == "" {
-		format = "json"
+		format = FormatJSON
 	}
 
 	configPath := x.GetGlobalConfigPath(format)
@@ -324,11 +330,11 @@ func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, err
 	var configData map[string]interface{}
 
 	switch format {
-	case "json":
+	case FormatJSON:
 		if err := json.Unmarshal(data, &configData); err != nil {
 			return nil, fmt.Errorf("failed to parse JSON config: %w", err)
 		}
-	case "toml":
+	case FormatTOML:
 		if err := toml.Unmarshal(data, &configData); err != nil {
 			return nil, fmt.Errorf("failed to parse TOML config: %w", err)
 		}
@@ -342,7 +348,7 @@ func (x *XDGConfig) LoadGlobalConfig(format string) (map[string]interface{}, err
 // SaveGlobalConfig saves the global configuration
 func (x *XDGConfig) SaveGlobalConfig(configData map[string]interface{}, format string) error {
 	if format == "" {
-		format = "json"
+		format = FormatJSON
 	}
 
 	if err := x.EnsureDirectories(); err != nil {
@@ -355,12 +361,12 @@ func (x *XDGConfig) SaveGlobalConfig(configData map[string]interface{}, format s
 	var err error
 
 	switch format {
-	case "json":
+	case FormatJSON:
 		data, err = json.MarshalIndent(configData, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON config: %w", err)
 		}
-	case "toml":
+	case FormatTOML:
 		var buf strings.Builder
 		encoder := toml.NewEncoder(&buf)
 		if err := encoder.Encode(configData); err != nil {
