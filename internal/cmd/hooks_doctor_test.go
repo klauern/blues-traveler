@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -191,14 +192,16 @@ func TestGetCandidateConfigPaths(t *testing.T) {
 	hasProject := false
 	hasGlobal := false
 	home, _ := os.UserHomeDir()
+	cwd, _ := os.Getwd()
 
 	for _, p := range paths {
-		if home != "" {
-			if filepath.HasPrefix(p, home) {
-				hasGlobal = true
-			} else {
-				hasProject = true
-			}
+		// Global paths are directly under ~/.claude
+		// Project paths are under <current-dir>/.claude
+		if home != "" && strings.HasPrefix(p, filepath.Join(home, ".claude")) &&
+			!strings.HasPrefix(p, filepath.Join(cwd, ".claude")) {
+			hasGlobal = true
+		} else if strings.HasPrefix(p, filepath.Join(cwd, ".claude")) {
+			hasProject = true
 		}
 	}
 
