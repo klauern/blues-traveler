@@ -229,83 +229,128 @@ func NewConfigEditCmd() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			global := cmd.Bool("global")
-			projectPath := cmd.String("project")
-			editor := cmd.String("editor")
-
 			xdg := config.NewXDGConfig()
 
-			// Determine which config file to edit
-			var configPath string
-			var err error
-
-			if global {
-				configPath = xdg.GetGlobalConfigPath("json")
-				// Ensure the global config exists
-				if _, err := os.Stat(configPath); os.IsNotExist(err) {
-					if err := xdg.SaveGlobalConfig(make(map[string]interface{}), "json"); err != nil {
-						return fmt.Errorf("failed to create global config: %w", err)
-					}
-					fmt.Printf("Created new global configuration file: %s\n", configPath)
-				}
-			} else {
-				// Use current directory if no project specified
-				if projectPath == "" {
-					projectPath, err = os.Getwd()
-					if err != nil {
-						return fmt.Errorf("failed to get current directory: %w", err)
-					}
-				}
-
-				absProjectPath, err := filepath.Abs(projectPath)
-				if err != nil {
-					return fmt.Errorf("failed to get absolute path: %w", err)
-				}
-
-				// Check if project is registered
-				projectConfig, err := xdg.GetProjectConfig(absProjectPath)
-				if err != nil {
-					// Project not registered, create new config
-					defaultConfig := make(map[string]interface{})
-					if err := xdg.SaveProjectConfig(absProjectPath, defaultConfig, "json"); err != nil {
-						return fmt.Errorf("failed to create project config: %w", err)
-					}
-					fmt.Printf("Created new project configuration for: %s\n", absProjectPath)
-					projectConfig, _ = xdg.GetProjectConfig(absProjectPath)
-				}
-
-				configPath = filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
+			configPath, err := determineConfigPath(cmd, xdg)
+			if err != nil {
+				return err
 			}
 
-			// Determine editor to use
-			if editor == "" {
-				editor = os.Getenv("EDITOR")
-				if editor == "" {
-					// Try common editors
-					editors := []string{"code", "vim", "nano", "gedit"}
-					for _, e := range editors {
-						if _, err := exec.LookPath(e); err == nil {
-							editor = e
-							break
-						}
-					}
-				}
+			editor, err := selectEditor(cmd.String("editor"))
+			if err != nil {
+				return err
 			}
 
-			if editor == "" {
-				return fmt.Errorf("no editor found. Set $EDITOR environment variable or use --editor flag")
-			}
-
-			// Launch editor
-			fmt.Printf("Opening %s with %s...\n", configPath, editor)
-			cmd_exec := exec.Command(editor, configPath) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
-			cmd_exec.Stdin = os.Stdin
-			cmd_exec.Stdout = os.Stdout
-			cmd_exec.Stderr = os.Stderr
-
-			return cmd_exec.Run()
+			return launchEditor(editor, configPath)
 		},
 	}
+}
+
+// determineConfigPath determines which config file to edit based on flags
+func determineConfigPath(cmd *cli.Command, xdg *config.XDGConfig) (string, error) {
+	if cmd.Bool("global") {
+		return ensureGlobalConfigExists(xdg)
+	}
+	return ensureProjectConfigExists(cmd.String("project"), xdg)
+}
+
+// ensureGlobalConfigExists ensures the global config file exists and returns its path
+func ensureGlobalConfigExists(xdg *config.XDGConfig) (string, error) {
+	configPath := xdg.GetGlobalConfigPath("json")
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := xdg.SaveGlobalConfig(make(map[string]interface{}), "json"); err != nil {
+			return "", fmt.Errorf("failed to create global config: %w", err)
+		}
+		fmt.Printf("Created new global configuration file: %s\n", configPath)
+	}
+
+	return configPath, nil
+}
+
+// ensureProjectConfigExists ensures the project config file exists and returns its path
+func ensureProjectConfigExists(projectPath string, xdg *config.XDGConfig) (string, error) {
+	absProjectPath, err := resolveProjectPath(projectPath)
+	if err != nil {
+		return "", err
+	}
+
+	projectConfig, err := xdg.GetProjectConfig(absProjectPath)
+	if err != nil {
+		// Project not registered, create new config
+		if err := createNewProjectConfig(absProjectPath, xdg); err != nil {
+			return "", err
+		}
+		projectConfig, _ = xdg.GetProjectConfig(absProjectPath)
+	}
+
+	return filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile), nil
+}
+
+// resolveProjectPath resolves the project path to an absolute path
+func resolveProjectPath(projectPath string) (string, error) {
+	if projectPath == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current directory: %w", err)
+		}
+		projectPath = cwd
+	}
+
+	absPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	return absPath, nil
+}
+
+// createNewProjectConfig creates a new project configuration
+func createNewProjectConfig(projectPath string, xdg *config.XDGConfig) error {
+	defaultConfig := make(map[string]interface{})
+	if err := xdg.SaveProjectConfig(projectPath, defaultConfig, "json"); err != nil {
+		return fmt.Errorf("failed to create project config: %w", err)
+	}
+	fmt.Printf("Created new project configuration for: %s\n", projectPath)
+	return nil
+}
+
+// selectEditor determines which editor to use based on flag, environment, or common editors
+func selectEditor(editorFlag string) (string, error) {
+	if editorFlag != "" {
+		return editorFlag, nil
+	}
+
+	if envEditor := os.Getenv("EDITOR"); envEditor != "" {
+		return envEditor, nil
+	}
+
+	if commonEditor := findCommonEditor(); commonEditor != "" {
+		return commonEditor, nil
+	}
+
+	return "", fmt.Errorf("no editor found. Set $EDITOR environment variable or use --editor flag")
+}
+
+// findCommonEditor searches for commonly available editors
+func findCommonEditor() string {
+	editors := []string{"code", "vim", "nano", "gedit"}
+	for _, editor := range editors {
+		if _, err := exec.LookPath(editor); err == nil {
+			return editor
+		}
+	}
+	return ""
+}
+
+// launchEditor launches the specified editor with the config file
+func launchEditor(editor, configPath string) error {
+	fmt.Printf("Opening %s with %s...\n", configPath, editor)
+	cmd := exec.Command(editor, configPath) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // NewConfigCleanCmd creates the config clean subcommand

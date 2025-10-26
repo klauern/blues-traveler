@@ -150,50 +150,63 @@ func clearAllConfig(t *testing.T) {
 func runConfigSync(t *testing.T, groupFilter ...string) error {
 	t.Helper()
 
-	// Load hooks config (this is what the sync command does)
-	hooksCfg, err := btconfig.LoadHooksConfig()
+	hooksCfg, settings, settingsPath, err := loadConfigAndSettings()
 	if err != nil {
 		return err
 	}
 
-	// Note: We don't return early for empty config anymore, since we need to clean up stale entries
+	targetGroup := getTargetGroup(groupFilter)
+	changed := cleanupStaleGroupsForTest(t, settings, hooksCfg, targetGroup)
+	changed += syncCurrentGroups(t, settings, hooksCfg, targetGroup)
 
-	// Load settings
+	if changed == 0 {
+		t.Log("No changes detected.")
+		return nil
+	}
+
+	return btconfig.SaveSettings(settingsPath, settings)
+}
+
+// loadConfigAndSettings loads the hooks config and settings
+func loadConfigAndSettings() (*btconfig.CustomHooksConfig, *btconfig.Settings, string, error) {
+	hooksCfg, err := btconfig.LoadHooksConfig()
+	if err != nil {
+		return nil, nil, "", err
+	}
+
 	settingsPath, err := btconfig.GetSettingsPath(false) // project scope
 	if err != nil {
-		return err
+		return nil, nil, "", err
 	}
 
 	settings, err := btconfig.LoadSettings(settingsPath)
 	if err != nil {
-		return err
+		return nil, nil, "", err
 	}
 
-	// Determine group filter
-	var targetGroup string
+	return hooksCfg, settings, settingsPath, nil
+}
+
+// getTargetGroup extracts the target group from the filter if provided
+func getTargetGroup(groupFilter []string) string {
 	if len(groupFilter) > 0 {
-		targetGroup = groupFilter[0]
+		return groupFilter[0]
 	}
+	return ""
+}
 
-	// This mimics the updated sync logic with stale group cleanup
+// cleanupStaleGroupsForTest removes groups that exist in settings but not in current config
+func cleanupStaleGroupsForTest(t *testing.T, settings *btconfig.Settings, hooksCfg *btconfig.CustomHooksConfig, targetGroup string) int {
+	t.Helper()
 	changed := 0
 
-	// Step 1: Clean up stale groups that no longer exist in config
 	existingGroups := btconfig.GetConfigGroupsInSettings(settings)
-	configGroups := make(map[string]bool)
-	if hooksCfg != nil {
-		for groupName := range *hooksCfg {
-			configGroups[groupName] = true
-		}
-	}
+	configGroups := buildConfigGroupsMapForTest(hooksCfg)
 
-	// Remove groups that exist in settings but not in current config
 	for existingGroup := range existingGroups {
-		// If we have a group filter, only process that specific group
-		if targetGroup != "" && existingGroup != targetGroup {
+		if shouldSkipGroupForTest(existingGroup, targetGroup) {
 			continue
 		}
-		// If the group doesn't exist in current config, remove it
 		if !configGroups[existingGroup] {
 			removed := btconfig.RemoveConfigGroupFromSettings(settings, existingGroup, "")
 			if removed > 0 {
@@ -203,46 +216,88 @@ func runConfigSync(t *testing.T, groupFilter ...string) error {
 		}
 	}
 
-	// Step 2: Iterate current config groups and sync them
+	return changed
+}
+
+// buildConfigGroupsMapForTest creates a map of groups that exist in the current config
+func buildConfigGroupsMapForTest(hooksCfg *btconfig.CustomHooksConfig) map[string]bool {
+	configGroups := make(map[string]bool)
 	if hooksCfg != nil {
-		for groupName, group := range *hooksCfg {
-			if targetGroup != "" && groupName != targetGroup {
-				continue
-			}
-
-			// Prune existing settings for this group
-			removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, "")
-			if removed > 0 {
-				t.Logf("Pruned %d entries for group '%s'", removed, groupName)
-			}
-
-			// Add current definitions
-			for eventName, ev := range group {
-				for _, job := range ev.Jobs {
-					if job.Name == "" {
-						continue
-					}
-					// Build command to run this job
-					hookCommand := "blues-traveler run config:" + groupName + ":" + job.Name
-					// Use default matcher
-					matcher := "*"
-					if eventName == "PostToolUse" {
-						matcher = "Edit,Write"
-					}
-					// Add to settings
-					btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, nil)
-					changed++
-				}
-			}
+		for groupName := range *hooksCfg {
+			configGroups[groupName] = true
 		}
-	} // Close the if hooksCfg != nil block
+	}
+	return configGroups
+}
 
-	if changed == 0 {
-		t.Log("No changes detected.")
-		return nil
+// shouldSkipGroupForTest determines if a group should be skipped based on the filter
+func shouldSkipGroupForTest(groupName, targetGroup string) bool {
+	return targetGroup != "" && groupName != targetGroup
+}
+
+// syncCurrentGroups syncs the current config groups to settings
+func syncCurrentGroups(t *testing.T, settings *btconfig.Settings, hooksCfg *btconfig.CustomHooksConfig, targetGroup string) int {
+	t.Helper()
+	changed := 0
+
+	if hooksCfg == nil {
+		return changed
 	}
 
-	return btconfig.SaveSettings(settingsPath, settings)
+	for groupName, group := range *hooksCfg {
+		if shouldSkipGroupForTest(groupName, targetGroup) {
+			continue
+		}
+
+		changed += syncGroup(t, settings, groupName, group)
+	}
+
+	return changed
+}
+
+// syncGroup syncs a single group to settings
+func syncGroup(t *testing.T, settings *btconfig.Settings, groupName string, group btconfig.HookGroup) int {
+	t.Helper()
+	changed := 0
+
+	// Prune existing settings for this group
+	removed := btconfig.RemoveConfigGroupFromSettings(settings, groupName, "")
+	if removed > 0 {
+		t.Logf("Pruned %d entries for group '%s'", removed, groupName)
+	}
+
+	// Add current definitions
+	for eventName, ev := range group {
+		changed += addJobsToSettings(settings, groupName, eventName, ev.Jobs)
+	}
+
+	return changed
+}
+
+// addJobsToSettings adds jobs to settings for a specific event
+func addJobsToSettings(settings *btconfig.Settings, groupName, eventName string, jobs []btconfig.HookJob) int {
+	changed := 0
+
+	for _, job := range jobs {
+		if job.Name == "" {
+			continue
+		}
+
+		hookCommand := "blues-traveler run config:" + groupName + ":" + job.Name
+		matcher := determineMatcherForEvent(eventName)
+		btconfig.AddHookToSettings(settings, eventName, matcher, hookCommand, nil)
+		changed++
+	}
+
+	return changed
+}
+
+// determineMatcherForEvent determines the appropriate matcher for an event
+func determineMatcherForEvent(eventName string) string {
+	if eventName == "PostToolUse" {
+		return "Edit,Write"
+	}
+	return "*"
 }
 
 // countHooksInSettings counts custom hook entries in settings.json for a specific group
