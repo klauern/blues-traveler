@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/klauern/blues-traveler/internal/constants"
@@ -137,42 +138,6 @@ func TestSanitizeFileName_AddsExtension(t *testing.T) {
 }
 
 // Helper functions
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && findSubstringInString(s, substr)
-}
-
-func findSubstringInString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func hasSuffix(s, suffix string) bool {
-	if len(s) < len(suffix) {
-		return false
-	}
-	// Case-insensitive comparison for extensions
-	sLower := toLower(s[len(s)-len(suffix):])
-	suffixLower := toLower(suffix)
-	return sLower == suffixLower
-}
-
-func toLower(s string) string {
-	result := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			result[i] = c + 32
-		} else {
-			result[i] = c
-		}
-	}
-	return string(result)
-}
-
 // validateSanitizeError validates that sanitizeFileName returned the expected error
 func validateSanitizeError(t *testing.T, testName, fileName, expectedErrMsg string, err error) {
 	t.Helper()
@@ -185,22 +150,22 @@ func validateSanitizeError(t *testing.T, testName, fileName, expectedErrMsg stri
 		return
 	}
 
-	if containsString(err.Error(), expectedErrMsg) {
+	if strings.Contains(err.Error(), expectedErrMsg) {
 		return
 	}
 
 	// Platform-specific error message handling
 	isWindowsAbsoluteCase := runtime.GOOS == constants.GOOSWindows &&
 		testName == "absolute path windows" &&
-		containsString(err.Error(), "absolute paths not allowed")
+		strings.Contains(err.Error(), "absolute paths not allowed")
 	isUnixBackslashCase := runtime.GOOS != constants.GOOSWindows &&
 		testName == "absolute path windows" &&
-		containsString(err.Error(), "path separators not allowed")
+		strings.Contains(err.Error(), "path separators not allowed")
 	// On Windows, Unix absolute paths like "/etc/passwd" are not recognized as absolute
 	// by filepath.IsAbs, so they trigger the path separator check instead
 	isWindowsUnixPathCase := runtime.GOOS == constants.GOOSWindows &&
 		testName == "absolute path unix" &&
-		containsString(err.Error(), "path separators not allowed")
+		strings.Contains(err.Error(), "path separators not allowed")
 
 	if !isWindowsAbsoluteCase && !isUnixBackslashCase && !isWindowsUnixPathCase {
 		t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", fileName, err, expectedErrMsg)
@@ -215,8 +180,9 @@ func validateSanitizeSuccess(t *testing.T, fileName, got string, err error) {
 		return
 	}
 
-	// Verify the result has a proper extension
-	if got != "" && !hasSuffix(got, ".yml") && !hasSuffix(got, ".yaml") {
+	// Verify the result has a proper extension (case-insensitive)
+	gotLower := strings.ToLower(got)
+	if got != "" && !strings.HasSuffix(gotLower, ".yml") && !strings.HasSuffix(gotLower, ".yaml") {
 		t.Errorf("sanitizeFileName(%q) = %q, expected .yml or .yaml extension", fileName, got)
 	}
 }

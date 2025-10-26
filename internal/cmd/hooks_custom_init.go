@@ -112,10 +112,8 @@ func writePerGroupConfig(global bool, fileName string, sample string, overwrite 
 		return "", err
 	}
 
+	// hooks subdirectory already created by EnsureClaudeDir
 	hooksDir := filepath.Join(dir, "hooks")
-	if err := os.MkdirAll(hooksDir, 0o750); err != nil {
-		return "", err
-	}
 
 	// Sanitize filename to prevent path traversal
 	base, err := sanitizeFileName(fileName)
