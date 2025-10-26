@@ -27,6 +27,7 @@ type DualMessagePostToolResponse struct {
 //
 // If agentMsg is omitted, userMsg is sent to both audiences.
 // If agentMsg is provided, userMsg goes to the user and agentMsg goes to the agent.
+// If multiple agentMsg values are provided, only the first is used.
 //
 // Usage:
 //

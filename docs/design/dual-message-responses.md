@@ -22,12 +22,12 @@ This design describes a wrapper layer that adds dual-message support without for
 
 ### High-Level Flow
 
-```
+```text
 Hook Code (security.go, format.go, etc.)
          ↓
          Block("user msg", "agent msg")  ← Call dual-message wrapper
          ↓
-Response wrapper layer (internal/core/response.go)
+Response wrapper layer ([internal/core/response.go](mdc:internal/core/response.go))
          ↓
 cchooks.Block(userMsg)  ← Single message to cchooks
          ↓
@@ -78,7 +78,8 @@ func (r *DualMessageResponse) Permission() string {
 // Add metadata-carrying methods
 ```
 
-**Option B: Metadata in Environment Variables**
+##### Option B: Metadata in Environment Variables
+
 - Store userMessage/agentMessage in environment during response
 - Claude Code reads and routes based on env vars
 - Simpler but less type-safe
