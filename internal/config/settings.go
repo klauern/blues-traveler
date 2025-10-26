@@ -109,6 +109,54 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 	return settings, nil
 }
 
+// writeFileAtomic writes data to a file atomically by writing to a temp file
+// and then renaming it. This prevents corruption from power loss or crashes.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	// Create temp file in same directory to ensure same filesystem
+	dir := filepath.Dir(path)
+	tempFile, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+
+	// Clean up temp file on error
+	defer func() {
+		if tempFile != nil {
+			tempFile.Close()
+			os.Remove(tempPath)
+		}
+	}()
+
+	// Write data to temp file
+	if _, err := tempFile.Write(data); err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	// Sync to disk to ensure data is persisted
+	if err := tempFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	// Close temp file before rename
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+	tempFile = nil // Prevent defer from closing again
+
+	// Set permissions before rename
+	if err := os.Chmod(tempPath, perm); err != nil {
+		return fmt.Errorf("failed to set permissions: %w", err)
+	}
+
+	// Atomic rename (on POSIX systems)
+	if err := os.Rename(tempPath, path); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	return nil
+}
+
 // SaveSettings saves settings to the specified path with proper formatting
 func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
@@ -146,7 +194,7 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
-	if err := os.WriteFile(settingsPath, data, 0o600); err != nil {
+	if err := writeFileAtomic(settingsPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write settings file: %w", err)
 	}
 

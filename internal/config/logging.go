@@ -120,7 +120,7 @@ func SaveLogConfig(configPath string, config *LogConfig) error {
 		return fmt.Errorf("failed to marshal config: %v", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0o600); err != nil {
+	if err := writeFileAtomic(configPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 

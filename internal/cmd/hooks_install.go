@@ -278,8 +278,7 @@ func newHooksUninstallCommand() *cli.Command {
 
 			// Handle 'all' case
 			if hookType == "all" {
-				uninstallAllKlauerHooks(global, cmd.Bool("yes"))
-				return nil
+				return uninstallAllKlauerHooks(global, cmd.Bool("yes"))
 			}
 
 			// Get settings path
@@ -398,19 +397,17 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 }
 
 // uninstallAllKlauerHooks removes all blues-traveler hooks from settings
-func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
+func uninstallAllKlauerHooks(global bool, skipConfirmation bool) error {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to get settings path: %w", err)
 	}
 
 	// Load existing settings
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading settings: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load settings from %s: %w", settingsPath, err)
 	}
 
 	scope := constants.ScopeProject
@@ -423,7 +420,7 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 
 	if totalHooksBefore == 0 {
 		fmt.Printf("No blues-traveler hooks found in %s settings.\n", scope)
-		return
+		return nil
 	}
 
 	// Show what will be removed
@@ -440,7 +437,7 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" && response != "yes" {
 			fmt.Println("Operation cancelled.")
-			return
+			return nil
 		}
 	}
 
@@ -449,13 +446,12 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 
 	if removed == 0 {
 		fmt.Printf("No blues-traveler hooks were found to remove.\n")
-		return
+		return nil
 	}
 
 	// Save settings
 	if err := config.SaveSettings(settingsPath, settings); err != nil {
-		fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to save settings to %s: %w", settingsPath, err)
 	}
 
 	fmt.Printf("✅ Successfully removed %d blues-traveler hooks from %s settings\n", removed, scope)
@@ -466,4 +462,5 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 		globalFlag = " --global"
 	}
 	fmt.Printf("\nUse 'blues-traveler hooks list --installed%s' to verify the changes.\n", globalFlag)
+	return nil
 }
