@@ -46,6 +46,7 @@ dist/
 # Track .beads/issues.jsonl for version control
 # Ignore database and temporary files
 .beads/*.db
+.beads/*.db.backup
 .beads/*.db-shm
 .beads/*.db-wal
 .beads/daemon.lock
