@@ -149,17 +149,16 @@ func (h *SecurityHook) checkStaticPatterns(cmdLower string) (bool, string) {
 
 // checkMacOSPatterns checks macOS specific critical command regexes
 func (h *SecurityHook) checkMacOSPatterns(cmdLower string) (bool, string) {
-	// Use case-insensitive regexes since cmdLower is already lowercased
 	regexes := map[string]*regexp.Regexp{
-		"disk erase / format (diskutil)": regexp.MustCompile(`(?i)\bdiskutil\s+(erase(?:disk|volume)|apfs\s+erase)`),
-		"asr restore":                    regexp.MustCompile(`(?i)\basr\s+restore\b`),
-		"csrutil modification":           regexp.MustCompile(`(?i)\bcsrutil\b`),
-		"gatekeeper disable (spctl)":     regexp.MustCompile(`(?i)\bspctl\b.*--master-disable`),
-		"launchctl service removal":      regexp.MustCompile(`(?i)\blaunchctl\b.*\b(remove|bootout)\b`),
-		"systemsetup change":             regexp.MustCompile(`(?i)\bsystemsetup\b\s+-set`),
-		"host/network config change":     regexp.MustCompile(`(?i)\b(scutil|networksetup)\b\s+--?set`),
-		"TCC db direct write":            regexp.MustCompile(`(?i)sqlite3\s+.*tcc\.db`),
-		"keychain dump":                  regexp.MustCompile(`(?i)\bsecurity\s+dump-keychain\b`),
+		"disk erase / format (diskutil)": regexp.MustCompile(`\bdiskutil\s+(erase(?:disk|volume)|apfs\s+erase)`),
+		"asr restore":                    regexp.MustCompile(`\basr\s+restore\b`),
+		"csrutil modification":           regexp.MustCompile(`\bcsrutil\b`),
+		"gatekeeper disable (spctl)":     regexp.MustCompile(`\bspctl\b.*--master-disable`),
+		"launchctl service removal":      regexp.MustCompile(`\blaunchctl\b.*\b(remove|bootout)\b`),
+		"systemsetup change":             regexp.MustCompile(`\bsystemsetup\b\s+-set`),
+		"host/network config change":     regexp.MustCompile(`\b(scutil|networksetup)\b\s+--?set`),
+		"TCC db direct write":            regexp.MustCompile(`sqlite3\s+.*tcc\.db`),
+		"keychain dump":                  regexp.MustCompile(`\bsecurity\s+dump-keychain\b`),
 	}
 
 	for label, rx := range regexes {

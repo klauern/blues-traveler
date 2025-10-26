@@ -5,20 +5,20 @@ globs: internal/hooks/security*.go
 
 # Security Hook Patterns
 
-## Case-Insensitive Regex Patterns
+## Pre-Lowercased Input Patterns
 
-All security regex patterns must use the `(?i)` flag because command strings are lowercased:
+Security patterns receive already-lowercased input, so use simple patterns without `(?i)` flags:
 
 ```go
-// ✅ CORRECT - case insensitive
-regexes := map[string]*regexp.Regexp{
-    "disk erase": regexp.MustCompile(`(?i)\bdiskutil\s+erase`),
-    "TCC db write": regexp.MustCompile(`(?i)sqlite3\s+.*tcc\.db`),
-}
-
-// ❌ WRONG - will miss "DiskUtil", "DISKUTIL", etc.
+// ✅ CORRECT - simple patterns for lowercased input (line 111: cmdLower := strings.ToLower(bash.Command))
 regexes := map[string]*regexp.Regexp{
     "disk erase": regexp.MustCompile(`\bdiskutil\s+erase`),
+    "TCC db write": regexp.MustCompile(`sqlite3\s+.*tcc\.db`),
+}
+
+// ❌ WRONG - unnecessary (?i) flag adds overhead
+regexes := map[string]*regexp.Regexp{
+    "disk erase": regexp.MustCompile(`(?i)\bdiskutil\s+erase`),  // Redundant when input is lowercased
 }
 ```
 
