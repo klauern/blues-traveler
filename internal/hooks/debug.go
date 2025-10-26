@@ -36,7 +36,7 @@ func (h *DebugHook) Run() error {
 	}
 	defer func() {
 		if h.logFile != nil {
-			h.logFile.Close()
+			_ = h.logFile.Close()
 		}
 	}()
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())

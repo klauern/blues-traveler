@@ -131,15 +131,9 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	c := core.BuildPreToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PreToolUseEvent), c)
-	ok, err := h.shouldRun(env)
-	if err != nil {
-		return cchooks.Block(fmt.Sprintf("config hook error: %v", err))
-	}
-	if !ok {
-		return cchooks.Approve()
-	}
-	if err := h.runCommandWithEnv(env); err != nil {
-		return cchooks.Block(fmt.Sprintf("job '%s' failed: %v", h.job.Name, err))
+
+	if err := h.executeIfShouldRun(env); err != nil {
+		return cchooks.Block(err.Error())
 	}
 	return cchooks.Approve()
 }
@@ -147,17 +141,26 @@ func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent
 func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	c := core.BuildPostToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PostToolUseEvent), c)
-	ok, err := h.shouldRun(env)
-	if err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("config hook error: %v", err))
-	}
-	if !ok {
-		return cchooks.Allow()
-	}
-	if err := h.runCommandWithEnv(env); err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("job '%s' failed: %v", h.job.Name, err))
+
+	if err := h.executeIfShouldRun(env); err != nil {
+		return cchooks.PostBlock(err.Error())
 	}
 	return cchooks.Allow()
+}
+
+// executeIfShouldRun checks if the hook should run and executes it
+func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
+	ok, err := h.shouldRun(env)
+	if err != nil {
+		return fmt.Errorf("config hook error: %v", err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := h.runCommandWithEnv(env); err != nil {
+		return fmt.Errorf("job '%s' failed: %v", h.job.Name, err)
+	}
+	return nil
 }
 
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON

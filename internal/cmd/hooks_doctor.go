@@ -67,38 +67,19 @@ func runDoctorCheck(verbose bool) error {
 
 // checkProjectSettings checks project-level hook settings
 func checkProjectSettings(verbose bool) {
-	settingsPath, err := config.GetSettingsPath(false)
-	if err != nil {
-		fmt.Printf("⚠️  Error getting project settings path: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Location: %s\n", settingsPath)
-
-	settings, err := config.LoadSettings(settingsPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("Status: ✗ No project settings file found")
-			fmt.Println("        Use 'hooks install <plugin>' to create project settings")
-		} else {
-			fmt.Printf("Status: ⚠️  Error loading settings: %v\n", err)
-		}
-		return
-	}
-
-	if config.IsHooksConfigEmpty(settings.Hooks) {
-		fmt.Println("Status: ✓ Settings file exists, but no hooks installed")
-	} else {
-		fmt.Println("Status: ✓ Hooks configured")
-		printHooksSummary(settings.Hooks, verbose)
-	}
+	checkSettings(false, verbose, "project", "hooks install <plugin>")
 }
 
 // checkGlobalSettings checks global-level hook settings
 func checkGlobalSettings(verbose bool) {
-	settingsPath, err := config.GetSettingsPath(true)
+	checkSettings(true, verbose, "global", "hooks install <plugin> --global")
+}
+
+// checkSettings is a helper that checks hook settings for project or global scope
+func checkSettings(isGlobal bool, verbose bool, scope string, installCmd string) {
+	settingsPath, err := config.GetSettingsPath(isGlobal)
 	if err != nil {
-		fmt.Printf("⚠️  Error getting global settings path: %v\n", err)
+		fmt.Printf("⚠️  Error getting %s settings path: %v\n", scope, err)
 		return
 	}
 
@@ -107,8 +88,8 @@ func checkGlobalSettings(verbose bool) {
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("Status: ✗ No global settings file found")
-			fmt.Println("        Use 'hooks install <plugin> --global' to create global settings")
+			fmt.Printf("Status: ✗ No %s settings file found\n", scope)
+			fmt.Printf("        Use '%s' to create %s settings\n", installCmd, scope)
 		} else {
 			fmt.Printf("Status: ⚠️  Error loading settings: %v\n", err)
 		}

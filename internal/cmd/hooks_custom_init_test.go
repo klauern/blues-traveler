@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -54,7 +55,7 @@ func TestSanitizeFileName(t *testing.T) {
 			name:     "absolute path windows",
 			fileName: "C:\\Windows\\System32",
 			wantErr:  true,
-			errMsg:   "path separators not allowed", // On Unix, backslash is caught by separator check
+			errMsg:   "path separators not allowed", // On Unix: checked by separator. On Windows: absolute path check
 		},
 		{
 			name:     "path traversal with slash",
@@ -101,7 +102,14 @@ func TestSanitizeFileName(t *testing.T) {
 				if err == nil {
 					t.Errorf("sanitizeFileName(%q) expected error containing %q, got nil", tt.fileName, tt.errMsg)
 				} else if tt.errMsg != "" && !containsString(err.Error(), tt.errMsg) {
-					t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", tt.fileName, err, tt.errMsg)
+					// On Windows, "C:\\Windows\\System32" is caught by absolute path check
+					// On Unix, backslashes are caught by separator check
+					isWindowsAbsoluteCase := runtime.GOOS == "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "absolute paths not allowed")
+					isUnixBackslashCase := runtime.GOOS != "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "path separators not allowed")
+
+					if !(isWindowsAbsoluteCase || isUnixBackslashCase) {
+						t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", tt.fileName, err, tt.errMsg)
+					}
 				}
 			} else {
 				if err != nil {

@@ -329,34 +329,32 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 }
 
 func RemoveHookFromSettings(settings *Settings, command string) bool {
-	removed := false
-
-	settings.Hooks.PreToolUse = removeHookFromMatchers(settings.Hooks.PreToolUse, command, &removed)
-	settings.Hooks.PostToolUse = removeHookFromMatchers(settings.Hooks.PostToolUse, command, &removed)
-	settings.Hooks.UserPromptSubmit = removeHookFromMatchers(settings.Hooks.UserPromptSubmit, command, &removed)
-	settings.Hooks.Notification = removeHookFromMatchers(settings.Hooks.Notification, command, &removed)
-	settings.Hooks.Stop = removeHookFromMatchers(settings.Hooks.Stop, command, &removed)
-	settings.Hooks.SubagentStop = removeHookFromMatchers(settings.Hooks.SubagentStop, command, &removed)
-	settings.Hooks.PreCompact = removeHookFromMatchers(settings.Hooks.PreCompact, command, &removed)
-	settings.Hooks.SessionStart = removeHookFromMatchers(settings.Hooks.SessionStart, command, &removed)
-
-	return removed
+	return removeFromAllEvents(settings, func(matchers []HookMatcher, removed *bool) []HookMatcher {
+		return removeHookFromMatchers(matchers, command, removed)
+	})
 }
 
 // RemoveHookTypeFromSettings removes all hooks matching a hook type pattern.
 // This handles cases where hooks were installed with flags (--log, --format) or
 // when the executable path has changed.
 func RemoveHookTypeFromSettings(settings *Settings, hookType string) bool {
+	return removeFromAllEvents(settings, func(matchers []HookMatcher, removed *bool) []HookMatcher {
+		return removeHookTypeFromMatchers(matchers, hookType, removed)
+	})
+}
+
+// removeFromAllEvents applies a removal function to all event types in settings
+func removeFromAllEvents(settings *Settings, removalFn func([]HookMatcher, *bool) []HookMatcher) bool {
 	removed := false
 
-	settings.Hooks.PreToolUse = removeHookTypeFromMatchers(settings.Hooks.PreToolUse, hookType, &removed)
-	settings.Hooks.PostToolUse = removeHookTypeFromMatchers(settings.Hooks.PostToolUse, hookType, &removed)
-	settings.Hooks.UserPromptSubmit = removeHookTypeFromMatchers(settings.Hooks.UserPromptSubmit, hookType, &removed)
-	settings.Hooks.Notification = removeHookTypeFromMatchers(settings.Hooks.Notification, hookType, &removed)
-	settings.Hooks.Stop = removeHookTypeFromMatchers(settings.Hooks.Stop, hookType, &removed)
-	settings.Hooks.SubagentStop = removeHookTypeFromMatchers(settings.Hooks.SubagentStop, hookType, &removed)
-	settings.Hooks.PreCompact = removeHookTypeFromMatchers(settings.Hooks.PreCompact, hookType, &removed)
-	settings.Hooks.SessionStart = removeHookTypeFromMatchers(settings.Hooks.SessionStart, hookType, &removed)
+	settings.Hooks.PreToolUse = removalFn(settings.Hooks.PreToolUse, &removed)
+	settings.Hooks.PostToolUse = removalFn(settings.Hooks.PostToolUse, &removed)
+	settings.Hooks.UserPromptSubmit = removalFn(settings.Hooks.UserPromptSubmit, &removed)
+	settings.Hooks.Notification = removalFn(settings.Hooks.Notification, &removed)
+	settings.Hooks.Stop = removalFn(settings.Hooks.Stop, &removed)
+	settings.Hooks.SubagentStop = removalFn(settings.Hooks.SubagentStop, &removed)
+	settings.Hooks.PreCompact = removalFn(settings.Hooks.PreCompact, &removed)
+	settings.Hooks.SessionStart = removalFn(settings.Hooks.SessionStart, &removed)
 
 	return removed
 }
