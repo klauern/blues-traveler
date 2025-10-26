@@ -307,7 +307,7 @@ func newHooksUninstallCommand() *cli.Command {
 
 			// Save settings
 			if err := config.SaveSettings(settingsPath, settings); err != nil {
-				return fmt.Errorf("error saving settings: %v", err)
+				return fmt.Errorf("error saving settings: %w", err)
 			}
 
 			scope := constants.ScopeProject

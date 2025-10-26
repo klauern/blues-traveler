@@ -94,7 +94,7 @@ func resolveExecutablePath() string {
 func loadSyncDependencies(useGlobal bool) (*config.CustomHooksConfig, *config.Settings, string, error) {
 	hooksCfg, err := config.LoadHooksConfig()
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("load hooks config: %v", err)
+		return nil, nil, "", fmt.Errorf("load hooks config: %w", err)
 	}
 
 	settingsPath, err := config.GetSettingsPath(useGlobal)

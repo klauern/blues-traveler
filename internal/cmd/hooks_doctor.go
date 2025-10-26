@@ -301,7 +301,7 @@ func getCandidateConfigPaths() ([]string, error) {
 	// Project scope
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current directory: %v", err)
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
 	proj := filepath.Join(cwd, ".claude")
 
@@ -317,7 +317,7 @@ func getCandidateConfigPaths() ([]string, error) {
 	// Global scope
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %v", err)
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 	glob := filepath.Join(home, ".claude")
 

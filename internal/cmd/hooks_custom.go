@@ -37,7 +37,7 @@ func newHooksCustomListCommand() *cli.Command {
 		Action: func(_ context.Context, _ *cli.Command) error {
 			cfg, err := config.LoadHooksConfig()
 			if err != nil {
-				return fmt.Errorf("load error: %v", err)
+				return fmt.Errorf("load error: %w", err)
 			}
 			groups := config.ListHookGroups(cfg)
 			if len(groups) == 0 {
@@ -60,10 +60,10 @@ func newHooksCustomValidateCommand() *cli.Command {
 		Action: func(_ context.Context, _ *cli.Command) error {
 			cfg, err := config.LoadHooksConfig()
 			if err != nil {
-				return fmt.Errorf("load error: %v", err)
+				return fmt.Errorf("load error: %w", err)
 			}
 			if err := config.ValidateHooksConfig(cfg); err != nil {
-				return fmt.Errorf("invalid hooks config: %v", err)
+				return fmt.Errorf("invalid hooks config: %w", err)
 			}
 			fmt.Println("hooks config is valid")
 			return nil
@@ -84,18 +84,18 @@ func newHooksCustomShowCommand() *cli.Command {
 			// Load merged hooks config (project over global, including embedded and legacy)
 			hooksCfg, err := config.LoadHooksConfig()
 			if err != nil {
-				return fmt.Errorf("load hooks config: %v", err)
+				return fmt.Errorf("load hooks config: %w", err)
 			}
 
 			// Load embedded blocked URLs for display (prefer project unless --global)
 			useGlobal := cmd.Bool("global")
 			cfgPath, err := config.GetLogConfigPath(useGlobal)
 			if err != nil {
-				return fmt.Errorf("get config path: %v", err)
+				return fmt.Errorf("get config path: %w", err)
 			}
 			logCfg, err := config.LoadLogConfig(cfgPath)
 			if err != nil {
-				return fmt.Errorf("load main config: %v", err)
+				return fmt.Errorf("load main config: %w", err)
 			}
 
 			// Build output view

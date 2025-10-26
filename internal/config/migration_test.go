@@ -70,7 +70,6 @@ func TestLegacyConfigDiscovery(t *testing.T) {
 	}
 
 	// Test discovery within the temp directory
-	originalWalkFunc := discovery.walkProjectDirectories
 	discoveredConfigs := make(map[string]string)
 
 	// Manually call walkProjectDirectories for our test directory
@@ -89,9 +88,6 @@ func TestLegacyConfigDiscovery(t *testing.T) {
 			t.Errorf("Config for project %s not discovered", project)
 		}
 	}
-
-	// Restore original function
-	_ = originalWalkFunc
 }
 
 func TestMigrationDryRun(t *testing.T) {

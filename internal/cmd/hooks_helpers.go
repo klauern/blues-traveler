@@ -91,7 +91,7 @@ func listInstalledHooks(global bool) error {
 	// Load existing settings
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
-		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Check if the settings file exists and is valid YAML/JSON", settingsPath, err)
+		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Check if the settings file exists and is valid JSON", settingsPath, err)
 	}
 
 	scope := ScopeProject
@@ -310,8 +310,10 @@ func syncJobsForEvent(settings *config.Settings, groupName, eventName string, ev
 		timeout := selectTimeout(opts.timeoutOverride, job.Timeout)
 		matcher := pickMatcherForEvent(eventName, opts.postMatcher, opts.defaultMatcher)
 
-		config.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
-		changed++
+		result := config.AddHookToSettings(settings, eventName, matcher, hookCommand, timeout)
+		if !result.WasDuplicate {
+			changed++
+		}
 
 		if opts.dryRun {
 			fmt.Printf("Would add: [%s] matcher=%q command=%q\n", eventName, matcher, hookCommand)
@@ -375,13 +377,13 @@ func loadOrCreateGroup(cfg *config.CustomHooksConfig, groupName string, initFlag
 	// Create stub group
 	sample := createSampleGroupYAML(groupName)
 	if _, err := config.WriteSampleHooksConfig(useGlobal, sample, false); err != nil {
-		return nil, fmt.Errorf("write hooks sample: %v", err)
+		return nil, fmt.Errorf("write hooks sample: %w", err)
 	}
 
 	// Reload after creating stub
 	reloadedCfg, err := config.LoadHooksConfig()
 	if err != nil {
-		return nil, fmt.Errorf("reload hooks config: %v", err)
+		return nil, fmt.Errorf("reload hooks config: %w", err)
 	}
 
 	if reloadedCfg == nil || (*reloadedCfg)[groupName] == nil {
@@ -445,8 +447,15 @@ func installJobsForEvent(settings *config.Settings, eventName string, ev *config
 func buildInstallCommand(groupName, jobName string) (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("failed to get executable path: %v", err)
+		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
+
+	// Quote the path when it contains spaces to handle paths like "/Program Files/app"
+	// Commands are executed via bash -lc, so unquoted paths with spaces break
+	if strings.ContainsRune(execPath, ' ') {
+		execPath = `"` + execPath + `"`
+	}
+
 	return fmt.Sprintf("%s hooks run config:%s:%s", execPath, groupName, jobName), nil
 }
 

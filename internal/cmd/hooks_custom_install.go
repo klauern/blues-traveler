@@ -107,7 +107,7 @@ func parseInstallOptions(cmd *cli.Command, isValidEventType func(string) bool, v
 func loadAndPrepareConfig(opts installOptions) (*config.CustomHooksConfig, error) {
 	cfg, err := config.LoadHooksConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load hooks config: %v", err)
+		return nil, fmt.Errorf("failed to load hooks config: %w", err)
 	}
 
 	return loadOrCreateGroup(cfg, opts.groupName, opts.init, opts.useGlobal)
@@ -117,12 +117,12 @@ func loadAndPrepareConfig(opts installOptions) (*config.CustomHooksConfig, error
 func loadSettingsForInstall(useGlobal bool) (*config.Settings, string, error) {
 	settingsPath, err := config.GetSettingsPath(useGlobal)
 	if err != nil {
-		return nil, "", fmt.Errorf("error getting settings path: %v", err)
+		return nil, "", fmt.Errorf("error getting settings path: %w", err)
 	}
 
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("error loading settings: %v", err)
+		return nil, "", fmt.Errorf("error loading settings: %w", err)
 	}
 
 	return settings, settingsPath, nil

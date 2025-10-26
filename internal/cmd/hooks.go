@@ -152,7 +152,7 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 
 			fmt.Printf("Running hook '%s'...\n", key)
 			if err := p.Run(); err != nil {
-				return fmt.Errorf("hook '%s' failed: %v", key, err)
+				return fmt.Errorf("hook '%s' failed: %w", key, err)
 			}
 			return nil
 		},
