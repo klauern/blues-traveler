@@ -202,10 +202,10 @@ func TestPostToolUseInterfaceCompliance(_ *testing.T) {
 // TestEmptyMessages tests that empty strings are handled correctly.
 func TestEmptyMessages(t *testing.T) {
 	tests := []struct {
-		name     string
-		userMsg  string
-		agentMsg []string
-		wantUser string
+		name      string
+		userMsg   string
+		agentMsg  []string
+		wantUser  string
 		wantAgent string
 	}{
 		{
@@ -249,7 +249,7 @@ func TestEmptyMessages(t *testing.T) {
 
 // TestUnicodeMessages tests that Unicode characters are handled correctly.
 func TestUnicodeMessages(t *testing.T) {
-	userMsg := "操作がブロックされました" // "Operation was blocked" in Japanese
+	userMsg := "操作がブロックされました"                       // "Operation was blocked" in Japanese
 	agentMsg := "Commande bloquée: motif détecté 🔒" // "Command blocked: pattern detected" in French with emoji
 
 	resp := BlockWithMessages(userMsg, agentMsg)
@@ -356,4 +356,3 @@ func BenchmarkPostBlockWithMessages(b *testing.B) {
 		_ = PostBlockWithMessages("test message", "agent message")
 	}
 }
-

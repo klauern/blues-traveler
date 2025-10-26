@@ -157,4 +157,3 @@ func (r *DualMessagePostToolResponse) GetUserMessage() string {
 func (r *DualMessagePostToolResponse) GetAgentMessage() string {
 	return r.agentMessage
 }
-
