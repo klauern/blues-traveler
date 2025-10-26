@@ -36,7 +36,9 @@ func (h *DebugHook) Run() error {
 	}
 	defer func() {
 		if h.logFile != nil {
-			_ = h.logFile.Close()
+			if err := h.logFile.Close(); err != nil && h.logger != nil {
+				h.logger.Printf("Error closing log file: %v", err)
+			}
 		}
 	}()
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())

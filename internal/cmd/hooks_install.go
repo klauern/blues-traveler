@@ -123,7 +123,7 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	// Load existing settings
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
-		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
+		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
 	}
 
 	// Add hook to settings
@@ -287,7 +287,7 @@ func newHooksUninstallCommand() *cli.Command {
 			// Load existing settings
 			settings, err := config.LoadSettings(settingsPath)
 			if err != nil {
-				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
+				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
 			}
 
 			// Remove hook from settings using pattern matching

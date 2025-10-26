@@ -99,6 +99,7 @@ func parseInstallOptions(cmd *cli.Command, isValidEventType func(string) bool, v
 		eventFilter:     eventFilter,
 		timeoutOverride: cmd.Int("timeout"),
 		prune:           cmd.Bool("prune"),
+		init:            cmd.Bool("init"),
 	}, nil
 }
 
@@ -109,7 +110,7 @@ func loadAndPrepareConfig(opts installOptions) (*config.CustomHooksConfig, error
 		return nil, fmt.Errorf("failed to load hooks config: %v", err)
 	}
 
-	return loadOrCreateGroup(cfg, opts.groupName, false, opts.useGlobal)
+	return loadOrCreateGroup(cfg, opts.groupName, opts.init, opts.useGlobal)
 }
 
 // loadSettingsForInstall loads settings for installation

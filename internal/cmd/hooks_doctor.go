@@ -85,14 +85,20 @@ func checkSettings(isGlobal bool, verbose bool, scope string, installCmd string)
 
 	fmt.Printf("Location: %s\n", settingsPath)
 
-	settings, err := config.LoadSettings(settingsPath)
-	if err != nil {
+	// Check if file exists first, since LoadSettings returns empty settings for missing files
+	if _, err := os.Stat(settingsPath); err != nil {
 		if os.IsNotExist(err) {
 			fmt.Printf("Status: ✗ No %s settings file found\n", scope)
 			fmt.Printf("        Use '%s' to create %s settings\n", installCmd, scope)
 		} else {
-			fmt.Printf("Status: ⚠️  Error loading settings: %v\n", err)
+			fmt.Printf("Status: ⚠️  Error checking settings file: %v\n", err)
 		}
+		return
+	}
+
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		fmt.Printf("Status: ⚠️  Error loading settings: %v\n", err)
 		return
 	}
 
@@ -150,8 +156,11 @@ func checkCustomHooksConfig(verbose bool) {
 		for _, f := range foundFiles {
 			scope := "project"
 			home, _ := os.UserHomeDir()
-			if home != "" && strings.HasPrefix(f, home) {
-				scope = "global"
+			if home != "" {
+				globalPrefix := filepath.Join(home, ".claude")
+				if strings.HasPrefix(f, globalPrefix) {
+					scope = "global"
+				}
 			}
 			fmt.Printf("  • %s (%s)\n", f, scope)
 		}
@@ -343,6 +352,24 @@ func getCandidateConfigPaths() ([]string, error) {
 		filepath.Join(glob, "hooks.yaml"),
 		filepath.Join(glob, "hooks.json"),
 	)
+
+	// Enumerate all *.yml and *.yaml files in project hooks directory
+	projHooksDir := filepath.Join(proj, "hooks")
+	if projYmls, err := filepath.Glob(filepath.Join(projHooksDir, "*.yml")); err == nil {
+		paths = append(paths, projYmls...)
+	}
+	if projYamls, err := filepath.Glob(filepath.Join(projHooksDir, "*.yaml")); err == nil {
+		paths = append(paths, projYamls...)
+	}
+
+	// Enumerate all *.yml and *.yaml files in global hooks directory
+	globHooksDir := filepath.Join(glob, "hooks")
+	if globYmls, err := filepath.Glob(filepath.Join(globHooksDir, "*.yml")); err == nil {
+		paths = append(paths, globYmls...)
+	}
+	if globYamls, err := filepath.Glob(filepath.Join(globHooksDir, "*.yaml")); err == nil {
+		paths = append(paths, globYamls...)
+	}
 
 	return paths, nil
 }

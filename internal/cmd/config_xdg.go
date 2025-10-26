@@ -563,7 +563,7 @@ func NewConfigLogCmd() *cli.Command {
 
 			logConfig, err := config.LoadLogConfig(configPath)
 			if err != nil {
-				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON/TOML format", configPath, err)
+				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
 			}
 
 			if show {

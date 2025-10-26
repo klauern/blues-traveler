@@ -48,6 +48,7 @@ func isValidHookConfigFile(name string) bool {
 }
 
 // collectPerGroupFiles collects per-group config files from a directory
+// Skips canonical hooks.yml and hooks.yaml files to avoid duplicates
 func collectPerGroupFiles(hooksDir string) []string {
 	var paths []string
 
@@ -61,8 +62,13 @@ func collectPerGroupFiles(hooksDir string) []string {
 		if e.IsDir() {
 			continue
 		}
-		if isValidHookConfigFile(e.Name()) {
-			names = append(names, e.Name())
+		// Skip canonical hooks.yml/hooks.yaml files as they're added explicitly
+		name := e.Name()
+		if name == "hooks.yml" || name == "hooks.yaml" {
+			continue
+		}
+		if isValidHookConfigFile(name) {
+			names = append(names, name)
 		}
 	}
 

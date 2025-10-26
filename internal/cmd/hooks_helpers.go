@@ -345,6 +345,7 @@ type installOptions struct {
 	eventFilter     string
 	timeoutOverride int
 	prune           bool
+	init            bool
 }
 
 // listCustomHookGroups lists all custom hook groups from config

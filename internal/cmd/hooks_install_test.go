@@ -97,39 +97,6 @@ func TestHandleDuplicateHookResult(t *testing.T) {
 	}
 }
 
-func TestParseInstallFlags(t *testing.T) {
-	tests := []struct {
-		name      string
-		logFormat string
-		wantErr   bool
-	}{
-		{
-			name:      "valid jsonl format",
-			logFormat: "jsonl",
-			wantErr:   false,
-		},
-		{
-			name:      "valid pretty format",
-			logFormat: "pretty",
-			wantErr:   false,
-		},
-		{
-			name:      "empty format defaults to jsonl",
-			logFormat: "",
-			wantErr:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Note: Full testing would require mocking cli.Command
-			// This is a placeholder for the test structure
-			if tt.wantErr {
-				// Test error cases
-			}
-		})
-	}
-}
 
 // Helper function
 func contains(s, substr string) bool {

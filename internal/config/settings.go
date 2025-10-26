@@ -355,6 +355,7 @@ func removeFromAllEvents(settings *Settings, removalFn func([]HookMatcher, *bool
 	settings.Hooks.SubagentStop = removalFn(settings.Hooks.SubagentStop, &removed)
 	settings.Hooks.PreCompact = removalFn(settings.Hooks.PreCompact, &removed)
 	settings.Hooks.SessionStart = removalFn(settings.Hooks.SessionStart, &removed)
+	settings.Hooks.SessionEnd = removalFn(settings.Hooks.SessionEnd, &removed)
 
 	return removed
 }
@@ -661,9 +662,17 @@ func extractConfigGroupName(command string) string {
 	}
 
 	// Extract group name from "blues-traveler run config:groupname:jobname"
-	parts := strings.Split(command, ":")
-	if len(parts) >= 3 && parts[1] != "" {
-		return parts[1]
+	// Find the "config:" substring to avoid splitting Windows paths like "C:\..."
+	configIdx := strings.Index(command, "config:")
+	if configIdx == -1 {
+		return ""
+	}
+
+	// Parse only from the "config:" part onwards
+	configPart := command[configIdx+len("config:"):]
+	parts := strings.Split(configPart, ":")
+	if len(parts) >= 2 && parts[0] != "" {
+		return parts[0]
 	}
 	return ""
 }
