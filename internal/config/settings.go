@@ -618,36 +618,56 @@ func GetConfigGroupsInSettings(settings *Settings) map[string]bool {
 		return groups
 	}
 
-	// Helper to extract group names from matchers
-	extractGroups := func(matchers []HookMatcher) {
-		for _, matcher := range matchers {
-			for _, hook := range matcher.Hooks {
-				if IsBluesTravelerCommand(hook.Command) && strings.Contains(hook.Command, "config:") {
-					// Extract group name from "blues-traveler run config:groupname:jobname"
-					parts := strings.Split(hook.Command, ":")
-					if len(parts) >= 3 {
-						groupName := parts[1]
-						if groupName != "" {
-							groups[groupName] = true
-						}
-					}
-				}
+	// Get all matcher slices from hooks
+	allMatchers := getAllHookMatchers(&settings.Hooks)
+
+	// Extract group names from all matchers
+	for _, matchers := range allMatchers {
+		extractGroupsFromMatchers(matchers, groups)
+	}
+
+	return groups
+}
+
+// getAllHookMatchers returns all hook matcher slices from a HooksConfig
+func getAllHookMatchers(hooks *HooksConfig) [][]HookMatcher {
+	return [][]HookMatcher{
+		hooks.PreToolUse,
+		hooks.PostToolUse,
+		hooks.UserPromptSubmit,
+		hooks.Notification,
+		hooks.Stop,
+		hooks.SubagentStop,
+		hooks.PreCompact,
+		hooks.SessionStart,
+		hooks.SessionEnd,
+	}
+}
+
+// extractGroupsFromMatchers extracts config group names from hook matchers
+func extractGroupsFromMatchers(matchers []HookMatcher, groups map[string]bool) {
+	for _, matcher := range matchers {
+		for _, hook := range matcher.Hooks {
+			if groupName := extractConfigGroupName(hook.Command); groupName != "" {
+				groups[groupName] = true
 			}
 		}
 	}
+}
 
-	// Extract from all event types
-	extractGroups(settings.Hooks.PreToolUse)
-	extractGroups(settings.Hooks.PostToolUse)
-	extractGroups(settings.Hooks.UserPromptSubmit)
-	extractGroups(settings.Hooks.Notification)
-	extractGroups(settings.Hooks.Stop)
-	extractGroups(settings.Hooks.SubagentStop)
-	extractGroups(settings.Hooks.PreCompact)
-	extractGroups(settings.Hooks.SessionStart)
-	extractGroups(settings.Hooks.SessionEnd)
+// extractConfigGroupName extracts the group name from a config hook command
+// Returns empty string if not a config hook command
+func extractConfigGroupName(command string) string {
+	if !IsBluesTravelerCommand(command) || !strings.Contains(command, "config:") {
+		return ""
+	}
 
-	return groups
+	// Extract group name from "blues-traveler run config:groupname:jobname"
+	parts := strings.Split(command, ":")
+	if len(parts) >= 3 && parts[1] != "" {
+		return parts[1]
+	}
+	return ""
 }
 
 // IsPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.

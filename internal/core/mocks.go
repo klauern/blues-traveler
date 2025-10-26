@@ -161,25 +161,30 @@ func (m *MockCommandExecutor) WasCommandExecuted(name string, args ...string) bo
 	defer m.mu.RUnlock()
 
 	for _, cmd := range m.Commands {
-		if cmd.Name == name {
-			if len(args) == 0 {
-				return true
-			}
-			if len(cmd.Args) >= len(args) {
-				match := true
-				for i, arg := range args {
-					if cmd.Args[i] != arg {
-						match = false
-						break
-					}
-				}
-				if match {
-					return true
-				}
-			}
+		if cmd.Name == name && m.argsMatch(cmd.Args, args) {
+			return true
 		}
 	}
 	return false
+}
+
+// argsMatch checks if the command arguments match the expected arguments
+func (m *MockCommandExecutor) argsMatch(cmdArgs, expectedArgs []string) bool {
+	// If no expected args, any command with matching name is a match
+	if len(expectedArgs) == 0 {
+		return true
+	}
+	// Command must have at least as many args as expected
+	if len(cmdArgs) < len(expectedArgs) {
+		return false
+	}
+	// Check if all expected args match
+	for i, arg := range expectedArgs {
+		if cmdArgs[i] != arg {
+			return false
+		}
+	}
+	return true
 }
 
 // MockRunner implements a test runner for cchooks that mimics cchooks.Runner structure
