@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestNewXDGConfig(t *testing.T) {
@@ -63,17 +65,17 @@ func TestSanitizeProjectPath(t *testing.T) {
 
 func TestGetConfigPaths(t *testing.T) {
 	xdg := NewXDGConfig()
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 
 	// Test global config path
-	globalPath := xdg.GetGlobalConfigPath("json")
+	globalPath := xdg.GetGlobalConfigPath(FormatJSON)
 	expectedGlobal := filepath.Join(xdg.BaseDir, "global.json")
 	if globalPath != expectedGlobal {
 		t.Errorf("Expected global path %s, got %s", expectedGlobal, globalPath)
 	}
 
 	// Test project config path
-	projectConfigPath := xdg.GetProjectConfigPath(projectPath, "json")
+	projectConfigPath := xdg.GetProjectConfigPath(projectPath, FormatJSON)
 	sanitized := xdg.SanitizeProjectPath(projectPath)
 	expectedProject := filepath.Join(xdg.GetProjectsDir(), sanitized+".json")
 	if projectConfigPath != expectedProject {
@@ -95,6 +97,7 @@ func TestGetConfigPaths(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo,cyclop // Comprehensive CRUD operations test with state validation
 func TestRegistryOperations(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "xdg-test-*")
@@ -123,8 +126,8 @@ func TestRegistryOperations(t *testing.T) {
 	}
 
 	// Test registering a project
-	projectPath := "/Users/user/dev/project"
-	err = xdg.RegisterProject(projectPath, "json")
+	projectPath := constants.TestProjectPath
+	err = xdg.RegisterProject(projectPath, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register project: %v", err)
 	}
@@ -142,7 +145,7 @@ func TestRegistryOperations(t *testing.T) {
 	if !exists {
 		t.Error("Project not found in registry")
 	}
-	if projectConfig.ConfigFormat != "json" {
+	if projectConfig.ConfigFormat != FormatJSON {
 		t.Errorf("Expected format json, got %s", projectConfig.ConfigFormat)
 	}
 
@@ -151,7 +154,7 @@ func TestRegistryOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get project config: %v", err)
 	}
-	if config.ConfigFormat != "json" {
+	if config.ConfigFormat != FormatJSON {
 		t.Errorf("Expected format json, got %s", config.ConfigFormat)
 	}
 
@@ -183,7 +186,7 @@ func TestConfigDataOperations(t *testing.T) {
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
 
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 	testData := map[string]interface{}{
 		"testKey": "testValue",
 		"nested": map[string]interface{}{
@@ -193,7 +196,7 @@ func TestConfigDataOperations(t *testing.T) {
 	}
 
 	// Test saving project config
-	err = xdg.SaveProjectConfig(projectPath, testData, "json")
+	err = xdg.SaveProjectConfig(projectPath, testData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save project config: %v", err)
 	}
@@ -214,12 +217,12 @@ func TestConfigDataOperations(t *testing.T) {
 		"globalKey": "globalValue",
 	}
 
-	err = xdg.SaveGlobalConfig(globalData, "json")
+	err = xdg.SaveGlobalConfig(globalData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save global config: %v", err)
 	}
 
-	loadedGlobalData, err := xdg.LoadGlobalConfig("json")
+	loadedGlobalData, err := xdg.LoadGlobalConfig(FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to load global config: %v", err)
 	}
@@ -244,7 +247,7 @@ func TestTOMLSupport(t *testing.T) {
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
 
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 	testData := map[string]interface{}{
 		"title": "Test Configuration",
 		"database": map[string]interface{}{
@@ -301,14 +304,14 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	}
 
 	// Register the project
-	err = xdg.RegisterProject(projectDir, "json")
+	err = xdg.RegisterProject(projectDir, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register project: %v", err)
 	}
 
 	// Create a config for a non-existent project
 	nonExistentProject := "/non/existent/project"
-	err = xdg.RegisterProject(nonExistentProject, "json")
+	err = xdg.RegisterProject(nonExistentProject, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register non-existent project: %v", err)
 	}
@@ -435,7 +438,7 @@ func TestConcurrentAccess(t *testing.T) {
 	// Test sequential project registration first to establish baseline
 	for i := 0; i < 3; i++ {
 		projectPath := filepath.Join("/test/project", string(rune('A'+i)))
-		err := xdg.RegisterProject(projectPath, "json")
+		err := xdg.RegisterProject(projectPath, FormatJSON)
 		if err != nil {
 			t.Errorf("Failed to register project %s: %v", projectPath, err)
 		}

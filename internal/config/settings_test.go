@@ -101,6 +101,7 @@ func TestMatchesHookType(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,funlen // Comprehensive table-driven test with extensive test cases
 func TestRemoveHookTypeFromSettings(t *testing.T) {
 	tests := []struct {
 		name     string

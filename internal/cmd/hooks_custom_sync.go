@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 	"github.com/urfave/cli/v3"
 )
@@ -165,9 +166,9 @@ func finalizeSyncOperation(settingsPath string, settings *config.Settings, chang
 		return err
 	}
 
-	scope := "project"
+	scope := constants.ScopeProject
 	if opts.useGlobal {
-		scope = "global"
+		scope = constants.ScopeGlobal
 	}
 	fmt.Printf("Synced %d entries into %s settings: %s\n", changed, scope, settingsPath)
 	return nil

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	btconfig "github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestInstallCustom_WritesSettings(t *testing.T) {
@@ -16,7 +17,7 @@ func TestInstallCustom_WritesSettings(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chdir(cwd)
 		// On Windows, give a moment for file handles to be released
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == constants.GOOSWindows {
 			time.Sleep(10 * time.Millisecond)
 		}
 	})

@@ -1,3 +1,4 @@
+// Package hooks provides built-in hook implementations for security, formatting, and auditing
 package hooks
 
 import (
@@ -8,17 +9,8 @@ import (
 	"time"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
-)
-
-// Tool name constants
-const (
-	ToolBash  = "Bash"
-	ToolEdit  = "Edit"
-	ToolWrite = "Write"
-	ToolRead  = "Read"
-	ToolGlob  = "Glob"
-	ToolGrep  = "Grep"
 )
 
 // AuditHook implements comprehensive audit logging
@@ -61,31 +53,31 @@ func (h *AuditHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolU
 
 	// Add tool-specific details
 	switch event.ToolName {
-	case ToolBash:
+	case constants.ToolBash:
 		if bash, err := event.AsBash(); err == nil {
 			entry.Details["command"] = bash.Command
 			entry.Details["description"] = bash.Description
 		}
-	case ToolEdit:
+	case constants.ToolEdit:
 		if edit, err := event.AsEdit(); err == nil {
 			entry.Details["file_path"] = edit.FilePath
 			entry.Details["old_string_length"] = len(edit.OldString)
 			entry.Details["new_string_length"] = len(edit.NewString)
 		}
-	case ToolWrite:
+	case constants.ToolWrite:
 		if write, err := event.AsWrite(); err == nil {
 			entry.Details["file_path"] = write.FilePath
 			entry.Details["content_length"] = len(write.Content)
 		}
-	case ToolRead:
+	case constants.ToolRead:
 		if read, err := event.AsRead(); err == nil {
 			entry.Details["file_path"] = read.FilePath
 		}
-	case ToolGlob:
+	case constants.ToolGlob:
 		if glob, err := event.AsGlob(); err == nil {
 			entry.Details["pattern"] = glob.Pattern
 		}
-	case ToolGrep:
+	case constants.ToolGrep:
 		if grep, err := event.AsGrep(); err == nil {
 			entry.Details["pattern"] = grep.Pattern
 		}

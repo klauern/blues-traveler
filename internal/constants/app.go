@@ -1,3 +1,4 @@
+// Package constants provides application-wide constants - single source of truth for naming throughout the codebase
 package constants
 
 // Application constants - single source of truth for naming throughout the codebase
@@ -28,6 +29,27 @@ const (
 
 	// Command patterns for settings
 	CommandPattern = BinaryName + " run"
+
+	// Platform and OS
+	GOOSWindows = "windows"
+
+	// Configuration sources
+	XDGSource = "xdg"
+
+	// Test constants
+	TestProjectPath = "/Users/user/dev/project"
+
+	// Scope constants
+	ScopeProject = "project"
+	ScopeGlobal  = "global"
+
+	// Tool names
+	ToolBash  = "Bash"
+	ToolEdit  = "Edit"
+	ToolWrite = "Write"
+	ToolRead  = "Read"
+	ToolGlob  = "Glob"
+	ToolGrep  = "Grep"
 )
 
 // GetConfigPath returns the full config file path

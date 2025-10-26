@@ -10,6 +10,7 @@ import (
 	"time"
 
 	btconfig "github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 // setupTestEnv creates a temporary directory with .claude structure for testing
@@ -37,7 +38,7 @@ func setupTestEnv(t *testing.T) func() {
 	cleanup := func() {
 		_ = os.Chdir(originalDir)
 		// On Windows, give a moment for file handles to be released
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == constants.GOOSWindows {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}

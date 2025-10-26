@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 	"github.com/urfave/cli/v3"
 )
@@ -303,9 +304,9 @@ func newHooksUninstallCommand() *cli.Command {
 				return fmt.Errorf("error saving settings: %v", err)
 			}
 
-			scope := "project"
+			scope := constants.ScopeProject
 			if global {
-				scope = "global"
+				scope = constants.ScopeGlobal
 			}
 
 			fmt.Printf("✅ Successfully removed all '%s' hooks from %s settings\n", hookType, scope)
@@ -328,7 +329,7 @@ func createSampleBlockedUrlsFile(global bool) {
 			return
 		}
 		targetDir = filepath.Join(homeDir, ".claude")
-		scope = "global"
+		scope = constants.ScopeGlobal
 	} else {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -336,7 +337,7 @@ func createSampleBlockedUrlsFile(global bool) {
 			return
 		}
 		targetDir = filepath.Join(cwd, ".claude")
-		scope = "project"
+		scope = constants.ScopeProject
 	}
 
 	blockedUrlsPath := filepath.Join(targetDir, "blocked-urls.txt")
@@ -405,9 +406,9 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 		os.Exit(1)
 	}
 
-	scope := "project"
+	scope := constants.ScopeProject
 	if global {
-		scope = "global"
+		scope = constants.ScopeGlobal
 	}
 
 	// Count blues-traveler hooks before removal

@@ -193,6 +193,7 @@ func TestMigrationDryRun(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo,cyclop // End-to-end migration test with multiple validation steps
 func TestActualMigration(t *testing.T) {
 	// Create temporary directory structure
 	tempDir, err := os.MkdirTemp("", "migration-test-*")
@@ -408,6 +409,7 @@ func TestMigrationSkipExisting(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo,cyclop // Comprehensive status validation across multiple scenarios
 func TestGetMigrationStatus(t *testing.T) {
 	// Create temporary directory structure
 	tempDir, err := os.MkdirTemp("", "migration-test-*")

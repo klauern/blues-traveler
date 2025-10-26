@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestNewEnhancedConfigLoader(t *testing.T) {
@@ -45,9 +47,9 @@ func testLoadXDGOnlyStrategy(t *testing.T) {
 	// Create XDG config
 	xdgConfigData := map[string]interface{}{
 		"logRotation": map[string]interface{}{"maxAge": 45},
-		"source":      "xdg",
+		"source":      constants.XDGSource,
 	}
-	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, "json"); err != nil {
+	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, FormatJSON); err != nil {
 		t.Fatalf("Failed to save XDG config: %v", err)
 	}
 
@@ -56,7 +58,7 @@ func testLoadXDGOnlyStrategy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load XDG config: %v", err)
 	}
-	if config.Other["source"] != "xdg" {
+	if config.Other["source"] != constants.XDGSource {
 		t.Errorf("Expected source=xdg, got %v", config.Other["source"])
 	}
 	if !filepath.IsAbs(configPath) {
@@ -118,7 +120,7 @@ func testXDGFirstPreference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load config with XDGFirst: %v", err)
 	}
-	if firstConfig.Other["source"] != "xdg" {
+	if firstConfig.Other["source"] != constants.XDGSource {
 		t.Errorf("XDGFirst should prefer XDG config, got source=%v", firstConfig.Other["source"])
 	}
 }
@@ -158,9 +160,9 @@ func setupBothConfigs(t *testing.T, project, xdgTempDir string) {
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
 	xdgConfigData := map[string]interface{}{
 		"logRotation": map[string]interface{}{"maxAge": 45},
-		"source":      "xdg",
+		"source":      constants.XDGSource,
 	}
-	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, "json"); err != nil {
+	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, FormatJSON); err != nil {
 		t.Fatalf("Failed to save XDG config: %v", err)
 	}
 
@@ -223,9 +225,9 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 		"logRotation": map[string]interface{}{
 			"maxAge": 60,
 		},
-		"globalSource": "xdg",
+		"globalSource": constants.XDGSource,
 	}
-	err = loader.xdg.SaveGlobalConfig(globalXDGData, "json")
+	err = loader.xdg.SaveGlobalConfig(globalXDGData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save XDG global config: %v", err)
 	}
@@ -235,7 +237,7 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load XDG global config: %v", err)
 	}
-	if config.Other["globalSource"] != "xdg" {
+	if config.Other["globalSource"] != constants.XDGSource {
 		t.Errorf("Expected globalSource=xdg, got %v", config.Other["globalSource"])
 	}
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	btconfig "github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestRunDoctorCheck_NoConfiguration(t *testing.T) {
@@ -17,7 +18,7 @@ func TestRunDoctorCheck_NoConfiguration(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chdir(cwd)
 		// On Windows, give a moment for file handles to be released
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == constants.GOOSWindows {
 			time.Sleep(10 * time.Millisecond)
 		}
 	})
@@ -42,7 +43,7 @@ func setupDoctorTest(t *testing.T, hooksConfig string) func() {
 	cleanup := func() {
 		_ = os.Chdir(cwd)
 		// On Windows, give a moment for file handles to be released
-		if runtime.GOOS == "windows" {
+		if runtime.GOOS == constants.GOOSWindows {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
