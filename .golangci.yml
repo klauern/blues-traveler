@@ -47,9 +47,9 @@ linters:
       package-average: 10
 
     funlen:
-      # Maximum function length
-      lines: 80
-      statements: 50
+      # Maximum function length (increased to 120 for comprehensive table-driven tests)
+      lines: 120
+      statements: 60
 
     nestif:
       # Maximum nesting depth
