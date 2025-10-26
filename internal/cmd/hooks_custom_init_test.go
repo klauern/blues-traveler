@@ -196,8 +196,13 @@ func validateSanitizeError(t *testing.T, testName, fileName, expectedErrMsg stri
 	isUnixBackslashCase := runtime.GOOS != constants.GOOSWindows &&
 		testName == "absolute path windows" &&
 		containsString(err.Error(), "path separators not allowed")
+	// On Windows, Unix absolute paths like "/etc/passwd" are not recognized as absolute
+	// by filepath.IsAbs, so they trigger the path separator check instead
+	isWindowsUnixPathCase := runtime.GOOS == constants.GOOSWindows &&
+		testName == "absolute path unix" &&
+		containsString(err.Error(), "path separators not allowed")
 
-	if !isWindowsAbsoluteCase && !isUnixBackslashCase {
+	if !isWindowsAbsoluteCase && !isUnixBackslashCase && !isWindowsUnixPathCase {
 		t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", fileName, err, expectedErrMsg)
 	}
 }
