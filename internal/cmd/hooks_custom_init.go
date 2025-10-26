@@ -196,17 +196,18 @@ func newHooksCustomInitCommand() *cli.Command {
 			var err error
 
 			// If --name provided, create .claude/hooks/<name>.yml
-			if fileName != "" {
+			switch {
+			case fileName != "":
 				path, err = writePerGroupConfig(global, fileName, sample, overwrite)
 				if err != nil {
 					return err
 				}
-			} else if global {
+			case global:
 				path, err = writeGlobalDefaultConfig(overwrite)
 				if err != nil {
 					return err
 				}
-			} else {
+			default:
 				// For project configs, use existing sample logic
 				path, err = config.WriteSampleHooksConfig(global, sample, overwrite)
 				if err != nil {

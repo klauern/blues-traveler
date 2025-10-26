@@ -118,33 +118,14 @@ func checkCustomHooksConfig(verbose bool) {
 		return
 	}
 
-	// Get candidate paths to show where we looked
-	candidates, err := getCandidateConfigPaths()
+	foundFiles, err := findExistingConfigFiles()
 	if err != nil {
 		fmt.Printf("⚠️  Error getting config paths: %v\n", err)
 		return
 	}
 
-	// Check which files exist
-	var foundFiles []string
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			foundFiles = append(foundFiles, path)
-		}
-	}
-
 	if len(foundFiles) == 0 {
-		fmt.Println("Status: ✗ No custom hooks configuration files found")
-		fmt.Println()
-		fmt.Println("Searched locations:")
-		fmt.Println("  Project: .claude/hooks/hooks.yml")
-		fmt.Println("           .claude/hooks.yml")
-		fmt.Println("           .claude/hooks/*.yml")
-		fmt.Println("  Global:  ~/.claude/hooks/hooks.yml")
-		fmt.Println("           ~/.claude/hooks.yml")
-		fmt.Println("           ~/.claude/hooks/*.yml")
-		fmt.Println()
-		fmt.Println("To create: Use 'hooks custom init <group-name>' to get started")
+		printNoConfigFilesFound()
 		return
 	}
 
@@ -152,19 +133,7 @@ func checkCustomHooksConfig(verbose bool) {
 	fmt.Println()
 
 	if verbose {
-		fmt.Println("Configuration files (in merge order):")
-		for _, f := range foundFiles {
-			scope := "project"
-			home, _ := os.UserHomeDir()
-			if home != "" {
-				globalPrefix := filepath.Join(home, ".claude")
-				if strings.HasPrefix(f, globalPrefix) {
-					scope = "global"
-				}
-			}
-			fmt.Printf("  • %s (%s)\n", f, scope)
-		}
-		fmt.Println()
+		printConfigFiles(foundFiles)
 	}
 
 	// Validate and show groups
@@ -177,16 +146,7 @@ func checkCustomHooksConfig(verbose bool) {
 	fmt.Printf("Groups: %d defined\n", len(groups))
 
 	if verbose {
-		for _, groupName := range groups {
-			group := (*cfg)[groupName]
-			eventCount := len(group)
-			jobCount := 0
-			for _, ev := range group {
-				jobCount += len(ev.Jobs)
-			}
-			fmt.Printf("  • %s (%d events, %d jobs)\n", groupName, eventCount, jobCount)
-		}
-		fmt.Println()
+		printGroupDetails(cfg, groups)
 	}
 
 	// Validate configuration
@@ -229,79 +189,31 @@ func printHooksSummary(hooks config.HooksConfig, verbose bool) {
 func countHooksByEvent(hooks config.HooksConfig) map[string]int {
 	events := make(map[string]int)
 
-	if len(hooks.PreToolUse) > 0 {
-		count := 0
-		for _, m := range hooks.PreToolUse {
-			count += len(m.Hooks)
-		}
-		events["PreToolUse"] = count
-	}
-
-	if len(hooks.PostToolUse) > 0 {
-		count := 0
-		for _, m := range hooks.PostToolUse {
-			count += len(m.Hooks)
-		}
-		events["PostToolUse"] = count
-	}
-
-	if len(hooks.UserPromptSubmit) > 0 {
-		count := 0
-		for _, m := range hooks.UserPromptSubmit {
-			count += len(m.Hooks)
-		}
-		events["UserPromptSubmit"] = count
-	}
-
-	if len(hooks.Notification) > 0 {
-		count := 0
-		for _, m := range hooks.Notification {
-			count += len(m.Hooks)
-		}
-		events["Notification"] = count
-	}
-
-	if len(hooks.Stop) > 0 {
-		count := 0
-		for _, m := range hooks.Stop {
-			count += len(m.Hooks)
-		}
-		events["Stop"] = count
-	}
-
-	if len(hooks.SubagentStop) > 0 {
-		count := 0
-		for _, m := range hooks.SubagentStop {
-			count += len(m.Hooks)
-		}
-		events["SubagentStop"] = count
-	}
-
-	if len(hooks.PreCompact) > 0 {
-		count := 0
-		for _, m := range hooks.PreCompact {
-			count += len(m.Hooks)
-		}
-		events["PreCompact"] = count
-	}
-
-	if len(hooks.SessionStart) > 0 {
-		count := 0
-		for _, m := range hooks.SessionStart {
-			count += len(m.Hooks)
-		}
-		events["SessionStart"] = count
-	}
-
-	if len(hooks.SessionEnd) > 0 {
-		count := 0
-		for _, m := range hooks.SessionEnd {
-			count += len(m.Hooks)
-		}
-		events["SessionEnd"] = count
-	}
+	// Count hooks for each event type
+	countEventHooks(events, "PreToolUse", hooks.PreToolUse)
+	countEventHooks(events, "PostToolUse", hooks.PostToolUse)
+	countEventHooks(events, "UserPromptSubmit", hooks.UserPromptSubmit)
+	countEventHooks(events, "Notification", hooks.Notification)
+	countEventHooks(events, "Stop", hooks.Stop)
+	countEventHooks(events, "SubagentStop", hooks.SubagentStop)
+	countEventHooks(events, "PreCompact", hooks.PreCompact)
+	countEventHooks(events, "SessionStart", hooks.SessionStart)
+	countEventHooks(events, "SessionEnd", hooks.SessionEnd)
 
 	return events
+}
+
+// countEventHooks counts hooks for a single event type
+func countEventHooks(events map[string]int, eventName string, matchers []config.HookMatcher) {
+	if len(matchers) == 0 {
+		return
+	}
+
+	count := 0
+	for _, m := range matchers {
+		count += len(m.Hooks)
+	}
+	events[eventName] = count
 }
 
 // printSummary prints overall summary and recommendations
@@ -319,6 +231,70 @@ func printSummary() {
 
 // getCandidateConfigPaths returns all potential hook config file locations
 // This is a simplified version that doesn't use the internal candidateConfigPaths
+// findExistingConfigFiles returns list of config files that actually exist
+func findExistingConfigFiles() ([]string, error) {
+	candidates, err := getCandidateConfigPaths()
+	if err != nil {
+		return nil, err
+	}
+
+	var foundFiles []string
+	for _, path := range candidates {
+		if _, err := os.Stat(path); err == nil {
+			foundFiles = append(foundFiles, path)
+		}
+	}
+	return foundFiles, nil
+}
+
+// printNoConfigFilesFound displays message when no config files are found
+func printNoConfigFilesFound() {
+	fmt.Println("Status: ✗ No custom hooks configuration files found")
+	fmt.Println()
+	fmt.Println("Searched locations:")
+	fmt.Println("  Project: .claude/hooks/hooks.yml")
+	fmt.Println("           .claude/hooks.yml")
+	fmt.Println("           .claude/hooks/*.yml")
+	fmt.Println("  Global:  ~/.claude/hooks/hooks.yml")
+	fmt.Println("           ~/.claude/hooks.yml")
+	fmt.Println("           ~/.claude/hooks/*.yml")
+	fmt.Println()
+	fmt.Println("To create: Use 'hooks custom init <group-name>' to get started")
+}
+
+// printConfigFiles displays list of found config files with scope
+func printConfigFiles(foundFiles []string) {
+	fmt.Println("Configuration files (in merge order):")
+	home, _ := os.UserHomeDir()
+	globalPrefix := ""
+	if home != "" {
+		globalPrefix = filepath.Join(home, ".claude")
+	}
+
+	for _, f := range foundFiles {
+		scope := "project"
+		if globalPrefix != "" && strings.HasPrefix(f, globalPrefix) {
+			scope = "global"
+		}
+		fmt.Printf("  • %s (%s)\n", f, scope)
+	}
+	fmt.Println()
+}
+
+// printGroupDetails displays details about hook groups
+func printGroupDetails(cfg *config.CustomHooksConfig, groups []string) {
+	for _, groupName := range groups {
+		group := (*cfg)[groupName]
+		eventCount := len(group)
+		jobCount := 0
+		for _, ev := range group {
+			jobCount += len(ev.Jobs)
+		}
+		fmt.Printf("  • %s (%d events, %d jobs)\n", groupName, eventCount, jobCount)
+	}
+	fmt.Println()
+}
+
 func getCandidateConfigPaths() ([]string, error) {
 	var paths []string
 

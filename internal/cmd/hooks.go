@@ -144,24 +144,8 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 				return fmt.Errorf("invalid --log-format '%s'. Valid: jsonl, pretty", logFormat)
 			}
 			if logEnabled {
-				logConfig := config.GetLogRotationConfigFromFile(false)
-				if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
-					logConfig = config.GetLogRotationConfigFromFile(true)
-				}
-
-				logPath := config.GetLogPath(key)
-				rotatingLogger := config.SetupLogRotation(logPath, logConfig)
-				if rotatingLogger != nil {
-					core.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
-					fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
-					fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
-						logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)
-					if err := config.CleanupOldLogs(filepath.Dir(logPath), logConfig.MaxAge); err != nil {
-						fmt.Printf("Warning: Failed to cleanup old logs: %v\n", err)
-					}
-				} else {
-					core.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
-					fmt.Printf("Logging enabled - output will be written to %s\n", logPath)
+				if err := setupHookLogging(key, logFormat); err != nil {
+					return err
 				}
 			}
 
@@ -172,4 +156,30 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 			return nil
 		},
 	}
+}
+
+// setupHookLogging configures logging with rotation for hook execution
+func setupHookLogging(hookKey, logFormat string) error {
+	logConfig := config.GetLogRotationConfigFromFile(false)
+	if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
+		logConfig = config.GetLogRotationConfigFromFile(true)
+	}
+
+	logPath := config.GetLogPath(hookKey)
+	rotatingLogger := config.SetupLogRotation(logPath, logConfig)
+
+	core.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
+
+	if rotatingLogger != nil {
+		fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
+		fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
+			logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)
+		if err := config.CleanupOldLogs(filepath.Dir(logPath), logConfig.MaxAge); err != nil {
+			fmt.Printf("Warning: Failed to cleanup old logs: %v\n", err)
+		}
+	} else {
+		fmt.Printf("Logging enabled - output will be written to %s\n", logPath)
+	}
+
+	return nil
 }

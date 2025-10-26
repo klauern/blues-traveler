@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/urfave/cli/v3"
 )
 
@@ -66,40 +67,20 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 			discovery := config.NewLegacyConfigDiscovery(xdg)
 			discovery.SetVerbose(verbose)
 
-			if verbose {
-				fmt.Printf("XDG config directory: %s\n", xdg.GetConfigDir())
-				if all {
-					fmt.Printf("Searching globally across common project directories\n")
-				} else {
-					fmt.Printf("Searching only in current directory\n")
-				}
-			}
+			printMigrateSearchInfo(xdg, verbose, all)
 
-			// First discover configs to show progress
+			// Discover and migrate
 			configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
 			if err != nil {
 				return fmt.Errorf("discovery failed: %w", err)
 			}
 
 			if len(configs) == 0 {
-				if all {
-					fmt.Printf("No legacy configurations found to migrate.\n")
-				} else {
-					fmt.Printf("No legacy configuration found in current directory.\n")
-					fmt.Printf("Use --all flag to search across common project directories.\n")
-				}
+				printNoConfigsFound(all)
 				return nil
 			}
 
-			fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
-
-			if verbose && len(configs) > 0 {
-				fmt.Printf("\nDiscovered configurations:\n")
-				for projectPath, configPath := range configs {
-					fmt.Printf("  - %s\n    → %s\n", projectPath, configPath)
-				}
-				fmt.Println()
-			}
+			printFoundConfigs(configs, verbose)
 
 			result, err := discovery.MigrateConfigs(configs, dryRun)
 			if err != nil {
@@ -108,13 +89,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 
 			// Display results
 			fmt.Print(config.FormatMigrationResult(result, dryRun))
-
-			if !dryRun && result.TotalMigrated > 0 {
-				fmt.Printf("\nMigration completed successfully!\n")
-				fmt.Printf("Configurations are now available in: %s\n", xdg.GetConfigDir())
-			} else if dryRun && result.TotalFound > 0 {
-				fmt.Printf("\nTo perform the actual migration, run: blues-traveler config migrate\n")
-			}
+			printMigrationSummary(result, dryRun, xdg.GetConfigDir())
 
 			return nil
 		},
@@ -122,6 +97,8 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 }
 
 // NewConfigListCmd creates the config list subcommand
+//
+//nolint:gocognit // CLI command with rich user interaction and detailed output formatting
 func NewConfigListCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "list",
@@ -354,6 +331,8 @@ func launchEditor(editor, configPath string) error {
 }
 
 // NewConfigCleanCmd creates the config clean subcommand
+//
+//nolint:gocognit // CLI command with interactive cleanup and detailed progress reporting
 func NewConfigCleanCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "clean",
@@ -477,22 +456,24 @@ func NewConfigStatusCmd() *cli.Command {
 
 			// Migration status
 			fmt.Printf("\nMigration Status:\n")
-			if status.NeedsMigration {
+			switch {
+			case status.NeedsMigration:
 				fmt.Printf("  ⚠ Migration needed\n")
 				fmt.Printf("  Run: blues-traveler config migrate\n")
-			} else if status.HasXDGConfig {
+			case status.HasXDGConfig:
 				fmt.Printf("  ✓ Already migrated to XDG\n")
-			} else if !status.HasLegacyConfig {
+			case !status.HasLegacyConfig:
 				fmt.Printf("  ✓ No configuration found (will use defaults)\n")
 			}
 
 			// Recommendations
 			fmt.Printf("\nRecommendations:\n")
-			if status.NeedsMigration {
+			switch {
+			case status.NeedsMigration:
 				fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
-			} else if status.HasXDGConfig {
+			case status.HasXDGConfig:
 				fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
-			} else {
+			default:
 				fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
 			}
 
@@ -502,6 +483,8 @@ func NewConfigStatusCmd() *cli.Command {
 }
 
 // NewConfigLogCmd creates the config log subcommand
+//
+//nolint:gocognit // CLI command with multiple validation steps and comprehensive help output
 func NewConfigLogCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "log",
@@ -554,9 +537,9 @@ func NewConfigLogCmd() *cli.Command {
 
 			configPath, err := config.GetLogConfigPath(global)
 			if err != nil {
-				scope := "project"
+				scope := constants.ScopeProject
 				if global {
-					scope = "global"
+					scope = constants.ScopeGlobal
 				}
 				return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
 			}
@@ -568,9 +551,9 @@ func NewConfigLogCmd() *cli.Command {
 
 			if show {
 				// Show current log rotation settings
-				scope := "project"
+				scope := constants.ScopeProject
 				if global {
-					scope = "global"
+					scope = constants.ScopeGlobal
 				}
 				fmt.Printf("Current log rotation settings (%s: %s):\n", scope, configPath)
 				fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
@@ -611,5 +594,53 @@ func NewConfigLogCmd() *cli.Command {
 			fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
 			return nil
 		},
+	}
+}
+
+// Helper functions for migrate command
+
+// printMigrateSearchInfo displays information about the migration search scope
+func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
+	if !verbose {
+		return
+	}
+	fmt.Printf("XDG config directory: %s\n", xdg.GetConfigDir())
+	if all {
+		fmt.Printf("Searching globally across common project directories\n")
+	} else {
+		fmt.Printf("Searching only in current directory\n")
+	}
+}
+
+// printNoConfigsFound displays message when no legacy configs are found
+func printNoConfigsFound(all bool) {
+	if all {
+		fmt.Printf("No legacy configurations found to migrate.\n")
+	} else {
+		fmt.Printf("No legacy configuration found in current directory.\n")
+		fmt.Printf("Use --all flag to search across common project directories.\n")
+	}
+}
+
+// printFoundConfigs displays discovered configuration files
+func printFoundConfigs(configs map[string]string, verbose bool) {
+	fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
+
+	if verbose && len(configs) > 0 {
+		fmt.Printf("\nDiscovered configurations:\n")
+		for projectPath, configPath := range configs {
+			fmt.Printf("  - %s\n    → %s\n", projectPath, configPath)
+		}
+		fmt.Println()
+	}
+}
+
+// printMigrationSummary displays summary after migration
+func printMigrationSummary(result *config.MigrationResult, dryRun bool, configDir string) {
+	if !dryRun && result.TotalMigrated > 0 {
+		fmt.Printf("\nMigration completed successfully!\n")
+		fmt.Printf("Configurations are now available in: %s\n", configDir)
+	} else if dryRun && result.TotalFound > 0 {
+		fmt.Printf("\nTo perform the actual migration, run: blues-traveler config migrate\n")
 	}
 }
