@@ -1,3 +1,4 @@
+// Package core provides the fundamental hook system interfaces, base implementations, and execution context
 package core
 
 import (
@@ -80,14 +81,17 @@ type FileSystem interface {
 // RealFileSystem implements FileSystem using the real filesystem
 type RealFileSystem struct{}
 
+// WriteFile writes data to a file with the specified permissions
 func (fs *RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(filename, data, perm)
 }
 
+// OpenFile opens a file with the specified flags and permissions
 func (fs *RealFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag, perm) // #nosec G304 - filesystem interface, paths controlled by caller
 }
 
+// Stat returns file information for the specified path
 func (fs *RealFileSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
@@ -100,6 +104,7 @@ type CommandExecutor interface {
 // RealCommandExecutor implements CommandExecutor using real system commands
 type RealCommandExecutor struct{}
 
+// ExecuteCommand executes a system command with the specified arguments and returns the combined output
 func (ce *RealCommandExecutor) ExecuteCommand(name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	return cmd.CombinedOutput()

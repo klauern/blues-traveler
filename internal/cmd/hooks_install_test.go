@@ -97,7 +97,6 @@ func TestHandleDuplicateHookResult(t *testing.T) {
 	}
 }
 
-
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && findInString(s, substr)

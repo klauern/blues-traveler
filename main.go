@@ -1,3 +1,4 @@
+// Package main provides the entry point for the blues-traveler CLI tool for managing Claude Code and Cursor hooks
 package main
 
 import (

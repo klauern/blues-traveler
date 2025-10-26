@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -39,7 +40,7 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 		rawData := make(map[string]interface{})
 		rawData["tool_name"] = event.ToolName
 
-		if event.ToolName == "Bash" {
+		if event.ToolName == constants.ToolBash {
 			if bash, err := event.AsBash(); err == nil {
 				details["command"] = bash.Command
 				details["description"] = bash.Description
@@ -50,7 +51,7 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 	}
 
 	// Only check Bash commands
-	if event.ToolName != "Bash" {
+	if event.ToolName != constants.ToolBash {
 		return cchooks.Approve()
 	}
 
@@ -65,7 +66,7 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 	// Check if this is a find command
 	if blocked, suggestion := h.isFindCommand(bash.Command); blocked {
 		if h.Context().LoggingEnabled {
-			h.LogHookEvent("find_blocker_block", "Bash", map[string]interface{}{
+			h.LogHookEvent("find_blocker_block", constants.ToolBash, map[string]interface{}{
 				"command":    bash.Command,
 				"suggestion": suggestion,
 			}, nil)
@@ -75,7 +76,7 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 
 	// Log approved commands if logging is enabled
 	if h.Context().LoggingEnabled {
-		h.LogHookEvent("find_blocker_approved", "Bash", map[string]interface{}{
+		h.LogHookEvent("find_blocker_approved", constants.ToolBash, map[string]interface{}{
 			"command": bash.Command,
 		}, nil)
 	}

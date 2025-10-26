@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// NewGenerateCmd creates the 'generate' CLI command for generating new hooks from templates
 func NewGenerateCmd() *cli.Command {
 	return &cli.Command{
 		Name:      "generate",

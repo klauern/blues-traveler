@@ -1,3 +1,4 @@
+// Package generator provides code generation utilities for creating new hook implementations
 package generator
 
 import (
@@ -17,6 +18,7 @@ var templates embed.FS
 // HookType represents the type of hook to generate
 type HookType string
 
+// Hook type constants for code generation
 const (
 	PreToolHook  HookType = "pre_tool"
 	PostToolHook HookType = "post_tool"

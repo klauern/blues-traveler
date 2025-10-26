@@ -582,17 +582,32 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 	if settings == nil || group == "" {
 		return 0
 	}
-	match := "config:" + group + ":"
-	removed := 0
 
-	// helper to filter a slice of matchers
-	filter := func(matchers []HookMatcher) []HookMatcher {
+	removed := 0
+	matchPattern := "config:" + group + ":"
+
+	// Create filter function that removes matching hooks
+	filter := makeConfigGroupFilter(matchPattern, &removed)
+
+	// Apply filter to specified event or all events
+	if event == "" {
+		filterAllEvents(settings, filter)
+	} else {
+		filterSingleEvent(settings, event, filter)
+	}
+
+	return removed
+}
+
+// makeConfigGroupFilter creates a filter function that removes hooks matching a config group
+func makeConfigGroupFilter(matchPattern string, removed *int) func([]HookMatcher) []HookMatcher {
+	return func(matchers []HookMatcher) []HookMatcher {
 		var result []HookMatcher
 		for _, m := range matchers {
 			var hooks []HookCommand
 			for _, h := range m.Hooks {
-				if IsBluesTravelerCommand(h.Command) && strings.Contains(h.Command, match) {
-					removed++
+				if IsBluesTravelerCommand(h.Command) && strings.Contains(h.Command, matchPattern) {
+					*removed++
 					continue
 				}
 				hooks = append(hooks, h)
@@ -604,8 +619,23 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 		}
 		return result
 	}
+}
 
-	// If event provided, only remove within that event; otherwise across all
+// filterAllEvents applies the filter to all event types
+func filterAllEvents(settings *Settings, filter func([]HookMatcher) []HookMatcher) {
+	settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
+	settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
+	settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
+	settings.Hooks.Notification = filter(settings.Hooks.Notification)
+	settings.Hooks.Stop = filter(settings.Hooks.Stop)
+	settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
+	settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
+	settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
+	settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
+}
+
+// filterSingleEvent applies the filter to a specific event type
+func filterSingleEvent(settings *Settings, event string, filter func([]HookMatcher) []HookMatcher) {
 	switch event {
 	case "PreToolUse":
 		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
@@ -625,19 +655,7 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
 	case "SessionEnd":
 		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
-	default:
-		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
-		settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
-		settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
-		settings.Hooks.Notification = filter(settings.Hooks.Notification)
-		settings.Hooks.Stop = filter(settings.Hooks.Stop)
-		settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
-		settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
-		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
-		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
 	}
-
-	return removed
 }
 
 // GetConfigGroupsInSettings returns a set of all config group names found in settings

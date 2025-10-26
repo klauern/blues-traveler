@@ -57,50 +57,81 @@ func evalSimple(s string) (bool, error) {
 	if s == "" {
 		return true, nil
 	}
-	// Handle unary !
+
+	// Handle unary negation
+	if result, handled, err := handleNegation(s); handled {
+		return result, err
+	}
+
+	// Try operator-based evaluation
+	if result, handled, err := evalOperator(s); handled {
+		return result, err
+	}
+
+	// Bareword/literal evaluation
+	return evalLiteral(s)
+}
+
+// handleNegation handles unary ! operator with recursion
+func handleNegation(s string) (bool, bool, error) {
 	negated := false
 	for strings.HasPrefix(s, "!") {
 		negated = !negated
 		s = strings.TrimPrefix(s, "!")
 	}
-	if negated {
-		inner, err := evalSimple(s)
-		if err != nil {
-			return false, err
-		}
-		return !inner, nil
+
+	if !negated {
+		return false, false, nil // Not a negation case
 	}
 
-	// Operators supported: ==, !=, matches, regex
-	for _, op := range []string{"==", "!=", "matches", "regex"} {
-		if idx := indexOutsideQuotes(s, op); idx >= 0 {
-			left := strings.TrimSpace(s[:idx])
-			right := strings.Trim(strings.TrimSpace(s[idx+len(op):]), "\"'")
-			switch op {
-			case "==":
-				return left == right, nil
-			case "!=":
-				return left != right, nil
-			case "matches":
-				// Glob match; if left contains multiple tokens, any match passes
-				return globMatchAny(left, right), nil
-			case "regex":
-				return regexMatchAny(left, right)
-			}
+	inner, err := evalSimple(s)
+	if err != nil {
+		return false, true, err
+	}
+	return !inner, true, nil
+}
+
+// evalOperator evaluates expressions with operators ==, !=, matches, regex
+func evalOperator(s string) (bool, bool, error) {
+	operators := []string{"==", "!=", "matches", "regex"}
+	for _, op := range operators {
+		idx := indexOutsideQuotes(s, op)
+		if idx < 0 {
+			continue
+		}
+
+		left := strings.TrimSpace(s[:idx])
+		right := strings.Trim(strings.TrimSpace(s[idx+len(op):]), "\"'")
+
+		switch op {
+		case "==":
+			return left == right, true, nil
+		case "!=":
+			return left != right, true, nil
+		case "matches":
+			return globMatchAny(left, right), true, nil
+		case "regex":
+			result, err := regexMatchAny(left, right)
+			return result, true, err
 		}
 	}
-	// Bareword truthy if non-empty and not "false"/"0"
+	return false, false, nil // No operator found
+}
+
+// evalLiteral evaluates a literal value as truthy/falsy
+func evalLiteral(s string) (bool, error) {
 	l := strings.ToLower(strings.Trim(s, "\"'"))
-	if l == "false" || l == "0" { //nolint:gocritic
+
+	if l == "false" || l == "0" {
 		return false, nil
 	}
 	if l == "true" || l == "1" {
 		return true, nil
 	}
-	// Non-empty literal considered true
 	if l != "" {
 		return true, nil
 	}
+
 	return false, fmt.Errorf("could not evaluate expression: %q", s)
 }
 

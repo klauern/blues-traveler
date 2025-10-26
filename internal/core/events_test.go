@@ -156,6 +156,7 @@ func TestResolveEventAlias(t *testing.T) {
 	}
 }
 
+//nolint:gocognit // Comprehensive test validating event alias mappings
 func TestGetEventAliases(t *testing.T) {
 	tests := []struct {
 		name          string

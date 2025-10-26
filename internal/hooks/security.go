@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -45,7 +46,7 @@ func (h *SecurityHook) logSecurityEvent(eventType, command, reason, checkType st
 		return
 	}
 
-	h.LogHookEvent(eventType, "Bash", map[string]interface{}{
+	h.LogHookEvent(eventType, constants.ToolBash, map[string]interface{}{
 		"command":    command,
 		"reason":     reason,
 		"check_type": checkType,
@@ -61,7 +62,7 @@ func (h *SecurityHook) logPreToolUseCheck(event *cchooks.PreToolUseEvent) {
 	details := make(map[string]interface{})
 	rawData := map[string]interface{}{"tool_name": event.ToolName}
 
-	if event.ToolName == "Bash" {
+	if event.ToolName == constants.ToolBash {
 		if bash, err := event.AsBash(); err == nil {
 			details["command"] = bash.Command
 			details["description"] = bash.Description
@@ -94,7 +95,7 @@ func (h *SecurityHook) runSecurityChecks(_ string, tokens []string, cmdLower str
 func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	h.logPreToolUseCheck(event)
 
-	if event.ToolName != "Bash" {
+	if event.ToolName != constants.ToolBash {
 		return cchooks.Approve()
 	}
 
@@ -117,7 +118,7 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 
 	// Log approved commands if logging is enabled
 	if h.Context().LoggingEnabled {
-		h.LogHookEvent("security_approved", "Bash", map[string]interface{}{
+		h.LogHookEvent("security_approved", constants.ToolBash, map[string]interface{}{
 			"command": bash.Command,
 		}, nil)
 	}

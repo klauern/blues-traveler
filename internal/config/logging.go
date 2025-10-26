@@ -53,14 +53,13 @@ func GetLogConfigPath(global bool) (string, error) {
 			return "", fmt.Errorf("failed to get home directory: %v", err)
 		}
 		return constants.GetConfigPath(homeDir), nil
-	} else {
-		// Project config: ./.claude/hooks/blues-traveler-config.json
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %v", err)
-		}
-		return constants.GetConfigPath(cwd), nil
 	}
+	// Project config: ./.claude/hooks/blues-traveler-config.json
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %v", err)
+	}
+	return constants.GetConfigPath(cwd), nil
 }
 
 // LoadLogConfig loads the log configuration, returning defaults if file doesn't exist

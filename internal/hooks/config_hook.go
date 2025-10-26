@@ -38,6 +38,7 @@ func NewConfigHook(groupName, jobName string, job config.HookJob, event string, 
 	}
 }
 
+// Run executes the custom hook based on its configured event type and matcher
 func (h *ConfigHook) Run() error {
 	if !h.IsEnabled() {
 		return nil

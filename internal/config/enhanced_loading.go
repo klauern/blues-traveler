@@ -1,3 +1,4 @@
+// Package config handles configuration management including settings files, XDG paths, and hooks configuration
 package config
 
 import (
@@ -7,12 +8,12 @@ import (
 	"path/filepath"
 )
 
-// ConfigLoaderStrategy defines different strategies for loading configuration
-type ConfigLoaderStrategy int
+// LoaderStrategy defines different strategies for loading configuration
+type LoaderStrategy int
 
 const (
 	// LoadXDGFirst tries XDG paths first, then falls back to legacy
-	LoadXDGFirst ConfigLoaderStrategy = iota
+	LoadXDGFirst LoaderStrategy = iota
 	// LoadLegacyOnly only loads from legacy paths
 	LoadLegacyOnly
 	// LoadXDGOnly only loads from XDG paths
@@ -22,11 +23,11 @@ const (
 // EnhancedConfigLoader provides configuration loading with XDG support and fallback
 type EnhancedConfigLoader struct {
 	xdg      *XDGConfig
-	strategy ConfigLoaderStrategy
+	strategy LoaderStrategy
 }
 
 // NewEnhancedConfigLoader creates a new enhanced configuration loader
-func NewEnhancedConfigLoader(strategy ConfigLoaderStrategy) *EnhancedConfigLoader {
+func NewEnhancedConfigLoader(strategy LoaderStrategy) *EnhancedConfigLoader {
 	return &EnhancedConfigLoader{
 		xdg:      NewXDGConfig(),
 		strategy: strategy,
