@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 
@@ -161,16 +162,19 @@ func newHooksRunCommand(getPlugin func(string) (interface {
 // setupHookLogging configures logging with rotation for hook execution
 func setupHookLogging(hookKey, logFormat string) error {
 	logConfig := config.GetLogRotationConfigFromFile(false)
-	if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 {
+	// Treat an entirely zeroed config as "not configured"; otherwise respect zeros intentionally set
+	if logConfig.MaxAge == 0 && logConfig.MaxSize == 0 && logConfig.MaxBackups == 0 {
 		logConfig = config.GetLogRotationConfigFromFile(true)
 	}
 
 	logPath := config.GetLogPath(hookKey)
 	rotatingLogger := config.SetupLogRotation(logPath, logConfig)
 
-	core.SetGlobalLoggingConfig(true, ".claude/hooks", logFormat)
+	core.SetGlobalLoggingConfig(true, filepath.Dir(logPath), logFormat)
 
 	if rotatingLogger != nil {
+		// Route stdlib logger to the rotating file target so log.Printf from hooks is captured
+		log.SetOutput(rotatingLogger)
 		fmt.Printf("Logging enabled with rotation - output will be written to %s\n", logPath)
 		fmt.Printf("Log rotation: max %d days, %dMB per file, %d backups\n",
 			logConfig.MaxAge, logConfig.MaxSize, logConfig.MaxBackups)

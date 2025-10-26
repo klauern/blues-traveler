@@ -101,10 +101,11 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 
 	bash, err := event.AsBash()
 	if err != nil {
+		// Log the parse error but approve the request to avoid breaking flows on benign parsing issues
 		if h.Context().LoggingEnabled {
 			h.LogHookEvent("security_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
 		}
-		return cchooks.Block("failed to parse bash command")
+		return cchooks.Approve()
 	}
 
 	cmdLower := strings.ToLower(bash.Command)

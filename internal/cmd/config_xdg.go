@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
 	"github.com/klauern/blues-traveler/internal/constants"
@@ -323,7 +324,18 @@ func findCommonEditor() string {
 // launchEditor launches the specified editor with the config file
 func launchEditor(editor, configPath string) error {
 	fmt.Printf("Opening %s with %s...\n", configPath, editor)
-	cmd := exec.Command(editor, configPath) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
+
+	// Parse editor string to support commands with arguments (e.g., "code -w")
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		return fmt.Errorf("invalid editor command")
+	}
+
+	cmdName := parts[0]
+	args := make([]string, 0, len(parts))
+	args = append(args, parts[1:]...)
+	args = append(args, configPath)
+	cmd := exec.Command(cmdName, args...) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

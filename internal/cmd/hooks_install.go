@@ -52,6 +52,12 @@ func buildInstallHookCommand(hookType string, flags installFlags) (string, error
 		return "", fmt.Errorf("failed to get executable path: %v", err)
 	}
 
+	// Quote the path when it contains spaces to handle paths like "/Program Files/app"
+	// Commands are executed via bash -lc, so unquoted paths with spaces break
+	if strings.ContainsRune(execPath, ' ') {
+		execPath = `"` + execPath + `"`
+	}
+
 	hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
 	if flags.logEnabled {
 		hookCommand += " --log"
@@ -91,18 +97,19 @@ func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, setti
 
 // installHookAction performs the hook installation
 func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
-	// Validate event (accepts both canonical names and Cursor aliases)
-	if !isValidEventType(flags.event) {
-		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
-	}
-
-	// Resolve Cursor alias to canonical event name
+	// Resolve Cursor alias to canonical event name first (accept both canonical and Cursor aliases)
 	// This allows users to use Cursor event names like "beforeShellExecution"
 	// which will be resolved to "PreToolUse"
 	resolvedEvent := core.ResolveEventAlias(flags.event)
 	if resolvedEvent == "" {
-		resolvedEvent = flags.event // Already canonical
+		resolvedEvent = flags.event // Already canonical (or unknown)
 	}
+
+	// Validate the resolved/canonical event name
+	if !isValidEventType(resolvedEvent) {
+		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
+	}
+
 	flags.event = resolvedEvent
 
 	// Build hook command
@@ -458,5 +465,5 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) {
 	if global {
 		globalFlag = " --global"
 	}
-	fmt.Printf("\nUse 'hooks list --installed%s' to verify the changes.\n", globalFlag)
+	fmt.Printf("\nUse 'blues-traveler hooks list --installed%s' to verify the changes.\n", globalFlag)
 }
