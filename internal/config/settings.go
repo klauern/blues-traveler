@@ -186,6 +186,12 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 		Hooks:   []HookCommand{hookCmd},
 	}
 
+	// Resolve Cursor event aliases to canonical names
+	// This allows hooks to be installed using Cursor event names
+	// Note: We don't import core package to avoid circular dependency,
+	// so alias resolution happens at the command level, not here.
+	// This function receives already-resolved canonical event names.
+
 	var result MergeResult
 	switch event {
 	case "PreToolUse":
@@ -212,6 +218,9 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 	case "SessionStart":
 		result = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
 		settings.Hooks.SessionStart = result.Matchers
+	case "SessionEnd":
+		result = mergeHookMatcher(settings.Hooks.SessionEnd, hookMatcher)
+		settings.Hooks.SessionEnd = result.Matchers
 	}
 	return result
 }

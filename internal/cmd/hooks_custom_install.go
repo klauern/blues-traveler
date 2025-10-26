@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/core"
 	"github.com/urfave/cli/v3"
 )
 
@@ -80,6 +81,14 @@ func parseInstallOptions(cmd *cli.Command, isValidEventType func(string) bool, v
 	eventFilter := strings.TrimSpace(cmd.String("event"))
 	if eventFilter != "" && !isValidEventType(eventFilter) {
 		return installOptions{}, fmt.Errorf("invalid --event '%s'. Valid events: %s", eventFilter, strings.Join(validEventTypes(), ", "))
+	}
+
+	// Resolve Cursor alias to canonical event name
+	if eventFilter != "" {
+		resolvedEvent := core.ResolveEventAlias(eventFilter)
+		if resolvedEvent != "" {
+			eventFilter = resolvedEvent
+		}
 	}
 
 	return installOptions{

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/core"
 	"github.com/urfave/cli/v3"
 )
 
@@ -89,10 +90,19 @@ func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, setti
 
 // installHookAction performs the hook installation
 func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
-	// Validate event
+	// Validate event (accepts both canonical names and Cursor aliases)
 	if !isValidEventType(flags.event) {
 		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
 	}
+
+	// Resolve Cursor alias to canonical event name
+	// This allows users to use Cursor event names like "beforeShellExecution"
+	// which will be resolved to "PreToolUse"
+	resolvedEvent := core.ResolveEventAlias(flags.event)
+	if resolvedEvent == "" {
+		resolvedEvent = flags.event // Already canonical
+	}
+	flags.event = resolvedEvent
 
 	// Build hook command
 	hookCommand, err := buildInstallHookCommand(hookType, flags)
