@@ -55,14 +55,14 @@ func GetSettingsPath(global bool) (string, error) {
 		// Global settings: ~/.claude/settings.json
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %v", err)
+			return "", fmt.Errorf("failed to get home directory: %w", err)
 		}
 		return filepath.Join(homeDir, ".claude", "settings.json"), nil
 	}
 	// Project settings: ./.claude/settings.json
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %v", err)
+		return "", fmt.Errorf("failed to get current directory: %w", err)
 	}
 	return filepath.Join(cwd, ".claude", "settings.json"), nil
 }
@@ -81,18 +81,18 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 
 	data, err := os.ReadFile(settingsPath) // #nosec G304 - controlled settings paths
 	if err != nil {
-		return nil, fmt.Errorf("failed to read settings file: %v", err)
+		return nil, fmt.Errorf("failed to read settings file: %w", err)
 	}
 
 	// First unmarshal into a generic map to preserve unknown fields
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse settings JSON: %v", err)
+		return nil, fmt.Errorf("failed to parse settings JSON: %w", err)
 	}
 
 	// Extract known fields
 	if err := json.Unmarshal(data, settings); err != nil {
-		return nil, fmt.Errorf("failed to parse settings: %v", err)
+		return nil, fmt.Errorf("failed to parse settings: %w", err)
 	}
 
 	// Store unknown fields (remove known keys first)
@@ -114,7 +114,8 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+		fmt.Fprintf(os.Stderr, "failed to create directory %s: %v\n", dir, err)
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Merge known and unknown fields
@@ -142,11 +143,11 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %v", err)
+		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
 	if err := os.WriteFile(settingsPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write settings file: %v", err)
+		return fmt.Errorf("failed to write settings file: %w", err)
 	}
 
 	return nil
@@ -242,10 +243,11 @@ type MergeResult struct {
 
 // extractHookType extracts the hook type from a blues-traveler command
 // Example: "/path/to/blues-traveler run debug --log" -> "debug"
+// Also handles: "/path/to/blues-traveler hooks run debug --log" -> "debug"
 func extractHookType(command string) string {
-	// Match full hook key after 'blues-traveler run ', capturing non-space sequence.
+	// Match both "blues-traveler run" and "blues-traveler hooks run" patterns
 	// This correctly captures config hooks like 'config:python:post-sample'.
-	re := regexp.MustCompile(`blues-traveler\s+run\s+([^\s]+)`) // capture until whitespace
+	re := regexp.MustCompile(`blues-traveler\s+(?:hooks\s+)?run\s+([^\s]+)`) // capture until whitespace
 	matches := re.FindStringSubmatch(command)
 	if len(matches) > 1 {
 		return matches[1]
@@ -255,7 +257,7 @@ func extractHookType(command string) string {
 
 // isBluesTravelerCommand checks if a command is a blues-traveler command
 func isBluesTravelerCommand(command string) bool {
-	return strings.Contains(command, "blues-traveler run")
+	return strings.Contains(command, "blues-traveler run") || strings.Contains(command, "blues-traveler hooks run")
 }
 
 // checkExactDuplicate checks if a hook command is an exact duplicate

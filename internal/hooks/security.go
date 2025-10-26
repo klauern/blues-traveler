@@ -73,7 +73,7 @@ func (h *SecurityHook) logPreToolUseCheck(event *cchooks.PreToolUseEvent) {
 }
 
 // runSecurityChecks executes all security checks and returns the first match
-func (h *SecurityHook) runSecurityChecks(_ string, tokens []string, cmdLower string) (bool, string, string) {
+func (h *SecurityHook) runSecurityChecks(tokens []string, cmdLower string) (bool, string, string) {
 	checks := []securityCheck{
 		{"static_patterns", func(_ []string, c string) (bool, string) { return h.checkStaticPatterns(c) }},
 		{"macos_patterns", func(_ []string, c string) (bool, string) { return h.checkMacOSPatterns(c) }},
@@ -112,7 +112,7 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 	tokens := strings.Fields(cmdLower)
 
 	// Run all security checks
-	if blocked, reason, checkType := h.runSecurityChecks(bash.Command, tokens, cmdLower); blocked {
+	if blocked, reason, checkType := h.runSecurityChecks(tokens, cmdLower); blocked {
 		h.logSecurityEvent("security_block", bash.Command, reason, checkType)
 		return cchooks.Block(reason)
 	}
@@ -149,16 +149,17 @@ func (h *SecurityHook) checkStaticPatterns(cmdLower string) (bool, string) {
 
 // checkMacOSPatterns checks macOS specific critical command regexes
 func (h *SecurityHook) checkMacOSPatterns(cmdLower string) (bool, string) {
+	// Use case-insensitive regexes since cmdLower is already lowercased
 	regexes := map[string]*regexp.Regexp{
-		"disk erase / format (diskutil)": regexp.MustCompile(`\bdiskutil\s+(erase(?:disk|volume)|apfs\s+erase)`),
-		"asr restore":                    regexp.MustCompile(`\basr\s+restore\b`),
-		"csrutil modification":           regexp.MustCompile(`\bcsrutil\b`),
-		"gatekeeper disable (spctl)":     regexp.MustCompile(`\bspctl\b.*--master-disable`),
-		"launchctl service removal":      regexp.MustCompile(`\blaunchctl\b.*\b(remove|bootout)\b`),
-		"systemsetup change":             regexp.MustCompile(`\bsystemsetup\b\s+-set`),
-		"host/network config change":     regexp.MustCompile(`\b(scutil|networksetup)\b\s+--?set`),
-		"TCC db direct write":            regexp.MustCompile(`sqlite3\s+.*TCC\.db`),
-		"keychain dump":                  regexp.MustCompile(`\bsecurity\s+dump-keychain\b`),
+		"disk erase / format (diskutil)": regexp.MustCompile(`(?i)\bdiskutil\s+(erase(?:disk|volume)|apfs\s+erase)`),
+		"asr restore":                    regexp.MustCompile(`(?i)\basr\s+restore\b`),
+		"csrutil modification":           regexp.MustCompile(`(?i)\bcsrutil\b`),
+		"gatekeeper disable (spctl)":     regexp.MustCompile(`(?i)\bspctl\b.*--master-disable`),
+		"launchctl service removal":      regexp.MustCompile(`(?i)\blaunchctl\b.*\b(remove|bootout)\b`),
+		"systemsetup change":             regexp.MustCompile(`(?i)\bsystemsetup\b\s+-set`),
+		"host/network config change":     regexp.MustCompile(`(?i)\b(scutil|networksetup)\b\s+--?set`),
+		"TCC db direct write":            regexp.MustCompile(`(?i)sqlite3\s+.*tcc\.db`),
+		"keychain dump":                  regexp.MustCompile(`(?i)\bsecurity\s+dump-keychain\b`),
 	}
 
 	for label, rx := range regexes {
@@ -190,8 +191,8 @@ func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
 		return false, ""
 	}
 
-	// Dangerous root/system targets
-	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/Volumes"}
+	// Dangerous root/system targets (lowercase since we compare against lowercased targets)
+	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
 	for _, tgt := range targets {
 		lt := strings.ToLower(tgt)
 		if lt == "/" {

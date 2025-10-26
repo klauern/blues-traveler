@@ -1,0 +1,185 @@
+---
+description: Hook implementation patterns and logging best practices
+globs: internal/hooks/*.go
+---
+
+# Hook Implementation Patterns
+
+## Logger Initialization
+
+Always check if logger is nil before using it:
+
+```go
+// ✅ CORRECT - guards against nil logger
+func (h *DebugHook) ensureLogger() {
+    if h.logger != nil {
+        return
+    }
+
+    logPath := ".claude/hooks/debug.log"
+    logDir := filepath.Dir(logPath)
+    if err := os.MkdirAll(logDir, 0o750); err != nil {
+        fmt.Fprintf(os.Stderr, "failed to create debug log dir %s: %v\n", logDir, err)
+        return  // Leave logger nil
+    }
+
+    var err error
+    h.logFile, err = h.Context().FileSystem.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "failed to open debug log file %s: %v\n", logPath, err)
+        return  // Leave logger nil
+    }
+    h.logger = log.New(h.logFile, "", log.LstdFlags)
+}
+
+// ❌ WRONG - assumes logger initialization succeeded
+func (h *DebugHook) logEvent(msg string) {
+    h.logger.Printf(msg)  // Panic if ensureLogger failed!
+}
+```
+
+## Conditional Logging
+
+Always guard log calls with nil checks or LoggingEnabled flags:
+
+```go
+// ✅ CORRECT - nil-safe logging
+func (h *DebugHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) {
+    h.ensureLogger()
+    if h.logger != nil {
+        h.logger.Printf("PRE-TOOL: %s", event.ToolName)
+    }
+
+    if h.Context().LoggingEnabled {
+        h.LogHookEvent("pre_tool_use", event.ToolName, rawData, details)
+    }
+
+    return cchooks.Approve()
+}
+
+// ❌ WRONG - unconditional logging, no nil check
+func (h *DebugHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) {
+    h.logger.Printf("PRE-TOOL: %s", event.ToolName)  // Panics if nil!
+    h.LogHookEvent("pre_tool_use", event.ToolName, rawData, details)  // Logs even if disabled
+    return cchooks.Approve()
+}
+```
+
+## Resource Cleanup
+
+Use defer with proper nil checks for cleanup:
+
+```go
+// ✅ CORRECT - nil-safe cleanup
+func (h *DebugHook) Run() error {
+    if !h.IsEnabled() {
+        return nil
+    }
+
+    h.ensureLogger()
+    if h.logger == nil {
+        return fmt.Errorf("failed to initialize logger")
+    }
+
+    defer func() {
+        if h.logFile != nil {
+            if err := h.logFile.Close(); err != nil {
+                fmt.Fprintf(os.Stderr, "debug log close error: %v\n", err)
+            }
+        }
+    }()
+
+    runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
+    return runner.Run()
+}
+
+// ❌ WRONG - assumes logger exists in cleanup
+func (h *DebugHook) Run() error {
+    h.ensureLogger()
+    defer func() {
+        if err := h.logFile.Close(); err != nil {
+            h.logger.Printf("Error closing: %v", err)  // Both could be nil!
+        }
+    }()
+    // ... rest of function
+}
+```
+
+## Logging Consistency
+
+Apply LoggingEnabled checks consistently across all hook event handlers:
+
+```go
+// ✅ CORRECT - consistent guards
+func (h *MyHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) {
+    if h.Context().LoggingEnabled {
+        h.LogHookEvent("pre_tool_use", event.ToolName, data, details)
+    }
+    return cchooks.Approve()
+}
+
+func (h *MyHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) {
+    if h.Context().LoggingEnabled {
+        h.LogHookEvent("post_tool_use", event.ToolName, data, details)
+    }
+    return cchooks.Allow()
+}
+
+// ❌ WRONG - inconsistent logging guards
+func (h *MyHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) {
+    if h.Context().LoggingEnabled {
+        h.LogHookEvent("pre_tool_use", event.ToolName, data, details)
+    }
+    return cchooks.Approve()
+}
+
+func (h *MyHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) {
+    h.LogHookEvent("post_tool_use", event.ToolName, data, details)  // No guard!
+    return cchooks.Allow()
+}
+```
+
+## Command Execution Timeouts
+
+Use context.WithTimeout for all command execution with timeouts:
+
+```go
+// ✅ CORRECT - context-based timeout
+func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
+    cmdCtx := context.Background()
+    if h.job.Timeout > 0 {
+        var cancel context.CancelFunc
+        cmdCtx, cancel = context.WithTimeout(cmdCtx, time.Duration(h.job.Timeout)*time.Second)
+        defer cancel()
+    }
+
+    cmd := exec.CommandContext(cmdCtx, "bash", "-lc", h.job.Run)
+    cmd.Env = env
+
+    if err := cmd.Run(); err != nil {
+        if cmdCtx.Err() == context.DeadlineExceeded && h.job.Timeout > 0 {
+            return fmt.Errorf("command timed out after %ds", h.job.Timeout)
+        }
+        return err
+    }
+    return nil
+}
+
+// ❌ WRONG - race condition with timer
+func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
+    cmd := exec.Command("bash", "-lc", h.job.Run)
+    cmd.Env = env
+
+    timer := time.NewTimer(time.Duration(h.job.Timeout) * time.Second)
+    done := make(chan error)
+    go func() { done <- cmd.Run() }()
+
+    select {
+    case err := <-done:
+        return err
+    case <-timer.C:
+        cmd.Process.Kill()  // Race: Process might be nil!
+        return fmt.Errorf("timeout")
+    }
+}
+```

@@ -98,8 +98,14 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 		mergedEnv = append(mergedEnv, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// Build command
-	cmd := exec.Command("bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
+	// Build command (with timeout-aware context)
+	cmdCtx := context.Background()
+	if h.job.Timeout > 0 {
+		var cancel context.CancelFunc
+		cmdCtx, cancel = context.WithTimeout(cmdCtx, time.Duration(h.job.Timeout)*time.Second)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(cmdCtx, "bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
 	// If we have the original raw JSON for this event, pass it to child stdin so
 	// nested blues-traveler invocations can consume it.
 	if h.lastRaw != "" {
@@ -110,23 +116,14 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 	}
 	cmd.Env = mergedEnv
 
-	// Handle timeout
-	var timer *time.Timer
-	done := make(chan error, 1)
-	go func() { done <- cmd.Run() }()
-
-	if h.job.Timeout > 0 {
-		timer = time.NewTimer(time.Duration(h.job.Timeout) * time.Second)
-		defer timer.Stop()
-		select {
-		case err := <-done:
-			return err
-		case <-timer.C:
-			_ = cmd.Process.Kill()
+	// Run and translate deadline exceeded into a friendly timeout error
+	if err := cmd.Run(); err != nil {
+		if cmdCtx.Err() == context.DeadlineExceeded && h.job.Timeout > 0 {
 			return fmt.Errorf("command timed out after %ds", h.job.Timeout)
 		}
+		return err
 	}
-	return <-done
+	return nil
 }
 
 func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
@@ -153,13 +150,13 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
 	ok, err := h.shouldRun(env)
 	if err != nil {
-		return fmt.Errorf("config hook error: %v", err)
+		return fmt.Errorf("config hook error: %w", err)
 	}
 	if !ok {
 		return nil
 	}
 	if err := h.runCommandWithEnv(env); err != nil {
-		return fmt.Errorf("job '%s' failed: %v", h.job.Name, err)
+		return fmt.Errorf("job '%s' failed: %w", h.job.Name, err)
 	}
 	return nil
 }

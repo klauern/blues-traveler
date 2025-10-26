@@ -1,0 +1,132 @@
+---
+description: Test writing patterns and common pitfalls to avoid
+globs: *_test.go
+---
+
+# Test Patterns and Best Practices
+
+## JSON Field Name Assertions
+
+When testing JSON marshaling, remember that Go struct fields without json tags are capitalized:
+
+```go
+// ✅ CORRECT - matches actual JSON field name
+type LogRotationConfig struct {
+    MaxAge     int  // Becomes "MaxAge" in JSON (no tag = capitalized)
+    MaxSize    int
+    MaxBackups int
+}
+
+// In test:
+if logRotation["MaxAge"] != float64(45) {
+    t.Errorf("Expected MaxAge=45, got %v", logRotation["MaxAge"])
+}
+
+// ❌ WRONG - field name doesn't match
+if logRotation["maxAge"] != float64(45) {  // JSON has "MaxAge", not "maxAge"
+    t.Errorf("Expected maxAge=45, got %v", logRotation["maxAge"])
+}
+```
+
+If you need lowercase JSON fields, add json tags:
+
+```go
+type LogRotationConfig struct {
+    MaxAge     int  `json:"maxAge"`      // Now becomes "maxAge" in JSON
+    MaxSize    int  `json:"maxSize"`
+    MaxBackups int  `json:"maxBackups"`
+}
+```
+
+## Empty/Meaningless Tests
+
+Tests must have assertions. Don't write tests that only exercise code without checking results:
+
+```go
+// ✅ CORRECT - has meaningful assertions
+func TestGetEventAliases(t *testing.T) {
+    aliases := GetEventAliases("PreToolUse")
+    if aliases == nil {
+        t.Error("Expected non-nil aliases")
+    }
+    if len(aliases) == 0 {
+        t.Error("Expected at least one alias")
+    }
+}
+
+// ❌ WRONG - no assertions, just field access
+func TestAllClaudeCodeEvents_HasCursorAliases(t *testing.T) {
+    events := AllClaudeCodeEvents()
+    for _, event := range events {
+        _ = event.CursorAliases  // Just accessing field, not checking anything
+    }
+}
+```
+
+Note: The underscore parameter in test function signatures is acceptable Go convention for unused parameters:
+
+```go
+// ✅ ACCEPTABLE - underscore indicates intentionally unused parameter
+func TestSomething(_ *testing.T) {
+    // Test that doesn't need t
+}
+```
+
+## Table-Driven Tests
+
+Use descriptive names and test both success and failure cases:
+
+```go
+// ✅ CORRECT - comprehensive test cases
+func TestSecurityPatterns(t *testing.T) {
+    tests := []struct {
+        name     string
+        command  string
+        blocked  bool
+        reason   string
+    }{
+        {
+            name:    "safe ls command",
+            command: "ls -la",
+            blocked: false,
+        },
+        {
+            name:    "dangerous rm root",
+            command: "rm -rf /",
+            blocked: true,
+            reason:  "blocked rm: targets filesystem root",
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            blocked, reason, _ := hook.runSecurityChecks(
+                strings.Fields(tt.command),
+                strings.ToLower(tt.command),
+            )
+            if blocked != tt.blocked {
+                t.Errorf("got blocked=%v, want %v", blocked, tt.blocked)
+            }
+            if tt.blocked && reason != tt.reason {
+                t.Errorf("got reason=%q, want %q", reason, tt.reason)
+            }
+        })
+    }
+}
+```
+
+## JSON Marshaling Tests
+
+Remember that `json.Marshal` converts numbers to `float64`:
+
+```go
+// ✅ CORRECT - expects float64 after JSON round-trip
+if value != float64(42) {  // JSON unmarshal converts to float64
+    t.Errorf("Expected 42, got %v", value)
+}
+
+// ❌ WRONG - wrong type after JSON unmarshal
+if value != 42 {  // This is int, but JSON gives float64
+    t.Errorf("Expected 42, got %v", value)
+}
+```

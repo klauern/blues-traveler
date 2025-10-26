@@ -1,0 +1,307 @@
+---
+alwaysApply: true
+description: Core architecture, platform support, hook implementation, and system design
+---
+
+# blues-traveler Architecture & Implementation Guide
+
+## Project Overview
+
+[blues-traveler](mdc:README.md) is a CLI tool for managing and running Claude Code hooks with multi-IDE support. It provides a **static hook registry** with built-in security, formatting, debugging, and audit capabilities.
+
+## Core Architecture Principles
+
+- **Static Registration**: All hooks are registered at startup via `init()` functions
+- **Independent Execution**: Each hook runs in isolation for security and reliability
+- **No Dynamic Loading**: Prevents security risks and ensures predictable behavior
+- **Simple Lifecycle**: Create → Execute → Cleanup
+- **Platform Abstraction**: Enables support for multiple IDEs (Claude Code, Cursor)
+
+## Key Components
+
+### CLI Layer ([internal/cmd/](mdc:internal/cmd/))
+- [hooks.go](mdc:internal/cmd/hooks.go): Hook management (list, run, install, etc.)
+- [config_xdg.go](mdc:internal/cmd/config_xdg.go): XDG configuration management
+- [generate.go](mdc:internal/cmd/generate.go): Code generation
+- [platform.go](mdc:internal/cmd/platform.go): Platform detection and info
+- Uses **urfave/cli v3** (NOT Cobra)
+
+### Core ([internal/core/](mdc:internal/core/))
+- [registry.go](mdc:internal/core/registry.go): Static hook registration and management
+- [base.go](mdc:internal/core/base.go): Base hook implementation and interfaces
+- [events.go](mdc:internal/core/events.go): Event type definitions
+- [environment.go](mdc:internal/core/environment.go): Environment variable management
+- [expressions.go](mdc:internal/core/expressions.go): Expression evaluation for custom hooks
+
+### Hooks ([internal/hooks/](mdc:internal/hooks/))
+- [init.go](mdc:internal/hooks/init.go): Hook registration and built-in hook initialization
+- Each hook implements the `core.Hook` interface
+- Built-in hooks: security, format, debug, audit, vet, fetch-blocker, find-blocker
+- [config_hook.go](mdc:internal/hooks/config_hook.go): Custom hook runner
+
+### Configuration ([internal/config/](mdc:internal/config/))
+- [settings.go](mdc:internal/config/settings.go): Settings file management (JSON)
+- [xdg.go](mdc:internal/config/xdg.go): XDG Base Directory support
+- [hooks_config.go](mdc:internal/config/hooks_config.go): Custom hooks configuration (YAML/JSON)
+- [migration.go](mdc:internal/config/migration.go): Legacy config migration
+- [enhanced_loading.go](mdc:internal/config/enhanced_loading.go): Config loading with precedence
+
+## Platform Abstraction System
+
+### Platform Interface
+
+```go
+type Platform interface {
+    Type() Type
+    Name() string
+    ConfigPath() (string, error)
+    SupportsEvent(event core.EventType) bool
+    MapEventFromGeneric(event core.EventType) []string
+    MapEventToGeneric(platformEvent string) (core.EventType, bool)
+    ValidateEventName(eventName string) bool
+    AllEvents() []PlatformEvent
+}
+```
+
+### Supported Platforms
+
+#### Claude Code
+- **Protocol**: Environment variables
+- **Config**: `.claude/settings.json`
+- **Events**: 9 events (all core events)
+- **Matchers**: Regex patterns in config
+- **Implementation**: [internal/platform/claude/](mdc:internal/platform/claude/)
+
+#### Cursor
+- **Protocol**: JSON stdin/stdout
+- **Config**: `~/.cursor/hooks/hooks.json`
+- **Events**: 6 events (subset of core)
+- **Matchers**: Command-line `--matcher` flag
+- **Implementation**: [internal/platform/cursor/](mdc:internal/platform/cursor/)
+- **Status**: ✅ Phase 3 Complete - Full JSON transformation
+
+### Platform Detection
+
+Detection order in [internal/platform/detect.go](mdc:internal/platform/detect.go):
+
+1. `BLUES_TRAVELER_PLATFORM` environment variable
+2. `.cursor/` directory exists
+3. `.claude/` directory exists
+4. `~/.cursor/hooks.json` exists
+5. Default to Claude Code
+
+### Import Cycle Prevention
+
+Platform instantiation MUST happen in the cmd layer:
+
+```go
+// ✅ CORRECT - in internal/cmd/
+func newPlatformFromType(t platform.Type) platform.Platform {
+    switch t {
+    case platform.Cursor:
+        return cursor.New()
+    case platform.ClaudeCode:
+        return claude.New()
+    }
+}
+
+// ❌ WRONG - creates import cycle if in internal/platform/
+```
+
+## Hook Implementation Guide
+
+### Hook Structure
+
+Every hook follows this pattern:
+
+```go
+package hooks
+
+import (
+    "github.com/klauern/blues-traveler/internal/core"
+    "github.com/brads3290/cchooks"
+)
+
+type MyHook struct {
+    *core.BaseHook
+}
+
+func NewMyHook(ctx *core.HookContext) core.Hook {
+    base := core.NewBaseHook("myhook", "My Hook", "Description", ctx)
+    return &MyHook{BaseHook: base}
+}
+
+func (h *MyHook) Run() error {
+    if !h.IsEnabled() {
+        return nil
+    }
+
+    // Register event handlers
+    runner := cchooks.NewRunner()
+    runner.PreToolUse(h.preToolUseHandler)
+    runner.PostToolUse(h.postToolUseHandler)
+
+    return runner.Run()
+}
+
+// Event handlers
+func (h *MyHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+    // Log event
+    h.LogHookEvent("PreToolUse", event.ToolName, nil, nil)
+
+    // Hook logic here
+    if shouldBlock {
+        return cchooks.PreToolUseResponse{
+            ToolAllowed: false,
+            ToolDeniedMessage: "Blocked by MyHook",
+        }
+    }
+
+    return cchooks.PreToolUseResponse{ToolAllowed: true}
+}
+```
+
+### Registration
+
+Add to `builtinHooks` in [internal/hooks/init.go](mdc:internal/hooks/init.go):
+
+```go
+func init() {
+    builtinHooks := map[string]core.HookFactory{
+        "security":      NewSecurityHook,
+        "format":        NewFormatHook,
+        "myhook":        NewMyHook,  // Add here
+    }
+    core.RegisterBuiltinHooks(builtinHooks)
+}
+```
+
+### Event Handlers
+
+#### PreToolUse
+- **Purpose**: Validate/block before tool execution
+- **Response**: Allow/deny with optional message
+- **Common uses**: Security, validation
+
+#### PostToolUse
+- **Purpose**: React after tool execution
+- **Response**: Optional message to user
+- **Common uses**: Formatting, testing, notifications
+
+### Built-in Hooks Reference
+
+| Hook | Event | Purpose | Best Practices |
+|------|-------|---------|----------------|
+| `security` | PreToolUse | Block dangerous commands | Token-based analysis |
+| `format` | PostToolUse | Auto-format code files | Check tool availability |
+| `debug` | All | Log to blues-traveler.log | Structured logging |
+| `audit` | All | JSON audit logging | Comprehensive tracking |
+| `vet` | PostToolUse | Type checking (Python) | Language-specific |
+| `fetch-blocker` | PreToolUse | Block fetch URLs | Security enforcement |
+| `find-blocker` | PreToolUse | Suggest fd over find | Tool preferences |
+
+## Cursor JSON Protocol
+
+### Architecture Flow
+```text
+Cursor Agent
+    ↓ JSON stdin (Cursor format)
+blues-traveler run <hook> --cursor-mode [--matcher <pattern>]
+    ↓ Transform to Claude Code format
+Hook Execution (cchooks Runner)
+    ↓ JSON response (Cursor format)
+Cursor Agent
+```
+
+### Event Mapping
+
+| Cursor Event | Tool Name | Claude Format | Notes |
+|--------------|-----------|---------------|-------|
+| `beforeShellExecution` | "Bash" | PreToolUse | Command in `command` field |
+| `beforeMCPExecution` | (varies) | PreToolUse | Tool name from input |
+| `afterFileEdit` | "Edit" | PostToolUse | File path in `file_path` |
+| `beforeReadFile` | "Read" | PreToolUse | File path in `file_path` |
+| `beforeSubmitPrompt` | N/A | UserPromptSubmit | Prompt in `prompt` field |
+| `stop` | N/A | Stop | Status in `status` field |
+
+### JSON Transformation Examples
+
+```go
+// Input: beforeShellExecution → PreToolUse
+{
+    "hook_event_name": "beforeShellExecution",
+    "command": "rm -rf /"
+}
+↓
+{
+    "event": "pre_tool_use",
+    "tool_name": "Bash",
+    "tool_args": "rm -rf /"
+}
+
+// Output: Claude response → Cursor response
+{
+    "tool_allowed": false,
+    "tool_denied_message": "Dangerous command"
+}
+↓
+{
+    "permission": "deny",
+    "userMessage": "Dangerous command"
+}
+```
+
+### Matcher Support
+
+The `--matcher` flag enables regex filtering:
+
+```bash
+# Install with matcher
+blues-traveler hooks install security --platform cursor \
+  --event PreToolUse --matcher "rm.*|sudo.*"
+
+# Registered command in hooks.json:
+"command": "/path/to/blues-traveler hooks run security --cursor-mode --matcher \"rm.*|sudo.*\""
+```
+
+## Important Patterns
+
+- **Hooks are stateless** and created fresh for each execution
+- **Use `core.BaseHook`** for common functionality (Key(), Name(), Description(), IsEnabled())
+- **Settings hierarchy**: project overrides global
+- **Platform abstraction** enables multi-IDE support
+- **Check IsEnabled()** - Respect user configuration
+- **Log events** - Use LogHookEvent for consistency
+- **Handle errors gracefully** - Return errors, don't panic
+
+## Adding New Features
+
+### New Hook
+1. Create implementation in `internal/hooks/myhook.go`
+2. Register in `internal/hooks/init.go`
+3. Add tests in `internal/hooks/myhook_test.go`
+4. Update documentation
+
+### New Platform
+1. Create `internal/platform/<name>/platform.go`
+2. Implement `Platform` interface
+3. Add Type constant to [platform.go](mdc:internal/platform/platform.go)
+4. Update factory in cmd layer (avoid import cycles)
+5. Update detection logic in [detect.go](mdc:internal/platform/detect.go)
+
+## Configuration Files
+
+- Project settings: `./.claude/settings.json`
+- Global settings: `~/.claude/settings.json`
+- XDG config: `~/.config/blues-traveler/`
+- Platform-specific:
+  - Claude Code: `~/.claude/settings.json`
+  - Cursor: `~/.cursor/hooks/hooks.json`
+
+## What NOT to Do
+
+- Don't suggest dynamic plugin loading or runtime registration
+- Don't reference the old pipeline system (it's been removed)
+- Don't suggest modifying the registry at runtime
+- Don't reference Cobra (the project now uses urfave/cli v3)
+- Don't create import cycles by instantiating platforms in the wrong layer

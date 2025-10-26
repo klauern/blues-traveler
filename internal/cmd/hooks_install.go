@@ -49,7 +49,7 @@ func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
 func buildInstallHookCommand(hookType string, flags installFlags) (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("failed to get executable path: %v", err)
+		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 
 	// Quote the path when it contains spaces to handle paths like "/Program Files/app"

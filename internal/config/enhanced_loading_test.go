@@ -547,7 +547,7 @@ func TestConvertFromLogConfig(t *testing.T) {
 		t.Fatalf("logRotation should be a map, got %T: %+v", configData["logRotation"], configData["logRotation"])
 	}
 
-	if logRotation["MaxAge"] != float64(45) { // JSON marshal/unmarshal converts to float64
+	if logRotation["MaxAge"] != float64(45) { // JSON marshal/unmarshal converts to float64; field name is capitalized (no json tag)
 		t.Errorf("Expected MaxAge=45, got %v (type %T)", logRotation["MaxAge"], logRotation["MaxAge"])
 	}
 

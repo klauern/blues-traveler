@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/brads3290/cchooks"
@@ -189,7 +190,7 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 		}
 
 		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("error reading file %s: %v", filePath, err)
+			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
 
 		// If we successfully loaded from this file, return the prefixes
@@ -229,22 +230,38 @@ type BlockedPrefix struct {
 	Suggestion string
 }
 
-// isURLBlocked checks if a URL should be blocked based on prefix matching
+// isURLBlocked checks if a URL should be blocked based on prefix/pattern matching
 func (h *FetchBlockerHook) isURLBlocked(url string, blockedPrefixes []BlockedPrefix) (bool, string, string) {
 	for _, blocked := range blockedPrefixes {
-		prefix := blocked.Prefix
+		pat := blocked.Prefix
 
-		// Handle wildcard patterns (e.g., "https://example.com/path*")
-		if strings.HasSuffix(prefix, "*") {
-			prefixWithoutWildcard := prefix[:len(prefix)-1]
-			if strings.HasPrefix(url, prefixWithoutWildcard) {
-				return true, prefix, blocked.Suggestion
+		// Fast-path: no wildcard → prefix match
+		if !strings.Contains(pat, "*") {
+			if strings.HasPrefix(url, pat) {
+				return true, pat, blocked.Suggestion
 			}
-		} else if strings.HasPrefix(url, prefix) {
-			// Exact prefix match
-			return true, prefix, blocked.Suggestion
+			continue
+		}
+
+		// Handle wildcard patterns using simple glob matching
+		if wildcardMatch(url, pat) {
+			return true, pat, blocked.Suggestion
 		}
 	}
 
 	return false, "", ""
+}
+
+// wildcardMatch matches s against a pattern where '*' means any sequence (including '/').
+func wildcardMatch(s, pattern string) bool {
+	// Escape regex meta, then restore ".*" for '*'
+	rePat := regexp.QuoteMeta(pattern)
+	rePat = strings.ReplaceAll(rePat, `\*`, `.*`)
+	// Anchor to beginning (prefix match behavior)
+	rePat = "^" + rePat
+	rx, err := regexp.Compile(rePat)
+	if err != nil {
+		return false // Invalid pattern
+	}
+	return rx.MatchString(s)
 }

@@ -37,8 +37,8 @@ func (h *DebugHook) Run() error {
 	}
 	defer func() {
 		if h.logFile != nil {
-			if err := h.logFile.Close(); err != nil && h.logger != nil {
-				h.logger.Printf("Error closing log file: %v", err)
+			if err := h.logFile.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "debug log close error: %v\n", err)
 			}
 		}
 	}()
@@ -57,7 +57,8 @@ func (h *DebugHook) ensureLogger() {
 	logPath := ".claude/hooks/debug.log"
 	logDir := filepath.Dir(logPath)
 	if err := os.MkdirAll(logDir, 0o750); err != nil {
-		// Fallback: leave logger nil
+		// Fallback: leave logger nil, but surface the error
+		fmt.Fprintf(os.Stderr, "failed to create debug log dir %s: %v\n", logDir, err)
 		return
 	}
 
@@ -65,6 +66,7 @@ func (h *DebugHook) ensureLogger() {
 	h.logFile, err = h.Context().FileSystem.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		// Fallback: leave logger nil
+		fmt.Fprintf(os.Stderr, "failed to open debug log file %s: %v\n", logPath, err)
 		return
 	}
 	h.logger = log.New(h.logFile, "", log.LstdFlags)
@@ -87,7 +89,9 @@ func (h *DebugHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolU
 	h.logPreToolDetails(event, details)
 
 	// Log detailed event data if logging is enabled
-	h.LogHookEvent("pre_tool_use", event.ToolName, rawData, details)
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent("pre_tool_use", event.ToolName, rawData, details)
+	}
 
 	return cchooks.Approve()
 }

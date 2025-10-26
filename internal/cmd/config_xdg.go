@@ -507,7 +507,7 @@ func NewConfigLogCmd() *cli.Command {
 				Name:    "global",
 				Aliases: []string{"g"},
 				Value:   false,
-				Usage:   "Configure global settings (~/.claude/settings.json)",
+				Usage:   "Configure global settings",
 			},
 			&cli.IntFlag{
 				Name:    "max-age",
@@ -585,9 +585,8 @@ func NewConfigLogCmd() *cli.Command {
 			if maxBackups > 0 {
 				logConfig.LogRotation.MaxBackups = maxBackups
 			}
-			// Note: urfave/cli v3 doesn't have Changed() method, so we check compress directly
-			// This means compress will be set to false if not explicitly provided
-			if compress {
+			// Respect explicit presence of the flag (true or false)
+			if cmd.IsSet("compress") {
 				logConfig.LogRotation.Compress = compress
 			}
 

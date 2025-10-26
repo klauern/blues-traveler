@@ -683,14 +683,14 @@ For detailed documentation, see:
 
 | Issue | Solution |
 |-------|----------|
-| Hook not found | Run `blues-traveler list` to see available hooks |
-| Hook not working | Check if enabled: `blues-traveler list-installed` |
+| Hook not found | Run `blues-traveler hooks list` to see available hooks |
+| Hook not working | Check if enabled: `blues-traveler hooks list --installed` |
 | Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
 | Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
 | Logs not appearing | Use `--log` flag and check `~/.config/blues-traveler/` directory |
 | Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
-| Config sync issues | Use `--dry-run` to preview changes, check config with `config validate` |
-| Stale hook entries | Run `config sync` - it automatically cleans up removed groups |
+| Config sync issues | Use `--dry-run` to preview changes, check config with `hooks custom validate` |
+| Stale hook entries | Run `hooks custom sync` - it automatically cleans up removed groups |
 
 ## 🤝 Contributing
 
