@@ -11,7 +11,7 @@ import (
 )
 
 // newHooksCustomSyncCommand creates the sync command for custom hooks
-func newHooksCustomSyncCommand() *cli.Command {
+func newHooksCustomSyncCommand(isValidEventType func(string) bool, validEventTypes func() []string) *cli.Command {
 	return &cli.Command{
 		Name:      "sync",
 		Usage:     "Sync custom hooks from hooks.yml into Claude settings",
@@ -25,7 +25,7 @@ func newHooksCustomSyncCommand() *cli.Command {
 			&cli.IntFlag{Name: "timeout", Aliases: []string{"t"}, Usage: "Override timeout in seconds for installed commands"},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			opts, err := parseSyncOptions(cmd)
+			opts, err := parseSyncOptions(cmd, isValidEventType, validEventTypes)
 			if err != nil {
 				return err
 			}
@@ -43,7 +43,7 @@ func newHooksCustomSyncCommand() *cli.Command {
 }
 
 // parseSyncOptions extracts and validates command line options
-func parseSyncOptions(cmd *cli.Command) (syncOptions, error) {
+func parseSyncOptions(cmd *cli.Command, isValidEventType func(string) bool, validEventTypes func() []string) (syncOptions, error) {
 	args := cmd.Args().Slice()
 	var groupFilter string
 	if len(args) > 0 {
@@ -54,11 +54,17 @@ func parseSyncOptions(cmd *cli.Command) (syncOptions, error) {
 	}
 
 	execPath := resolveExecutablePath()
+	eventFilter := strings.TrimSpace(cmd.String("event"))
+
+	// Validate event filter if provided
+	if eventFilter != "" && !isValidEventType(eventFilter) {
+		return syncOptions{}, fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", eventFilter, strings.Join(validEventTypes(), ", "))
+	}
 
 	return syncOptions{
 		useGlobal:       cmd.Bool("global"),
 		dryRun:          cmd.Bool("dry-run"),
-		eventFilter:     strings.TrimSpace(cmd.String("event")),
+		eventFilter:     eventFilter,
 		groupFilter:     groupFilter,
 		defaultMatcher:  cmd.String("matcher"),
 		postMatcher:     cmd.String("post-matcher"),

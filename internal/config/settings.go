@@ -334,6 +334,24 @@ func RemoveHookFromSettings(settings *Settings, command string) bool {
 	return removed
 }
 
+// RemoveHookTypeFromSettings removes all hooks matching a hook type pattern.
+// This handles cases where hooks were installed with flags (--log, --format) or
+// when the executable path has changed.
+func RemoveHookTypeFromSettings(settings *Settings, hookType string) bool {
+	removed := false
+
+	settings.Hooks.PreToolUse = removeHookTypeFromMatchers(settings.Hooks.PreToolUse, hookType, &removed)
+	settings.Hooks.PostToolUse = removeHookTypeFromMatchers(settings.Hooks.PostToolUse, hookType, &removed)
+	settings.Hooks.UserPromptSubmit = removeHookTypeFromMatchers(settings.Hooks.UserPromptSubmit, hookType, &removed)
+	settings.Hooks.Notification = removeHookTypeFromMatchers(settings.Hooks.Notification, hookType, &removed)
+	settings.Hooks.Stop = removeHookTypeFromMatchers(settings.Hooks.Stop, hookType, &removed)
+	settings.Hooks.SubagentStop = removeHookTypeFromMatchers(settings.Hooks.SubagentStop, hookType, &removed)
+	settings.Hooks.PreCompact = removeHookTypeFromMatchers(settings.Hooks.PreCompact, hookType, &removed)
+	settings.Hooks.SessionStart = removeHookTypeFromMatchers(settings.Hooks.SessionStart, hookType, &removed)
+
+	return removed
+}
+
 func removeHookFromMatchers(matchers []HookMatcher, command string, removed *bool) []HookMatcher {
 	var result []HookMatcher
 
@@ -355,6 +373,61 @@ func removeHookFromMatchers(matchers []HookMatcher, command string, removed *boo
 	}
 
 	return result
+}
+
+func removeHookTypeFromMatchers(matchers []HookMatcher, hookType string, removed *bool) []HookMatcher {
+	var result []HookMatcher
+
+	for _, matcher := range matchers {
+		var filteredHooks []HookCommand
+		for _, hook := range matcher.Hooks {
+			// Check if this is a blues-traveler command matching the hook type
+			// Matches: "hooks run <hookType>" or "blues-traveler run <hookType>"
+			// Ignores: executable path, flags like --log, --log-format
+			if !matchesHookType(hook.Command, hookType) {
+				filteredHooks = append(filteredHooks, hook)
+			} else {
+				*removed = true
+			}
+		}
+
+		// Only keep matcher if it still has hooks
+		if len(filteredHooks) > 0 {
+			matcher.Hooks = filteredHooks
+			result = append(result, matcher)
+		}
+	}
+
+	return result
+}
+
+// matchesHookType checks if a command matches a hook type pattern
+// Example: matchesHookType("/path/blues-traveler hooks run security --log", "security") -> true
+// Example: matchesHookType("/path/blues-traveler hooks run config:group:job", "config:group:job") -> true
+func matchesHookType(command, hookType string) bool {
+	// Must be a blues-traveler command
+	if !IsBluesTravelerCommand(command) {
+		return false
+	}
+
+	// Look for "hooks run <hookType>" pattern
+	// The command may have additional flags after the hook type
+	pattern := "hooks run " + hookType
+	idx := strings.Index(command, pattern)
+	if idx == -1 {
+		return false
+	}
+
+	// Verify it's either at the end or followed by a space (for flags)
+	endIdx := idx + len(pattern)
+	if endIdx == len(command) {
+		return true
+	}
+	if endIdx < len(command) && (command[endIdx] == ' ' || command[endIdx] == '\t') {
+		return true
+	}
+
+	return false
 }
 
 // CountBluesTravelerInSettings counts all blues-traveler commands in the settings

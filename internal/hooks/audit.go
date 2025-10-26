@@ -18,6 +18,7 @@ const (
 	ToolWrite = "Write"
 	ToolRead  = "Read"
 	ToolGlob  = "Glob"
+	ToolGrep  = "Grep"
 )
 
 // AuditHook implements comprehensive audit logging
@@ -76,15 +77,15 @@ func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 			entry.Details["file_path"] = write.FilePath
 			entry.Details["content_length"] = len(write.Content)
 		}
-	case "Read":
+	case ToolRead:
 		if read, err := event.AsRead(); err == nil {
 			entry.Details["file_path"] = read.FilePath
 		}
-	case "Glob":
+	case ToolGlob:
 		if glob, err := event.AsGlob(); err == nil {
 			entry.Details["pattern"] = glob.Pattern
 		}
-	case "Grep":
+	case ToolGrep:
 		if grep, err := event.AsGrep(); err == nil {
 			entry.Details["pattern"] = grep.Pattern
 		}

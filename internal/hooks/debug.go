@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/brads3290/cchooks"
 	"github.com/klauern/blues-traveler/internal/core"
@@ -33,8 +34,13 @@ func (h *DebugHook) Run() error {
 	if h.logger == nil {
 		return fmt.Errorf("failed to initialize logger")
 	}
+	defer func() {
+		if h.logFile != nil {
+			h.logFile.Close()
+		}
+	}()
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	fmt.Println("Debug hook started - logging to blues-traveler.log")
+	fmt.Println("Debug hook started - logging to .claude/hooks/debug.log")
 	runner.Run()
 	return nil
 }
@@ -43,8 +49,17 @@ func (h *DebugHook) ensureLogger() {
 	if h.logger != nil {
 		return
 	}
+
+	// Ensure directory exists
+	logPath := ".claude/hooks/debug.log"
+	logDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
+		// Fallback: leave logger nil
+		return
+	}
+
 	var err error
-	h.logFile, err = h.Context().FileSystem.OpenFile(".claude/hooks/debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	h.logFile, err = h.Context().FileSystem.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		// Fallback: leave logger nil
 		return
@@ -72,33 +87,41 @@ func (h *DebugHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 	switch event.ToolName {
 	case ToolBash:
 		if bash, err := event.AsBash(); err == nil {
-			h.logger.Printf("  Command: %s", bash.Command)
+			if h.logger != nil {
+				h.logger.Printf("  Command: %s", bash.Command)
+			}
 			details["command"] = bash.Command
 			details["description"] = bash.Description
 		}
 	case ToolEdit:
 		if edit, err := event.AsEdit(); err == nil {
-			h.logger.Printf("  File: %s", edit.FilePath)
+			if h.logger != nil {
+				h.logger.Printf("  File: %s", edit.FilePath)
+			}
 			details["file_path"] = edit.FilePath
 			details["old_string_length"] = len(edit.OldString)
 			details["new_string_length"] = len(edit.NewString)
 		}
 	case ToolWrite:
 		if write, err := event.AsWrite(); err == nil {
-			h.logger.Printf("  File: %s", write.FilePath)
+			if h.logger != nil {
+				h.logger.Printf("  File: %s", write.FilePath)
+			}
 			details["file_path"] = write.FilePath
 			details["content_length"] = len(write.Content)
 		}
-	case "Read":
+	case ToolRead:
 		if read, err := event.AsRead(); err == nil {
-			h.logger.Printf("  File: %s", read.FilePath)
+			if h.logger != nil {
+				h.logger.Printf("  File: %s", read.FilePath)
+			}
 			details["file_path"] = read.FilePath
 		}
-	case "Glob":
+	case ToolGlob:
 		if glob, err := event.AsGlob(); err == nil {
 			details["pattern"] = glob.Pattern
 		}
-	case "Grep":
+	case ToolGrep:
 		if grep, err := event.AsGrep(); err == nil {
 			details["pattern"] = grep.Pattern
 		}

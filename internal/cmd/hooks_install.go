@@ -264,15 +264,6 @@ func newHooksUninstallCommand() *cli.Command {
 				return nil
 			}
 
-			// Get path to this executable
-			execPath, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("failed to get executable path: %v", err)
-			}
-
-			// Create command pattern to match: blues-traveler hooks run <type>
-			hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
-
 			// Get settings path
 			settingsPath, err := config.GetSettingsPath(global)
 			if err != nil {
@@ -289,8 +280,9 @@ func newHooksUninstallCommand() *cli.Command {
 				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid YAML/JSON", settingsPath, err)
 			}
 
-			// Remove hook from settings
-			removed := config.RemoveHookFromSettings(settings, hookCommand)
+			// Remove hook from settings using pattern matching
+			// This handles hooks installed with flags (--log, --format) or different executable paths
+			removed := config.RemoveHookTypeFromSettings(settings, hookType)
 
 			if !removed {
 				return fmt.Errorf("hook type '%s' was not found in settings", hookType)
@@ -306,8 +298,7 @@ func newHooksUninstallCommand() *cli.Command {
 				scope = "global"
 			}
 
-			fmt.Printf("✅ Successfully removed %s hook from %s settings\n", hookType, scope)
-			fmt.Printf("   Command: %s\n", hookCommand)
+			fmt.Printf("✅ Successfully removed all '%s' hooks from %s settings\n", hookType, scope)
 			fmt.Printf("   Settings: %s\n", settingsPath)
 			return nil
 		},

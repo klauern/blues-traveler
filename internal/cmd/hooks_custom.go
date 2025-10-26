@@ -20,7 +20,7 @@ func newHooksCustomCommand(isValidEventType func(string) bool, validEventTypes f
 		Commands: []*cli.Command{
 			newHooksCustomInstallCommand(isValidEventType, validEventTypes),
 			newHooksCustomListCommand(),
-			newHooksCustomSyncCommand(),
+			newHooksCustomSyncCommand(isValidEventType, validEventTypes),
 			newHooksCustomInitCommand(),
 			newHooksCustomValidateCommand(),
 			newHooksCustomShowCommand(),

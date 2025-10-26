@@ -77,6 +77,34 @@ func generateSampleConfig(global bool, group string) string {
 `, group, group)
 }
 
+// sanitizeFileName validates and sanitizes a filename to prevent path traversal
+func sanitizeFileName(fileName string) (string, error) {
+	// Reject empty, ".", or ".." names
+	if fileName == "" || fileName == "." || fileName == ".." {
+		return "", fmt.Errorf("invalid filename: %q", fileName)
+	}
+
+	// Reject absolute paths
+	if filepath.IsAbs(fileName) {
+		return "", fmt.Errorf("absolute paths not allowed: %q", fileName)
+	}
+
+	// Reject paths containing separators
+	if strings.Contains(fileName, string(filepath.Separator)) || strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") {
+		return "", fmt.Errorf("path separators not allowed in filename: %q", fileName)
+	}
+
+	// Use filepath.Base as additional safety (should be a no-op after above checks)
+	base := filepath.Base(fileName)
+
+	// Ensure .yml or .yaml extension
+	if !strings.HasSuffix(strings.ToLower(base), ".yml") && !strings.HasSuffix(strings.ToLower(base), ".yaml") {
+		base = base + ".yml"
+	}
+
+	return base, nil
+}
+
 // writePerGroupConfig writes a per-group config file to .claude/hooks/<name>.yml
 func writePerGroupConfig(global bool, fileName string, sample string, overwrite bool) (string, error) {
 	dir, err := config.EnsureClaudeDir(global)
@@ -89,10 +117,10 @@ func writePerGroupConfig(global bool, fileName string, sample string, overwrite 
 		return "", err
 	}
 
-	// Sanitize: ensure .yml extension
-	base := fileName
-	if !strings.HasSuffix(strings.ToLower(base), ".yml") && !strings.HasSuffix(strings.ToLower(base), ".yaml") {
-		base = base + ".yml"
+	// Sanitize filename to prevent path traversal
+	base, err := sanitizeFileName(fileName)
+	if err != nil {
+		return "", err
 	}
 
 	target := filepath.Join(hooksDir, base)
