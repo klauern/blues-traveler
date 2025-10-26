@@ -57,17 +57,16 @@ func parseSyncOptions(cmd *cli.Command, isValidEventType func(string) bool, vali
 	execPath := resolveExecutablePath()
 	eventFilter := strings.TrimSpace(cmd.String("event"))
 
-	// Validate event filter if provided (accepts Cursor aliases)
-	if eventFilter != "" && !isValidEventType(eventFilter) {
-		return syncOptions{}, fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", eventFilter, strings.Join(validEventTypes(), ", "))
+	// Resolve Cursor alias to canonical event name first
+	if eventFilter != "" {
+		if resolved := core.ResolveEventAlias(eventFilter); resolved != "" {
+			eventFilter = resolved
+		}
 	}
 
-	// Resolve Cursor alias to canonical event name
-	if eventFilter != "" {
-		resolvedEvent := core.ResolveEventAlias(eventFilter)
-		if resolvedEvent != "" {
-			eventFilter = resolvedEvent
-		}
+	// Validate event filter after resolution
+	if eventFilter != "" && !isValidEventType(eventFilter) {
+		return syncOptions{}, fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", eventFilter, strings.Join(validEventTypes(), ", "))
 	}
 
 	return syncOptions{

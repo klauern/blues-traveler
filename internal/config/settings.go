@@ -9,17 +9,20 @@ import (
 	"strings"
 )
 
+// HookCommand represents a single hook command configuration with type, command, and optional timeout
 type HookCommand struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 	Timeout *int   `json:"timeout,omitempty"`
 }
 
+// HookMatcher represents a matcher pattern with associated hook commands
 type HookMatcher struct {
 	Matcher string        `json:"matcher,omitempty"`
 	Hooks   []HookCommand `json:"hooks"`
 }
 
+// HooksConfig represents the hooks configuration organized by event type
 type HooksConfig struct {
 	PreToolUse       []HookMatcher `json:"PreToolUse,omitempty"`
 	PostToolUse      []HookMatcher `json:"PostToolUse,omitempty"`
@@ -38,6 +41,7 @@ type PluginConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
+// Settings represents the complete settings structure including hooks, plugins, and other configuration
 type Settings struct {
 	Hooks        HooksConfig             `json:"hooks,omitempty"`
 	Plugins      map[string]PluginConfig `json:"plugins,omitempty"`
@@ -45,6 +49,7 @@ type Settings struct {
 	Other        map[string]interface{}  `json:"-"`
 }
 
+// GetSettingsPath returns the path to the settings file (global or project-specific)
 func GetSettingsPath(global bool) (string, error) {
 	if global {
 		// Global settings: ~/.claude/settings.json
@@ -53,16 +58,16 @@ func GetSettingsPath(global bool) (string, error) {
 			return "", fmt.Errorf("failed to get home directory: %v", err)
 		}
 		return filepath.Join(homeDir, ".claude", "settings.json"), nil
-	} else {
-		// Project settings: ./.claude/settings.json
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %v", err)
-		}
-		return filepath.Join(cwd, ".claude", "settings.json"), nil
 	}
+	// Project settings: ./.claude/settings.json
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %v", err)
+	}
+	return filepath.Join(cwd, ".claude", "settings.json"), nil
 }
 
+// LoadSettings loads settings from the specified path, preserving unknown JSON fields
 func LoadSettings(settingsPath string) (*Settings, error) {
 	settings := &Settings{
 		Other: make(map[string]interface{}),
@@ -104,6 +109,7 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 	return settings, nil
 }
 
+// SaveSettings saves settings to the specified path with proper formatting
 func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
@@ -146,6 +152,7 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 	return nil
 }
 
+// IsHooksConfigEmpty returns true if the hooks configuration has no hooks defined for any event
 func IsHooksConfigEmpty(hooks HooksConfig) bool {
 	return len(hooks.PreToolUse) == 0 &&
 		len(hooks.PostToolUse) == 0 &&
@@ -174,6 +181,7 @@ func (s *Settings) IsPluginEnabled(key string) bool {
 	return *cfg.Enabled
 }
 
+// AddHookToSettings adds or merges a hook into settings for the specified event
 func AddHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
 	hookCmd := HookCommand{
 		Type:    "command",
@@ -263,6 +271,7 @@ func checkExactDuplicate(existingHook HookCommand, newHook HookCommand, matcherN
 }
 
 // checkBluesTravelerConflict checks if two blues-traveler hooks conflict
+// Creates a copy of the input slice to avoid side effects on the original data
 func checkBluesTravelerConflict(existingHook HookCommand, newHook HookCommand, matcherName string, matcherIndex, hookIndex int, existing []HookMatcher) *MergeResult {
 	if !isBluesTravelerCommand(existingHook.Command) || !isBluesTravelerCommand(newHook.Command) {
 		return nil
@@ -272,10 +281,19 @@ func checkBluesTravelerConflict(existingHook HookCommand, newHook HookCommand, m
 	newType := extractHookType(newHook.Command)
 
 	if existingType != "" && existingType == newType {
-		// Replace the existing hook with the new one
-		existing[matcherIndex].Hooks[hookIndex] = newHook
+		// Create a copy of the existing matchers to avoid mutating the input
+		result := make([]HookMatcher, len(existing))
+		copy(result, existing)
+
+		// Copy the hooks slice for the affected matcher
+		result[matcherIndex].Hooks = make([]HookCommand, len(existing[matcherIndex].Hooks))
+		copy(result[matcherIndex].Hooks, existing[matcherIndex].Hooks)
+
+		// Replace the existing hook with the new one in the copy
+		result[matcherIndex].Hooks[hookIndex] = newHook
+
 		return &MergeResult{
-			Matchers:      existing,
+			Matchers:      result,
 			WasDuplicate:  true,
 			DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcherName),
 		}
@@ -285,9 +303,9 @@ func checkBluesTravelerConflict(existingHook HookCommand, newHook HookCommand, m
 }
 
 // checkHookConflicts checks for conflicts between existing and new hooks
-func checkHookConflicts(existing []HookMatcher, new HookMatcher, matcherIndex int) *MergeResult {
+func checkHookConflicts(existing []HookMatcher, newMatcher HookMatcher, matcherIndex int) *MergeResult {
 	for j, existingHook := range existing[matcherIndex].Hooks {
-		for _, newHook := range new.Hooks {
+		for _, newHook := range newMatcher.Hooks {
 			// Exact duplicate check
 			if result := checkExactDuplicate(existingHook, newHook, existing[matcherIndex].Matcher); result != nil {
 				result.Matchers = existing
@@ -303,17 +321,17 @@ func checkHookConflicts(existing []HookMatcher, new HookMatcher, matcherIndex in
 	return nil
 }
 
-func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
+func mergeHookMatcher(existing []HookMatcher, newMatcher HookMatcher) MergeResult {
 	// Look for existing matcher
 	for i, matcher := range existing {
-		if matcher.Matcher == new.Matcher {
+		if matcher.Matcher == newMatcher.Matcher {
 			// Check for conflicts
-			if result := checkHookConflicts(existing, new, i); result != nil {
+			if result := checkHookConflicts(existing, newMatcher, i); result != nil {
 				return *result
 			}
 
 			// No conflicts found, append to existing matcher
-			existing[i].Hooks = append(existing[i].Hooks, new.Hooks...)
+			existing[i].Hooks = append(existing[i].Hooks, newMatcher.Hooks...)
 			return MergeResult{
 				Matchers:     existing,
 				WasDuplicate: false,
@@ -323,11 +341,12 @@ func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
 
 	// No existing matcher found, add new one
 	return MergeResult{
-		Matchers:     append(existing, new),
+		Matchers:     append(existing, newMatcher),
 		WasDuplicate: false,
 	}
 }
 
+// RemoveHookFromSettings removes all occurrences of a specific hook command from settings
 func RemoveHookFromSettings(settings *Settings, command string) bool {
 	return removeFromAllEvents(settings, func(matchers []HookMatcher, removed *bool) []HookMatcher {
 		return removeHookFromMatchers(matchers, command, removed)
@@ -411,6 +430,7 @@ func removeHookTypeFromMatchers(matchers []HookMatcher, hookType string, removed
 
 // matchesHookType checks if a command matches a hook type pattern
 // Example: matchesHookType("/path/blues-traveler hooks run security --log", "security") -> true
+// Example: matchesHookType("/path/blues-traveler run security --log", "security") -> true
 // Example: matchesHookType("/path/blues-traveler hooks run config:group:job", "config:group:job") -> true
 func matchesHookType(command, hookType string) bool {
 	// Must be a blues-traveler command
@@ -418,16 +438,26 @@ func matchesHookType(command, hookType string) bool {
 		return false
 	}
 
-	// Look for "hooks run <hookType>" pattern
+	// Look for "hooks run <hookType>" or "blues-traveler run <hookType>" pattern
 	// The command may have additional flags after the hook type
-	pattern := "hooks run " + hookType
-	idx := strings.Index(command, pattern)
+	patterns := []string{"hooks run " + hookType, "blues-traveler run " + hookType}
+	idx := -1
+	patternLen := 0
+
+	for _, pattern := range patterns {
+		if foundIdx := strings.Index(command, pattern); foundIdx != -1 {
+			idx = foundIdx
+			patternLen = len(pattern)
+			break
+		}
+	}
+
 	if idx == -1 {
 		return false
 	}
 
 	// Verify it's either at the end or followed by a space (for flags)
-	endIdx := idx + len(pattern)
+	endIdx := idx + patternLen
 	if endIdx == len(command) {
 		return true
 	}

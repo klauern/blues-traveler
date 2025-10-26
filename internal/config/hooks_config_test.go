@@ -147,10 +147,10 @@ func TestAddProjectPaths(t *testing.T) {
 		}
 	}
 
-	// Verify it includes local override
+	// Verify it includes local override (should be first for highest precedence)
 	localOverride := filepath.Join(baseDir, "hooks-local.yml")
-	if paths[len(paths)-1] != localOverride {
-		t.Errorf("addProjectPaths() last path should be local override, got %s", paths[len(paths)-1])
+	if paths[0] != localOverride {
+		t.Errorf("addProjectPaths() first path should be local override, got %s", paths[0])
 	}
 }
 

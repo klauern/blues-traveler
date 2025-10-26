@@ -72,10 +72,10 @@ func TestMatchesHookType(t *testing.T) {
 			want:     false,
 		},
 		{
-			name:     "match with blues-traveler run (legacy)",
+			name:     "match with blues-traveler run (direct)",
 			command:  "/path/blues-traveler run security",
 			hookType: "security",
-			want:     false, // Should only match "hooks run" pattern
+			want:     true, // Should match "blues-traveler run" pattern
 		},
 		{
 			name:     "match at end of command",

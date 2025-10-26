@@ -35,7 +35,7 @@ type EventConfig struct {
 // HookGroup is a set of EventName -> EventConfig
 type HookGroup map[string]*EventConfig
 
-// HooksConfig is the root structure: GroupName -> HookGroup
+// CustomHooksConfig is the root structure mapping group names to hook groups
 type CustomHooksConfig map[string]HookGroup
 
 // isValidHookConfigFile checks if a file should be included as a hook config
@@ -84,6 +84,9 @@ func collectPerGroupFiles(hooksDir string) []string {
 func addProjectPaths(baseDir string) []string {
 	var paths []string
 
+	// Project local override (highest precedence)
+	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
+
 	// Prefer new canonical file under hooks/
 	paths = append(paths,
 		filepath.Join(baseDir, "hooks", "hooks.yml"),
@@ -100,15 +103,15 @@ func addProjectPaths(baseDir string) []string {
 	// Per-group files in .claude/hooks/
 	paths = append(paths, collectPerGroupFiles(filepath.Join(baseDir, "hooks"))...)
 
-	// Local override last in project scope
-	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
-
 	return paths
 }
 
 // addGlobalPaths adds global-scoped config paths
 func addGlobalPaths(baseDir string) []string {
 	var paths []string
+
+	// Global local override (highest precedence)
+	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
 
 	paths = append(paths,
 		filepath.Join(baseDir, "hooks", "hooks.yml"),
@@ -124,9 +127,6 @@ func addGlobalPaths(baseDir string) []string {
 
 	// Per-group files in ~/.claude/hooks/
 	paths = append(paths, collectPerGroupFiles(filepath.Join(baseDir, "hooks"))...)
-
-	// Global local override last
-	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
 
 	return paths
 }
