@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestNewEnhancedConfigLoader(t *testing.T) {
@@ -18,86 +20,75 @@ func TestNewEnhancedConfigLoader(t *testing.T) {
 }
 
 func TestLoadConfigWithFallback(t *testing.T) {
-	// Create temporary directories
-	tempDir, err := os.MkdirTemp("", "enhanced-loader-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	t.Run("XDGOnly", testLoadXDGOnlyStrategy)
+	t.Run("LegacyOnly", testLoadLegacyOnlyStrategy)
+	t.Run("XDGFirstPreference", testXDGFirstPreference)
+	t.Run("XDGFirstFallback", testXDGFirstFallback)
+}
 
-	xdgTempDir, err := os.MkdirTemp("", "xdg-enhanced-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	defer os.RemoveAll(xdgTempDir)
-
-	// Create test project
+func testLoadXDGOnlyStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
 	project := filepath.Join(tempDir, "test-project")
-	err = os.MkdirAll(project, 0o755)
-	if err != nil {
+
+	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatalf("Failed to create project dir: %v", err)
 	}
 
-	// Test LoadXDGOnly strategy with no XDG config
 	loader := NewEnhancedConfigLoader(LoadXDGOnly)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
 
-	_, _, err = loader.LoadConfigWithFallback(project)
+	// Should error when no XDG config exists
+	_, _, err := loader.LoadConfigWithFallback(project)
 	if err == nil {
 		t.Error("Expected error when loading XDG-only with no XDG config")
 	}
 
 	// Create XDG config
 	xdgConfigData := map[string]interface{}{
-		"logRotation": map[string]interface{}{
-			"maxAge": 45,
-		},
-		"source": "xdg",
+		"logRotation": map[string]interface{}{"maxAge": 45},
+		"source":      constants.XDGSource,
 	}
-	err = loader.xdg.SaveProjectConfig(project, xdgConfigData, "json")
-	if err != nil {
+	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, FormatJSON); err != nil {
 		t.Fatalf("Failed to save XDG config: %v", err)
 	}
 
-	// Test LoadXDGOnly with XDG config
+	// Should load successfully now
 	config, configPath, err := loader.LoadConfigWithFallback(project)
 	if err != nil {
 		t.Fatalf("Failed to load XDG config: %v", err)
 	}
-	if config.Other["source"] != "xdg" {
+	if config.Other["source"] != constants.XDGSource {
 		t.Errorf("Expected source=xdg, got %v", config.Other["source"])
 	}
 	if !filepath.IsAbs(configPath) {
 		t.Errorf("Config path should be absolute: %s", configPath)
 	}
+}
 
-	// Test LoadLegacyOnly strategy
-	legacyLoader := NewEnhancedConfigLoader(LoadLegacyOnly)
+func testLoadLegacyOnlyStrategy(t *testing.T) {
+	tempDir := t.TempDir()
+	project := filepath.Join(tempDir, "test-project")
 
-	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(legacyConfigDir, 0o755); err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
 
 	legacyConfigPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
 	legacyConfigData := map[string]interface{}{
-		"logRotation": map[string]interface{}{
-			"maxAge": 30,
-		},
-		"source": "legacy",
+		"logRotation": map[string]interface{}{"maxAge": 30},
+		"source":      "legacy",
 	}
 	data, err := json.MarshalIndent(legacyConfigData, "", "  ")
 	if err != nil {
 		t.Fatalf("Failed to marshal legacy config: %v", err)
 	}
-	err = os.WriteFile(legacyConfigPath, data, 0o600)
-	if err != nil {
+	if err := os.WriteFile(legacyConfigPath, data, 0o600); err != nil {
 		t.Fatalf("Failed to write legacy config: %v", err)
 	}
 
-	// Test loading legacy config
+	legacyLoader := NewEnhancedConfigLoader(LoadLegacyOnly)
 	legacyConfig, legacyPath, err := legacyLoader.LoadConfigWithFallback(project)
 	if err != nil {
 		t.Fatalf("Failed to load legacy config: %v", err)
@@ -108,8 +99,20 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	if legacyPath != legacyConfigPath {
 		t.Errorf("Expected path %s, got %s", legacyConfigPath, legacyPath)
 	}
+}
 
-	// Test LoadXDGFirst with both configs (should prefer XDG)
+func testXDGFirstPreference(t *testing.T) {
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
+	project := filepath.Join(tempDir, "test-project")
+
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
+	}
+
+	// Create both XDG and legacy configs
+	setupBothConfigs(t, project, xdgTempDir)
+
 	xdgFirstLoader := NewEnhancedConfigLoader(LoadXDGFirst)
 	xdgFirstLoader.xdg = &XDGConfig{BaseDir: xdgTempDir}
 
@@ -117,21 +120,25 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load config with XDGFirst: %v", err)
 	}
-	if firstConfig.Other["source"] != "xdg" {
+	if firstConfig.Other["source"] != constants.XDGSource {
 		t.Errorf("XDGFirst should prefer XDG config, got source=%v", firstConfig.Other["source"])
 	}
+}
 
-	// Remove XDG config and test fallback
-	err = os.RemoveAll(xdgTempDir)
-	if err != nil {
-		t.Fatalf("Failed to remove XDG temp dir: %v", err)
+func testXDGFirstFallback(t *testing.T) {
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
+	project := filepath.Join(tempDir, "test-project")
+
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatalf("Failed to create project dir: %v", err)
 	}
 
-	// Recreate empty XDG temp dir
-	err = os.MkdirAll(xdgTempDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to recreate XDG temp dir: %v", err)
-	}
+	// Create only legacy config
+	legacyConfigPath := setupLegacyConfig(t, project)
+
+	xdgFirstLoader := NewEnhancedConfigLoader(LoadXDGFirst)
+	xdgFirstLoader.xdg = &XDGConfig{BaseDir: xdgTempDir}
 
 	fallbackConfig, fallbackPath, err := xdgFirstLoader.LoadConfigWithFallback(project)
 	if err != nil {
@@ -145,19 +152,69 @@ func TestLoadConfigWithFallback(t *testing.T) {
 	}
 }
 
+func setupBothConfigs(t *testing.T, project, xdgTempDir string) {
+	t.Helper()
+
+	// Setup XDG config
+	loader := NewEnhancedConfigLoader(LoadXDGOnly)
+	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
+	xdgConfigData := map[string]interface{}{
+		"logRotation": map[string]interface{}{"maxAge": 45},
+		"source":      constants.XDGSource,
+	}
+	if err := loader.xdg.SaveProjectConfig(project, xdgConfigData, FormatJSON); err != nil {
+		t.Fatalf("Failed to save XDG config: %v", err)
+	}
+
+	// Setup legacy config
+	setupLegacyConfig(t, project)
+}
+
+func setupLegacyConfig(t *testing.T, project string) string {
+	t.Helper()
+
+	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
+	if err := os.MkdirAll(legacyConfigDir, 0o755); err != nil {
+		t.Fatalf("Failed to create legacy config dir: %v", err)
+	}
+
+	legacyConfigPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
+	legacyConfigData := map[string]interface{}{
+		"logRotation": map[string]interface{}{"maxAge": 30},
+		"source":      "legacy",
+	}
+	data, err := json.MarshalIndent(legacyConfigData, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal legacy config: %v", err)
+	}
+	if err := os.WriteFile(legacyConfigPath, data, 0o600); err != nil {
+		t.Fatalf("Failed to write legacy config: %v", err)
+	}
+
+	return legacyConfigPath
+}
+
 func TestLoadGlobalConfigWithFallback(t *testing.T) {
 	// Create temporary directories
 	xdgTempDir, err := os.MkdirTemp("", "xdg-global-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	legacyTempDir, err := os.MkdirTemp("", "legacy-global-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create legacy temp dir: %v", err)
 	}
-	defer os.RemoveAll(legacyTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(legacyTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Test LoadXDGOnly strategy
 	loader := NewEnhancedConfigLoader(LoadXDGOnly)
@@ -168,9 +225,9 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 		"logRotation": map[string]interface{}{
 			"maxAge": 60,
 		},
-		"globalSource": "xdg",
+		"globalSource": constants.XDGSource,
 	}
-	err = loader.xdg.SaveGlobalConfig(globalXDGData, "json")
+	err = loader.xdg.SaveGlobalConfig(globalXDGData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save XDG global config: %v", err)
 	}
@@ -180,7 +237,7 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load XDG global config: %v", err)
 	}
-	if config.Other["globalSource"] != "xdg" {
+	if config.Other["globalSource"] != constants.XDGSource {
 		t.Errorf("Expected globalSource=xdg, got %v", config.Other["globalSource"])
 	}
 
@@ -196,13 +253,21 @@ func TestSaveConfigWithXDG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "save-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -268,13 +333,21 @@ func TestGetConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "path-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	project := filepath.Join(tempDir, "test-project")
 
@@ -340,13 +413,21 @@ func TestIsProjectRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create XDG temp dir: %v", err)
 	}
-	defer os.RemoveAll(xdgTempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(xdgTempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	tempDir, err := os.MkdirTemp("", "registered-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -466,7 +547,7 @@ func TestConvertFromLogConfig(t *testing.T) {
 		t.Fatalf("logRotation should be a map, got %T: %+v", configData["logRotation"], configData["logRotation"])
 	}
 
-	if logRotation["MaxAge"] != float64(45) { // JSON marshal/unmarshal converts to float64
+	if logRotation["MaxAge"] != float64(45) { // JSON marshal/unmarshal converts to float64; field name is capitalized (no json tag)
 		t.Errorf("Expected MaxAge=45, got %v (type %T)", logRotation["MaxAge"], logRotation["MaxAge"])
 	}
 

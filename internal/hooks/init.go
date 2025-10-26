@@ -23,28 +23,49 @@ func init() {
 
 	// Attempt to load and register config-based hooks.
 	// Errors are non-fatal and will be surfaced at runtime via logs.
-	if cfg, err := config.LoadHooksConfig(); err == nil && cfg != nil {
-		factories := map[string]core.HookFactory{}
-		for groupName, group := range *cfg {
-			for eventName, eventCfg := range group {
-				if eventCfg == nil {
-					continue
-				}
-				for _, job := range eventCfg.Jobs {
-					jobName := job.Name
-					if jobName == "" {
-						continue
-					}
-					key := fmt.Sprintf("config:%s:%s", groupName, jobName)
-					g, j, e := groupName, job, eventName
-					factories[key] = func(ctx *core.HookContext) core.Hook {
-						return NewConfigHook(g, j.Name, j, e, ctx)
-					}
-				}
+	registerConfigBasedHooks()
+}
+
+// registerConfigBasedHooks loads and registers hooks from configuration files
+func registerConfigBasedHooks() {
+	cfg, err := config.LoadHooksConfig()
+	if err != nil || cfg == nil {
+		return
+	}
+
+	factories := buildConfigHookFactories(cfg)
+	if len(factories) > 0 {
+		core.RegisterBuiltinHooks(factories)
+	}
+}
+
+// buildConfigHookFactories creates hook factories from configuration
+func buildConfigHookFactories(cfg *config.CustomHooksConfig) map[string]core.HookFactory {
+	factories := make(map[string]core.HookFactory)
+
+	for groupName, group := range *cfg {
+		for eventName, eventCfg := range group {
+			if eventCfg == nil {
+				continue
 			}
+			addJobFactories(factories, groupName, eventName, eventCfg.Jobs)
 		}
-		if len(factories) > 0 {
-			core.RegisterBuiltinHooks(factories)
+	}
+
+	return factories
+}
+
+// addJobFactories adds hook factories for each job in the configuration
+func addJobFactories(factories map[string]core.HookFactory, groupName, eventName string, jobs []config.HookJob) {
+	for _, job := range jobs {
+		if job.Name == "" {
+			continue
+		}
+		key := fmt.Sprintf("config:%s:%s", groupName, job.Name)
+		// Capture variables for closure
+		g, j, e := groupName, job, eventName
+		factories[key] = func(ctx *core.HookContext) core.Hook {
+			return NewConfigHook(g, j.Name, j, e, ctx)
 		}
 	}
 }

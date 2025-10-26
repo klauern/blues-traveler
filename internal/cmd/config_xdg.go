@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/urfave/cli/v3"
 )
 
@@ -57,7 +59,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 				Usage:   "Search all common project directories instead of just current directory",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			dryRun := cmd.Bool("dry-run")
 			verbose := cmd.Bool("verbose")
 			all := cmd.Bool("all")
@@ -66,40 +68,20 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 			discovery := config.NewLegacyConfigDiscovery(xdg)
 			discovery.SetVerbose(verbose)
 
-			if verbose {
-				fmt.Printf("XDG config directory: %s\n", xdg.GetConfigDir())
-				if all {
-					fmt.Printf("Searching globally across common project directories\n")
-				} else {
-					fmt.Printf("Searching only in current directory\n")
-				}
-			}
+			printMigrateSearchInfo(xdg, verbose, all)
 
-			// First discover configs to show progress
+			// Discover and migrate
 			configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
 			if err != nil {
 				return fmt.Errorf("discovery failed: %w", err)
 			}
 
 			if len(configs) == 0 {
-				if all {
-					fmt.Printf("No legacy configurations found to migrate.\n")
-				} else {
-					fmt.Printf("No legacy configuration found in current directory.\n")
-					fmt.Printf("Use --all flag to search across common project directories.\n")
-				}
+				printNoConfigsFound(all)
 				return nil
 			}
 
-			fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
-
-			if verbose && len(configs) > 0 {
-				fmt.Printf("\nDiscovered configurations:\n")
-				for projectPath, configPath := range configs {
-					fmt.Printf("  - %s\n    → %s\n", projectPath, configPath)
-				}
-				fmt.Println()
-			}
+			printFoundConfigs(configs, verbose)
 
 			result, err := discovery.MigrateConfigs(configs, dryRun)
 			if err != nil {
@@ -108,13 +90,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 
 			// Display results
 			fmt.Print(config.FormatMigrationResult(result, dryRun))
-
-			if !dryRun && result.TotalMigrated > 0 {
-				fmt.Printf("\nMigration completed successfully!\n")
-				fmt.Printf("Configurations are now available in: %s\n", xdg.GetConfigDir())
-			} else if dryRun && result.TotalFound > 0 {
-				fmt.Printf("\nTo perform the actual migration, run: blues-traveler config migrate\n")
-			}
+			printMigrationSummary(result, dryRun, xdg.GetConfigDir())
 
 			return nil
 		},
@@ -122,6 +98,8 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 }
 
 // NewConfigListCmd creates the config list subcommand
+//
+//nolint:gocognit // CLI command with rich user interaction and detailed output formatting
 func NewConfigListCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "list",
@@ -140,7 +118,7 @@ func NewConfigListCmd() *cli.Command {
 				Usage: "Show only project paths (useful for scripting)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			verbose := cmd.Bool("verbose")
 			pathsOnly := cmd.Bool("paths-only")
 
@@ -228,87 +206,145 @@ func NewConfigEditCmd() *cli.Command {
 				Usage:   "Override default editor (uses $EDITOR environment variable by default)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			global := cmd.Bool("global")
-			projectPath := cmd.String("project")
-			editor := cmd.String("editor")
-
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			xdg := config.NewXDGConfig()
 
-			// Determine which config file to edit
-			var configPath string
-			var err error
-
-			if global {
-				configPath = xdg.GetGlobalConfigPath("json")
-				// Ensure the global config exists
-				if _, err := os.Stat(configPath); os.IsNotExist(err) {
-					if err := xdg.SaveGlobalConfig(make(map[string]interface{}), "json"); err != nil {
-						return fmt.Errorf("failed to create global config: %w", err)
-					}
-					fmt.Printf("Created new global configuration file: %s\n", configPath)
-				}
-			} else {
-				// Use current directory if no project specified
-				if projectPath == "" {
-					projectPath, err = os.Getwd()
-					if err != nil {
-						return fmt.Errorf("failed to get current directory: %w", err)
-					}
-				}
-
-				absProjectPath, err := filepath.Abs(projectPath)
-				if err != nil {
-					return fmt.Errorf("failed to get absolute path: %w", err)
-				}
-
-				// Check if project is registered
-				projectConfig, err := xdg.GetProjectConfig(absProjectPath)
-				if err != nil {
-					// Project not registered, create new config
-					defaultConfig := make(map[string]interface{})
-					if err := xdg.SaveProjectConfig(absProjectPath, defaultConfig, "json"); err != nil {
-						return fmt.Errorf("failed to create project config: %w", err)
-					}
-					fmt.Printf("Created new project configuration for: %s\n", absProjectPath)
-					projectConfig, _ = xdg.GetProjectConfig(absProjectPath)
-				}
-
-				configPath = filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
+			configPath, err := determineConfigPath(cmd, xdg)
+			if err != nil {
+				return err
 			}
 
-			// Determine editor to use
-			if editor == "" {
-				editor = os.Getenv("EDITOR")
-				if editor == "" {
-					// Try common editors
-					editors := []string{"code", "vim", "nano", "gedit"}
-					for _, e := range editors {
-						if _, err := exec.LookPath(e); err == nil {
-							editor = e
-							break
-						}
-					}
-				}
+			editor, err := selectEditor(cmd.String("editor"))
+			if err != nil {
+				return err
 			}
 
-			if editor == "" {
-				return fmt.Errorf("no editor found. Set $EDITOR environment variable or use --editor flag")
-			}
-
-			// Launch editor
-			fmt.Printf("Opening %s with %s...\n", configPath, editor)
-			cmd_exec := exec.Command(editor, configPath) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
-			cmd_exec.Stdin = os.Stdin
-			cmd_exec.Stdout = os.Stdout
-			cmd_exec.Stderr = os.Stderr
-
-			return cmd_exec.Run()
+			return launchEditor(editor, configPath)
 		},
 	}
 }
 
+// determineConfigPath determines which config file to edit based on flags
+func determineConfigPath(cmd *cli.Command, xdg *config.XDGConfig) (string, error) {
+	if cmd.Bool("global") {
+		return ensureGlobalConfigExists(xdg)
+	}
+	return ensureProjectConfigExists(cmd.String("project"), xdg)
+}
+
+// ensureGlobalConfigExists ensures the global config file exists and returns its path
+func ensureGlobalConfigExists(xdg *config.XDGConfig) (string, error) {
+	configPath := xdg.GetGlobalConfigPath("json")
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := xdg.SaveGlobalConfig(make(map[string]interface{}), "json"); err != nil {
+			return "", fmt.Errorf("failed to create global config: %w", err)
+		}
+		fmt.Printf("Created new global configuration file: %s\n", configPath)
+	}
+
+	return configPath, nil
+}
+
+// ensureProjectConfigExists ensures the project config file exists and returns its path
+func ensureProjectConfigExists(projectPath string, xdg *config.XDGConfig) (string, error) {
+	absProjectPath, err := resolveProjectPath(projectPath)
+	if err != nil {
+		return "", err
+	}
+
+	projectConfig, err := xdg.GetProjectConfig(absProjectPath)
+	if err != nil {
+		// Project not registered, create new config
+		if err := createNewProjectConfig(absProjectPath, xdg); err != nil {
+			return "", err
+		}
+		projectConfig, _ = xdg.GetProjectConfig(absProjectPath)
+	}
+
+	return filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile), nil
+}
+
+// resolveProjectPath resolves the project path to an absolute path
+func resolveProjectPath(projectPath string) (string, error) {
+	if projectPath == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get current directory: %w", err)
+		}
+		projectPath = cwd
+	}
+
+	absPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	return absPath, nil
+}
+
+// createNewProjectConfig creates a new project configuration
+func createNewProjectConfig(projectPath string, xdg *config.XDGConfig) error {
+	defaultConfig := make(map[string]interface{})
+	if err := xdg.SaveProjectConfig(projectPath, defaultConfig, "json"); err != nil {
+		return fmt.Errorf("failed to create project config: %w", err)
+	}
+	fmt.Printf("Created new project configuration for: %s\n", projectPath)
+	return nil
+}
+
+// selectEditor determines which editor to use based on flag, environment, or common editors
+func selectEditor(editorFlag string) (string, error) {
+	if editorFlag != "" {
+		return editorFlag, nil
+	}
+
+	if envEditor := os.Getenv("EDITOR"); envEditor != "" {
+		return envEditor, nil
+	}
+
+	if commonEditor := findCommonEditor(); commonEditor != "" {
+		return commonEditor, nil
+	}
+
+	return "", fmt.Errorf("no editor found. Set $EDITOR environment variable or use --editor flag")
+}
+
+// findCommonEditor searches for commonly available editors
+func findCommonEditor() string {
+	editors := []string{"code", "vim", "nano", "gedit"}
+	for _, editor := range editors {
+		if _, err := exec.LookPath(editor); err == nil {
+			return editor
+		}
+	}
+	return ""
+}
+
+// launchEditor launches the specified editor with the config file
+func launchEditor(editor, configPath string) error {
+	fmt.Printf("Opening %s with %s...\n", configPath, editor)
+
+	// Parse editor string to support commands with arguments (e.g., "code -w")
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		return fmt.Errorf("invalid editor command")
+	}
+
+	cmdName := parts[0]
+	args := make([]string, 0, len(parts))
+	args = append(args, parts[1:]...)
+	args = append(args, configPath)
+	cmd := exec.Command(cmdName, args...) // #nosec G204 - editor is from controlled sources: user flag, $EDITOR env var, or predefined safe list
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // NewConfigCleanCmd creates the config clean subcommand
+//
+//nolint:gocognit // CLI command with interactive cleanup and detailed progress reporting
 func NewConfigCleanCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "clean",
@@ -322,7 +358,7 @@ func NewConfigCleanCmd() *cli.Command {
 				Usage:   "Show what would be cleaned without making changes",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			dryRun := cmd.Bool("dry-run")
 
 			xdg := config.NewXDGConfig()
@@ -395,7 +431,7 @@ func NewConfigStatusCmd() *cli.Command {
 				Usage:   "Check status for specific project path (defaults to current directory)",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			projectPath := cmd.String("project")
 
 			// Use current directory if no project specified
@@ -432,22 +468,24 @@ func NewConfigStatusCmd() *cli.Command {
 
 			// Migration status
 			fmt.Printf("\nMigration Status:\n")
-			if status.NeedsMigration {
+			switch {
+			case status.NeedsMigration:
 				fmt.Printf("  ⚠ Migration needed\n")
 				fmt.Printf("  Run: blues-traveler config migrate\n")
-			} else if status.HasXDGConfig {
+			case status.HasXDGConfig:
 				fmt.Printf("  ✓ Already migrated to XDG\n")
-			} else if !status.HasLegacyConfig {
+			case !status.HasLegacyConfig:
 				fmt.Printf("  ✓ No configuration found (will use defaults)\n")
 			}
 
 			// Recommendations
 			fmt.Printf("\nRecommendations:\n")
-			if status.NeedsMigration {
+			switch {
+			case status.NeedsMigration:
 				fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
-			} else if status.HasXDGConfig {
+			case status.HasXDGConfig:
 				fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
-			} else {
+			default:
 				fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
 			}
 
@@ -457,6 +495,8 @@ func NewConfigStatusCmd() *cli.Command {
 }
 
 // NewConfigLogCmd creates the config log subcommand
+//
+//nolint:gocognit // CLI command with multiple validation steps and comprehensive help output
 func NewConfigLogCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "log",
@@ -467,7 +507,7 @@ func NewConfigLogCmd() *cli.Command {
 				Name:    "global",
 				Aliases: []string{"g"},
 				Value:   false,
-				Usage:   "Configure global settings (~/.claude/settings.json)",
+				Usage:   "Configure global settings",
 			},
 			&cli.IntFlag{
 				Name:    "max-age",
@@ -499,7 +539,7 @@ func NewConfigLogCmd() *cli.Command {
 				Usage: "Show current log rotation settings",
 			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
+		Action: func(_ context.Context, cmd *cli.Command) error {
 			global := cmd.Bool("global")
 			maxAge := cmd.Int("max-age")
 			maxSize := cmd.Int("max-size")
@@ -509,19 +549,23 @@ func NewConfigLogCmd() *cli.Command {
 
 			configPath, err := config.GetLogConfigPath(global)
 			if err != nil {
-				return fmt.Errorf("error getting config path: %v", err)
+				scope := constants.ScopeProject
+				if global {
+					scope = constants.ScopeGlobal
+				}
+				return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
 			}
 
 			logConfig, err := config.LoadLogConfig(configPath)
 			if err != nil {
-				return fmt.Errorf("error loading config: %v", err)
+				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
 			}
 
 			if show {
 				// Show current log rotation settings
-				scope := "project"
+				scope := constants.ScopeProject
 				if global {
-					scope = "global"
+					scope = constants.ScopeGlobal
 				}
 				fmt.Printf("Current log rotation settings (%s: %s):\n", scope, configPath)
 				fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
@@ -541,14 +585,13 @@ func NewConfigLogCmd() *cli.Command {
 			if maxBackups > 0 {
 				logConfig.LogRotation.MaxBackups = maxBackups
 			}
-			// Note: urfave/cli v3 doesn't have Changed() method, so we check compress directly
-			// This means compress will be set to false if not explicitly provided
-			if compress {
+			// Respect explicit presence of the flag (true or false)
+			if cmd.IsSet("compress") {
 				logConfig.LogRotation.Compress = compress
 			}
 
 			if err := config.SaveLogConfig(configPath, logConfig); err != nil {
-				return fmt.Errorf("error saving config: %v", err)
+				return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
 			}
 
 			scope := "project"
@@ -562,5 +605,53 @@ func NewConfigLogCmd() *cli.Command {
 			fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
 			return nil
 		},
+	}
+}
+
+// Helper functions for migrate command
+
+// printMigrateSearchInfo displays information about the migration search scope
+func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
+	if !verbose {
+		return
+	}
+	fmt.Printf("XDG config directory: %s\n", xdg.GetConfigDir())
+	if all {
+		fmt.Printf("Searching globally across common project directories\n")
+	} else {
+		fmt.Printf("Searching only in current directory\n")
+	}
+}
+
+// printNoConfigsFound displays message when no legacy configs are found
+func printNoConfigsFound(all bool) {
+	if all {
+		fmt.Printf("No legacy configurations found to migrate.\n")
+	} else {
+		fmt.Printf("No legacy configuration found in current directory.\n")
+		fmt.Printf("Use --all flag to search across common project directories.\n")
+	}
+}
+
+// printFoundConfigs displays discovered configuration files
+func printFoundConfigs(configs map[string]string, verbose bool) {
+	fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
+
+	if verbose && len(configs) > 0 {
+		fmt.Printf("\nDiscovered configurations:\n")
+		for projectPath, configPath := range configs {
+			fmt.Printf("  - %s\n    → %s\n", projectPath, configPath)
+		}
+		fmt.Println()
+	}
+}
+
+// printMigrationSummary displays summary after migration
+func printMigrationSummary(result *config.MigrationResult, dryRun bool, configDir string) {
+	if !dryRun && result.TotalMigrated > 0 {
+		fmt.Printf("\nMigration completed successfully!\n")
+		fmt.Printf("Configurations are now available in: %s\n", configDir)
+	} else if dryRun && result.TotalFound > 0 {
+		fmt.Printf("\nTo perform the actual migration, run: blues-traveler config migrate\n")
 	}
 }

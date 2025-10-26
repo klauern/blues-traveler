@@ -38,6 +38,7 @@ func NewConfigHook(groupName, jobName string, job config.HookJob, event string, 
 	}
 }
 
+// Run executes the custom hook based on its configured event type and matcher
 func (h *ConfigHook) Run() error {
 	if !h.IsEnabled() {
 		return nil
@@ -97,8 +98,14 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 		mergedEnv = append(mergedEnv, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// Build command
-	cmd := exec.Command("bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
+	// Build command (with timeout-aware context)
+	cmdCtx := context.Background()
+	if h.job.Timeout > 0 {
+		var cancel context.CancelFunc
+		cmdCtx, cancel = context.WithTimeout(cmdCtx, time.Duration(h.job.Timeout)*time.Second)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(cmdCtx, "bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
 	// If we have the original raw JSON for this event, pass it to child stdin so
 	// nested blues-traveler invocations can consume it.
 	if h.lastRaw != "" {
@@ -109,37 +116,22 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 	}
 	cmd.Env = mergedEnv
 
-	// Handle timeout
-	var timer *time.Timer
-	done := make(chan error, 1)
-	go func() { done <- cmd.Run() }()
-
-	if h.job.Timeout > 0 {
-		timer = time.NewTimer(time.Duration(h.job.Timeout) * time.Second)
-		defer timer.Stop()
-		select {
-		case err := <-done:
-			return err
-		case <-timer.C:
-			_ = cmd.Process.Kill()
+	// Run and translate deadline exceeded into a friendly timeout error
+	if err := cmd.Run(); err != nil {
+		if cmdCtx.Err() == context.DeadlineExceeded && h.job.Timeout > 0 {
 			return fmt.Errorf("command timed out after %ds", h.job.Timeout)
 		}
+		return err
 	}
-	return <-done
+	return nil
 }
 
 func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	c := core.BuildPreToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PreToolUseEvent), c)
-	ok, err := h.shouldRun(env)
-	if err != nil {
-		return cchooks.Block(fmt.Sprintf("config hook error: %v", err))
-	}
-	if !ok {
-		return cchooks.Approve()
-	}
-	if err := h.runCommandWithEnv(env); err != nil {
-		return cchooks.Block(fmt.Sprintf("job '%s' failed: %v", h.job.Name, err))
+
+	if err := h.executeIfShouldRun(env); err != nil {
+		return cchooks.Block(err.Error())
 	}
 	return cchooks.Approve()
 }
@@ -147,23 +139,32 @@ func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent
 func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	c := core.BuildPostToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PostToolUseEvent), c)
-	ok, err := h.shouldRun(env)
-	if err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("config hook error: %v", err))
-	}
-	if !ok {
-		return cchooks.Allow()
-	}
-	if err := h.runCommandWithEnv(env); err != nil {
-		return cchooks.PostBlock(fmt.Sprintf("job '%s' failed: %v", h.job.Name, err))
+
+	if err := h.executeIfShouldRun(env); err != nil {
+		return cchooks.PostBlock(err.Error())
 	}
 	return cchooks.Allow()
+}
+
+// executeIfShouldRun checks if the hook should run and executes it
+func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
+	ok, err := h.shouldRun(env)
+	if err != nil {
+		return fmt.Errorf("config hook error: %w", err)
+	}
+	if !ok {
+		return nil
+	}
+	if err := h.runCommandWithEnv(env); err != nil {
+		return fmt.Errorf("job '%s' failed: %w", h.job.Name, err)
+	}
+	return nil
 }
 
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON
 // and executing the configured job when the event name matches this hook's event.
 func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResponse {
-	return func(ctx context.Context, rawJSON string) *cchooks.RawResponse {
+	return func(_ context.Context, rawJSON string) *cchooks.RawResponse {
 		var rawEvent map[string]interface{}
 		if err := json.Unmarshal([]byte(rawJSON), &rawEvent); err != nil {
 			return nil

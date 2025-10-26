@@ -1,0 +1,273 @@
+---
+description: CI/CD workflows, security scanning, GitHub Actions, and handling check failures
+---
+
+# CI/CD Pipeline & Security Scanning
+
+## GitHub Actions Workflows
+
+The project uses GitHub Actions for CI/CD:
+
+- [.github/workflows/ci.yml](mdc:.github/workflows/ci.yml) - Main CI pipeline (format, lint, test)
+- [.github/workflows/security.yml](mdc:.github/workflows/security.yml) - Security scanning (gosec, govulncheck)
+- [.github/workflows/release.yml](mdc:.github/workflows/release.yml) - Release automation (GoReleaser)
+
+## CI Pipeline Checks
+
+### Main CI Workflow
+
+Runs on every PR and push to main:
+
+1. **Format Check**: Verifies code is formatted with `gofumpt`
+2. **Lint Check**: Runs `golangci-lint` or `go vet`
+3. **Tests**: Runs on Linux, macOS, and Windows with Go 1.25.0
+4. **Build**: Compiles the binary and tests execution
+
+### Security Workflow
+
+1. **gosec**: Static security analysis
+2. **govulncheck**: Vulnerability scanning for dependencies
+
+## Security Scanning with gosec
+
+This project uses `gosec` for security scanning in CI/CD. Understanding when and how to suppress warnings is critical.
+
+### gosec Configuration
+
+See [.github/workflows/security.yml](mdc:.github/workflows/security.yml):
+
+```yaml
+- name: Run Gosec Security Scanner
+  uses: securego/gosec@master
+  with:
+    args: -severity medium -exclude=G204 ./...
+```
+
+### Current Exclusions
+
+- **G204**: Command injection - Excluded because we intentionally execute shell commands (it's a hook runner)
+
+### When to Suppress Warnings
+
+Use `#nosec` directives **ONLY** when:
+
+1. **False Positive**: The warning doesn't apply to your specific use case
+2. **Controlled Input**: The file path, command, or data comes from trusted sources
+3. **Validated Path**: Paths are constructed from known safe sources (e.g., `UserHomeDir()`)
+4. **Required Functionality**: The operation is essential and already secured
+
+### How to Suppress Warnings
+
+```go
+// #nosec G304 -- justification explaining why this is safe
+data, err := os.ReadFile(configPath)
+```
+
+**Best Practices:**
+1. **Always include justification**: Explain WHY the warning is a false positive
+2. **Specify the rule**: Use `G304` instead of just `#nosec`
+3. **Be specific**: Reference the actual security controls in place
+
+### Common gosec Rules
+
+| Rule | Description | When to Suppress |
+|------|-------------|------------------|
+| G101 | Hardcoded credentials | Never - fix the code |
+| G204 | Command injection | When command is from trusted source |
+| G304 | File path injection | When path is validated/controlled |
+| G301 | Directory permissions | When 0755 is required (executables) |
+| G306 | File permissions | When 0644/0600 is appropriate |
+
+### Security-Critical Areas
+
+**NEVER suppress these without careful review:**
+
+1. Password/credential handling
+2. User input processing
+3. External data parsing
+4. Network requests
+5. File uploads
+
+## Handling CI Failures
+
+### Quick Diagnosis
+
+```bash
+# View PR checks
+gh pr checks
+
+# Watch checks in real-time
+gh pr checks --watch
+
+# View specific run logs
+gh run view <run-id> --log
+```
+
+### Common Failures and Fixes
+
+#### Format Check Failure
+
+```bash
+# Fix locally
+task format
+git add .
+git commit -m "style: format code with gofumpt"
+```
+
+#### Lint Failures
+
+```bash
+# Run locally
+task lint
+
+# Fix common issues
+go mod tidy
+gofumpt -w .
+```
+
+#### Test Failures
+
+```bash
+# Run tests locally
+task test
+
+# Run with race detection
+go test -race ./...
+
+# Run specific test
+go test -v -run TestName ./internal/...
+```
+
+#### Security Scan Failures
+
+Common fixes:
+
+1. Add `#nosec` with justification for false positives
+2. Fix actual security issues
+3. Adjust file/directory permissions (0750/0600 instead of 0755/0644)
+
+Example: Safe File Read
+```go
+// #nosec G304 -- configPath is constructed from UserHomeDir() and validated by ConfigPath()
+data, err := os.ReadFile(configPath)
+```
+
+Example: Required Command Execution
+```go
+// #nosec G204 -- command is from trusted hook registry, not user input
+cmd := exec.Command("gofumpt", "-w", filePath)
+```
+
+### Platform-Specific Failures
+
+If tests pass locally but fail in CI:
+
+1. **Windows**: Check path separators and line endings
+2. **macOS**: May have different tool versions
+3. **Linux**: Most common platform, usually reliable
+
+## Go Version Management
+
+**Required**: Go 1.25.0+
+
+The CI workflow reads from [go.mod](mdc:go.mod):
+
+```yaml
+- name: Set up Go
+  uses: actions/setup-go@v5
+  with:
+    go-version-file: 'go.mod'
+```
+
+When updating Go version:
+
+1. Update `go.mod`: `go mod edit -go=1.25.1`
+2. Update documentation references
+3. Test locally before pushing
+
+## Release Process
+
+Automated via [.github/workflows/release.yml](mdc:.github/workflows/release.yml):
+
+1. Create and push a tag: `git tag v0.1.0 && git push origin v0.1.0`
+2. GoReleaser builds for multiple platforms
+3. Creates GitHub release with binaries
+4. Updates Homebrew formula (if configured)
+
+### Manual Release
+
+```bash
+# Tag the release (use semantic versioning)
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+
+# Wait for GitHub Actions to complete
+gh run watch
+```
+
+## Cache Management
+
+GitHub Actions caches:
+
+- Go module cache (`~/go/pkg/mod`)
+- Go build cache (`~/.cache/go-build`)
+- golangci-lint cache
+
+If experiencing cache issues:
+
+1. Use GitHub UI to clear cache
+2. Or bump cache key in workflow files
+
+## Debugging Failed Workflows
+
+### View Logs
+
+```bash
+# Find the failing run
+gh run list --branch cursor-support
+
+# View detailed logs
+gh run view <run-id> --log
+
+# Download logs
+gh run download <run-id>
+```
+
+### Common Patterns
+
+1. **Dependency issues**: Run `go mod tidy` and commit
+2. **Format issues**: Run `task format` locally
+3. **Test flakes**: Check for race conditions or timing issues
+4. **Permission errors**: Review file/directory permissions in code
+
+## Status Badges
+
+The README includes CI status badges that link to workflows:
+
+```markdown
+[![CI](https://github.com/klauern/blues-traveler/workflows/CI/badge.svg)](https://github.com/klauern/blues-traveler/actions)
+```
+
+## Best Practices
+
+1. **Always run `task check` before pushing**
+2. **Use conventional commits** for clear CI logs
+3. **Fix CI failures promptly** - don't merge with red checks
+4. **Test on all platforms** if making OS-specific changes
+5. **Keep workflows simple** - complex logic belongs in Taskfile or scripts
+
+## Verification Before Push
+
+Before suppressing a gosec warning:
+
+1. Review the actual code path
+2. Verify input validation exists
+3. Check if path sanitization is needed
+4. Consider if there's a safer alternative
+5. Document the security controls in the comment
+
+## References
+
+- [gosec Rules](https://github.com/securego/gosec#available-rules)
+- [CWE Database](https://cwe.mitre.org/)
+- [internal/platform/cursor/platform.go](mdc:internal/platform/cursor/platform.go) - Example of proper suppression

@@ -1,0 +1,89 @@
+---
+description: Error handling patterns and best practices for Go code
+---
+
+# Error Handling Best Practices
+
+## Error Wrapping
+
+Always use `%w` instead of `%v` when wrapping errors to preserve the error chain:
+
+```go
+// ✅ CORRECT - preserves error chain
+if err != nil {
+    return fmt.Errorf("failed to read file: %w", err)
+}
+
+// ❌ WRONG - breaks error chain
+if err != nil {
+    return fmt.Errorf("failed to read file: %v", err)
+}
+```
+
+## Directory Creation
+
+Always surface directory creation errors to stderr before returning:
+
+```go
+// ✅ CORRECT - user sees the error
+if err := os.MkdirAll(dir, 0o750); err != nil {
+    fmt.Fprintf(os.Stderr, "failed to create directory %s: %v\n", dir, err)
+    return fmt.Errorf("failed to create directory: %w", err)
+}
+
+// ❌ WRONG - silent failure
+if err := os.MkdirAll(dir, 0o750); err != nil {
+    return fmt.Errorf("failed to create directory: %w", err)
+}
+```
+
+## Nil Pointer Guards
+
+Always check for nil before dereferencing, especially in error handling paths:
+
+```go
+// ✅ CORRECT - checks for nil logger
+defer func() {
+    if h.logFile != nil {
+        if err := h.logFile.Close(); err != nil {
+            fmt.Fprintf(os.Stderr, "debug log close error: %v\n", err)
+        }
+    }
+}()
+
+// ❌ WRONG - assumes logger exists
+defer func() {
+    if err := h.logFile.Close(); err != nil {
+        h.logger.Printf("Error closing: %v", err)  // logger might be nil!
+    }
+}()
+```
+
+## Context-Based Timeouts
+
+Use `context.WithTimeout` instead of timer/select patterns to avoid race conditions:
+
+```go
+// ✅ CORRECT - no race condition
+ctx, cancel := context.WithTimeout(context.Background(), timeout)
+defer cancel()
+cmd := exec.CommandContext(ctx, "bash", "-c", command)
+if err := cmd.Run(); err != nil {
+    if ctx.Err() == context.DeadlineExceeded {
+        return fmt.Errorf("command timed out")
+    }
+    return err
+}
+
+// ❌ WRONG - race condition: timer can fire before cmd starts
+timer := time.NewTimer(timeout)
+done := make(chan error)
+go func() { done <- cmd.Run() }()
+select {
+case err := <-done:
+    return err
+case <-timer.C:
+    cmd.Process.Kill()  // Process might be nil!
+    return fmt.Errorf("timeout")
+}
+```

@@ -158,7 +158,7 @@ func toLower(s string) string {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if 'A' <= c && c <= 'Z' {
-			c = c + ('a' - 'A')
+			c += ('a' - 'A')
 		}
 		result[i] = c
 	}

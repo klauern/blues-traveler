@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/brads3290/cchooks"
@@ -36,22 +37,8 @@ func (h *FetchBlockerHook) Run() error {
 	return nil
 }
 
-func (h *FetchBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	// Log detailed event data if logging is enabled
-	if h.Context().LoggingEnabled {
-		details := make(map[string]interface{})
-		rawData := make(map[string]interface{})
-		rawData["tool_name"] = event.ToolName
-
-		if event.ToolName == "WebFetch" {
-			if webFetch, err := event.AsWebFetch(); err == nil {
-				details["url"] = webFetch.URL
-				details["prompt"] = webFetch.Prompt
-			}
-		}
-
-		h.LogHookEvent("pre_tool_use_fetch_check", event.ToolName, rawData, details)
-	}
+func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	h.logEventDetails(event)
 
 	// Only check WebFetch calls
 	if event.ToolName != "WebFetch" {
@@ -60,53 +47,93 @@ func (h *FetchBlockerHook) preToolUseHandler(ctx context.Context, event *cchooks
 
 	webFetch, err := event.AsWebFetch()
 	if err != nil {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("fetch_blocker_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
-		}
+		h.logError(event.ToolName, err)
 		return cchooks.Block("failed to parse WebFetch command")
 	}
 
-	// Load blocked URL prefixes from embedded config first, then files
-	blockedPrefixes, err := h.loadBlockedFromConfig()
-	if err == nil && len(blockedPrefixes) == 0 {
-		// Fallback to files if not configured in JSON
-		blockedPrefixes, err = h.loadBlockedPrefixes()
-	}
+	// Load blocked prefixes
+	blockedPrefixes, err := h.loadAllBlockedPrefixes()
 	if err != nil {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("fetch_blocker_error", event.ToolName, map[string]interface{}{
-				"error": fmt.Sprintf("failed to load blocked prefixes: %v", err),
-			}, nil)
-		}
+		h.logLoadError(event.ToolName, err)
 		// If we can't load the file, allow the request (fail open)
 		return cchooks.Approve()
 	}
 
-	// Check if URL matches any blocked prefix
-	if blocked, matchedPrefix, suggestion := h.isURLBlocked(webFetch.URL, blockedPrefixes); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("fetch_blocker_block", "WebFetch", map[string]interface{}{
-				"url":            webFetch.URL,
-				"matched_prefix": matchedPrefix,
-				"suggestion":     suggestion,
-			}, nil)
-		}
+	// Check and handle blocked URLs
+	return h.checkAndBlockURL(webFetch.URL, blockedPrefixes)
+}
 
-		message := fmt.Sprintf("URL blocked: matches prefix '%s'", matchedPrefix)
-		if suggestion != "" {
-			message += fmt.Sprintf(". %s", suggestion)
-		}
-		return cchooks.Block(message)
+// logEventDetails logs the event details if logging is enabled
+func (h *FetchBlockerHook) logEventDetails(event *cchooks.PreToolUseEvent) {
+	if !h.Context().LoggingEnabled {
+		return
 	}
 
-	// Log approved fetch if logging is enabled
+	rawData := map[string]interface{}{"tool_name": event.ToolName}
+	details := make(map[string]interface{})
+
+	if event.ToolName == "WebFetch" {
+		if webFetch, err := event.AsWebFetch(); err == nil {
+			details["url"] = webFetch.URL
+			details["prompt"] = webFetch.Prompt
+		}
+	}
+
+	h.LogHookEvent("pre_tool_use_fetch_check", event.ToolName, rawData, details)
+}
+
+// logError logs a parsing error
+func (h *FetchBlockerHook) logError(toolName string, err error) {
 	if h.Context().LoggingEnabled {
-		h.LogHookEvent("fetch_blocker_approved", "WebFetch", map[string]interface{}{
-			"url": webFetch.URL,
+		h.LogHookEvent("fetch_blocker_error", toolName, map[string]interface{}{"error": err.Error()}, nil)
+	}
+}
+
+// logLoadError logs an error loading blocked prefixes
+func (h *FetchBlockerHook) logLoadError(toolName string, err error) {
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent("fetch_blocker_error", toolName, map[string]interface{}{
+			"error": fmt.Sprintf("failed to load blocked prefixes: %v", err),
+		}, nil)
+	}
+}
+
+// loadAllBlockedPrefixes loads blocked prefixes from config and files
+func (h *FetchBlockerHook) loadAllBlockedPrefixes() ([]BlockedPrefix, error) {
+	blockedPrefixes := h.loadBlockedFromConfig()
+	if len(blockedPrefixes) == 0 {
+		// Fallback to files if not configured in JSON
+		return h.loadBlockedPrefixes()
+	}
+	return blockedPrefixes, nil
+}
+
+// checkAndBlockURL checks if a URL should be blocked and returns appropriate response
+func (h *FetchBlockerHook) checkAndBlockURL(url string, blockedPrefixes []BlockedPrefix) cchooks.PreToolUseResponseInterface {
+	blocked, matchedPrefix, suggestion := h.isURLBlocked(url, blockedPrefixes)
+	if !blocked {
+		// Log approval and return
+		if h.Context().LoggingEnabled {
+			h.LogHookEvent("fetch_blocker_approved", "WebFetch", map[string]interface{}{"url": url}, nil)
+		}
+		return cchooks.Approve()
+	}
+
+	// Log block event
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent("fetch_blocker_block", "WebFetch", map[string]interface{}{
+			"url":            url,
+			"matched_prefix": matchedPrefix,
+			"suggestion":     suggestion,
 		}, nil)
 	}
 
-	return cchooks.Approve()
+	// Build block message
+	message := fmt.Sprintf("URL blocked: matches prefix '%s'", matchedPrefix)
+	if suggestion != "" {
+		message += fmt.Sprintf(". %s", suggestion)
+	}
+	return cchooks.Block(message)
 }
 
 // loadBlockedPrefixes loads URL prefixes from the blocked URLs file
@@ -163,7 +190,7 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 		}
 
 		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("error reading file %s: %v", filePath, err)
+			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
 		}
 
 		// If we successfully loaded from this file, return the prefixes
@@ -174,7 +201,7 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 	return []BlockedPrefix{}, nil
 }
 
-func (h *FetchBlockerHook) loadBlockedFromConfig() ([]BlockedPrefix, error) {
+func (h *FetchBlockerHook) loadBlockedFromConfig() []BlockedPrefix {
 	// Project then global
 	for _, global := range []bool{false, true} {
 		cfgPath, err := config.GetLogConfigPath(global)
@@ -192,9 +219,9 @@ func (h *FetchBlockerHook) loadBlockedFromConfig() ([]BlockedPrefix, error) {
 		for _, b := range lc.BlockedURLs {
 			out = append(out, BlockedPrefix{Prefix: b.Prefix, Suggestion: b.Suggestion})
 		}
-		return out, nil
+		return out
 	}
-	return []BlockedPrefix{}, nil
+	return []BlockedPrefix{}
 }
 
 // BlockedPrefix represents a blocked URL prefix with optional suggestion
@@ -203,24 +230,38 @@ type BlockedPrefix struct {
 	Suggestion string
 }
 
-// isURLBlocked checks if a URL should be blocked based on prefix matching
+// isURLBlocked checks if a URL should be blocked based on prefix/pattern matching
 func (h *FetchBlockerHook) isURLBlocked(url string, blockedPrefixes []BlockedPrefix) (bool, string, string) {
 	for _, blocked := range blockedPrefixes {
-		prefix := blocked.Prefix
+		pat := blocked.Prefix
 
-		// Handle wildcard patterns (e.g., "https://example.com/path*")
-		if strings.HasSuffix(prefix, "*") {
-			prefixWithoutWildcard := prefix[:len(prefix)-1]
-			if strings.HasPrefix(url, prefixWithoutWildcard) {
-				return true, prefix, blocked.Suggestion
+		// Fast-path: no wildcard → prefix match
+		if !strings.Contains(pat, "*") {
+			if strings.HasPrefix(url, pat) {
+				return true, pat, blocked.Suggestion
 			}
-		} else {
-			// Exact prefix match
-			if strings.HasPrefix(url, prefix) {
-				return true, prefix, blocked.Suggestion
-			}
+			continue
+		}
+
+		// Handle wildcard patterns using simple glob matching
+		if wildcardMatch(url, pat) {
+			return true, pat, blocked.Suggestion
 		}
 	}
 
 	return false, "", ""
+}
+
+// wildcardMatch matches s against a pattern where '*' means any sequence (including '/').
+func wildcardMatch(s, pattern string) bool {
+	// Escape regex meta, then restore ".*" for '*'
+	rePat := regexp.QuoteMeta(pattern)
+	rePat = strings.ReplaceAll(rePat, `\*`, `.*`)
+	// Anchor to beginning (prefix match behavior)
+	rePat = "^" + rePat
+	rx, err := regexp.Compile(rePat)
+	if err != nil {
+		return false // Invalid pattern
+	}
+	return rx.MatchString(s)
 }

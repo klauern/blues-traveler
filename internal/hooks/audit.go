@@ -1,3 +1,4 @@
+// Package hooks provides built-in hook implementations for security, formatting, and auditing
 package hooks
 
 import (
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -42,7 +44,7 @@ func (h *AuditHook) Run() error {
 	return nil
 }
 
-func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+func (h *AuditHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	entry := AuditEntry{
 		Event:    "pre_tool_use",
 		ToolName: event.ToolName,
@@ -51,31 +53,31 @@ func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 
 	// Add tool-specific details
 	switch event.ToolName {
-	case "Bash":
+	case constants.ToolBash:
 		if bash, err := event.AsBash(); err == nil {
 			entry.Details["command"] = bash.Command
 			entry.Details["description"] = bash.Description
 		}
-	case "Edit":
+	case constants.ToolEdit:
 		if edit, err := event.AsEdit(); err == nil {
 			entry.Details["file_path"] = edit.FilePath
 			entry.Details["old_string_length"] = len(edit.OldString)
 			entry.Details["new_string_length"] = len(edit.NewString)
 		}
-	case "Write":
+	case constants.ToolWrite:
 		if write, err := event.AsWrite(); err == nil {
 			entry.Details["file_path"] = write.FilePath
 			entry.Details["content_length"] = len(write.Content)
 		}
-	case "Read":
+	case constants.ToolRead:
 		if read, err := event.AsRead(); err == nil {
 			entry.Details["file_path"] = read.FilePath
 		}
-	case "Glob":
+	case constants.ToolGlob:
 		if glob, err := event.AsGlob(); err == nil {
 			entry.Details["pattern"] = glob.Pattern
 		}
-	case "Grep":
+	case constants.ToolGrep:
 		if grep, err := event.AsGrep(); err == nil {
 			entry.Details["pattern"] = grep.Pattern
 		}
@@ -93,7 +95,7 @@ func (h *AuditHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToo
 	return cchooks.Approve()
 }
 
-func (h *AuditHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *AuditHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	entry := AuditEntry{
 		Event:    "post_tool_use",
 		ToolName: event.ToolName,

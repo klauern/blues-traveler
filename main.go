@@ -1,3 +1,4 @@
+// Package main provides the entry point for the blues-traveler CLI tool for managing Claude Code and Cursor hooks
 package main
 
 import (
@@ -64,6 +65,7 @@ func main() {
 Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
 		Commands: []*cli.Command{
 			cmd.NewHooksCommand(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes, eventsWrapper),
+			cmd.NewDoctorCommand(),
 			cmd.NewConfigCmd(),
 			cmd.NewGenerateCmd(),
 			cmd.NewVersionCmd(versionInfo),

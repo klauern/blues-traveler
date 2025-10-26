@@ -1,0 +1,310 @@
+---
+description: Code review standards, documentation requirements, and automated feedback handling
+---
+
+# Code Review Standards & Automated Feedback
+
+## Pre-merge Requirements
+
+### Documentation Coverage
+- **Requirement**: Maintain at least 80% docstring coverage
+- **Tool**: CodeRabbit automatically checks this
+- **Fix**: Run `@coderabbitai generate docstrings` or manually add documentation
+
+### Required Documentation
+1. **All exported items** must have documentation comments:
+   - Types, interfaces, structs
+   - Functions and methods
+   - Constants and variables
+   - Package-level documentation
+
+2. **Documentation format**:
+   ```go
+   // ItemName does/represents/implements...
+   //
+   // Additional details if needed.
+   func ItemName() error {
+   ```
+
+### Code Quality Checks
+- No golint warnings for exported items
+- No gosec security warnings without proper suppression
+- Tests must pass with race detector enabled
+- No unhandled errors
+
+## PR Review Process
+
+### Before Submitting PR
+1. Run `task check` to verify:
+   - Code formatting (gofumpt)
+   - Linting (golangci-lint)
+   - Tests pass
+   - Documentation coverage
+
+2. Ensure conventional commits:
+   ```
+   feat(scope): add new feature
+   fix(scope): fix bug
+   docs(scope): update documentation
+   test(scope): add tests
+   refactor(scope): refactor code
+   chore(scope): maintenance tasks
+   ```
+
+## Handling CodeRabbit Feedback
+
+### Priority Classification
+
+#### 🔴 High Priority (Must Fix Before Merge)
+- **Unresolved/Duplicate Issues**: Flagged in previous reviews but not addressed
+- **Breaking Changes**: Code that breaks existing functionality
+- **Critical Security Issues**: Path traversal, injection vulnerabilities
+- **Missing Required Functionality**: Core features not working
+
+#### 🟡 Medium Priority (Should Fix)
+- **Code Quality**: Missing error handling, validation, availability checks
+- **Maintainability**: Code duplication, unclear logic
+- **Documentation**: Missing or incorrect comments
+- **Performance**: Inefficient patterns
+
+#### 🟢 Low Priority (Nice to Have)
+- **Style Issues**: Formatting, naming conventions
+- **Documentation Polish**: Language improvements, typos
+
+### Systematic Response Process
+
+1. **Extract and Categorize**
+   ```bash
+   # Use gh CLI to get CodeRabbit comments
+   gh pr view <branch> --json comments --jq '.comments[] | select(.author.login == "coderabbitai")'
+   ```
+
+2. **Fix High Priority First**
+   Address all high priority issues before medium/low.
+
+3. **Commit Strategy**
+   Create a single comprehensive commit addressing all feedback:
+   ```bash
+   git add <files>
+   git commit -m "fix: address CodeRabbit review feedback for <feature>
+
+   Resolves N high and M medium priority issues identified in PR review:
+
+   High Priority:
+   - file.go: Brief description of fix
+   - file.go: Brief description of fix
+
+   Medium Priority:
+   - file.go: Brief description of fix
+   - file.go: Brief description of fix
+   "
+   ```
+
+## Common Review Patterns & Fixes
+
+### Missing Environment Variables
+```go
+// Before (missing TOOL_NAME)
+case cursor.AfterFileEdit:
+    _ = os.Setenv("FILE_PATH", input.FilePath)
+
+// After
+case cursor.AfterFileEdit:
+    _ = os.Setenv("TOOL_NAME", "Edit")  // Added
+    _ = os.Setenv("FILE_PATH", input.FilePath)
+```
+
+### Shell Script Quoting
+```bash
+# Before (breaks with spaces in paths)
+if {{.BinaryPath}} hooks run {{.HookKey}} --cursor-mode; then
+
+# After (properly quoted)
+if "{{.BinaryPath}}" hooks run "{{.HookKey}}" --cursor-mode; then
+```
+
+### Input Validation
+```go
+func (h *Hook) formatFile(filePath string) error {
+    // Validate not empty
+    if filePath == "" {
+        return fmt.Errorf("empty file path")
+    }
+
+    // Validate existence
+    if _, err := os.Stat(filePath); err != nil {
+        return fmt.Errorf("file not accessible: %w", err)
+    }
+
+    // Prevent path traversal
+    cleanPath := filepath.Clean(filePath)
+    if cleanPath != filePath {
+        return fmt.Errorf("invalid file path: possible path traversal attempt")
+    }
+
+    // Process file...
+}
+```
+
+### Tool Availability Checks
+```go
+var (
+    toolOnce      sync.Once
+    toolAvailable bool
+)
+
+func checkToolAvailable() bool {
+    toolOnce.Do(func() {
+        _, err := exec.LookPath("tool")
+        toolAvailable = err == nil
+    })
+    return toolAvailable
+}
+```
+
+### Error Logging
+```go
+edit, err := event.InputAsEdit()
+if err != nil {
+    if h.Context().LoggingEnabled {
+        log.Printf("Failed to parse Edit input: %v", err)
+    }
+    return cchooks.Allow()  // Don't block on parse errors
+}
+```
+
+### Extract Duplicated Logic
+```go
+// Before: Duplicated in multiple places
+switch event.ToolName {
+case "Edit":
+    edit, err := event.InputAsEdit()
+    if err == nil {
+        filePath = edit.FilePath
+    }
+case "Write":
+    write, err := event.InputAsWrite()
+    if err == nil {
+        filePath = write.FilePath
+    }
+}
+
+// After: Single helper method
+func (h *Hook) extractFilePath(event *Event) (string, error) {
+    switch event.ToolName {
+    case "Edit":
+        edit, err := event.InputAsEdit()
+        if err != nil {
+            return "", err
+        }
+        return edit.FilePath, nil
+    case "Write":
+        write, err := event.InputAsWrite()
+        if err != nil {
+            return "", err
+        }
+        return write.FilePath, nil
+    default:
+        return "", fmt.Errorf("unsupported tool: %s", event.ToolName)
+    }
+}
+```
+
+### Security Improvements
+
+#### Token-based Analysis Over Substring Matching
+```go
+// Before: Substring matching (false positives on URLs, comments)
+if strings.Contains(cmdLower, " /etc") {
+    return true, "blocked system path"
+}
+
+// After: Token-based (accurate)
+for _, t := range tokens[1:] {
+    if strings.HasPrefix(t, "-") {
+        continue  // Skip flags
+    }
+    lt := strings.ToLower(t)
+    if strings.HasPrefix(lt, "/etc") {
+        return true, "blocked system path"
+    }
+}
+```
+
+### Documentation Improvements
+```go
+// isInQuotedString performs a simple check if the pattern is within quotes
+//
+// Limitations:
+// - Does not handle escaped quotes (e.g., \' or \")
+// - May produce false positives/negatives with mixed quoting styles
+// - Does not account for nested quotes or quotes in comments
+// - A full shell parser would be more accurate for edge cases
+func (h *Hook) isInQuotedString(command, pattern string) bool {
+    // Implementation...
+}
+```
+
+## Quick Reference
+
+### Fixing Documentation Coverage
+```bash
+# Check what needs documentation
+golint ./... | grep "should have comment"
+
+# Add documentation following the patterns in this project
+```
+
+### Security Issues
+- Use `#nosec` comments sparingly and with justification
+- Example: `// #nosec G304 - controlled path from trusted source`
+
+### Test Coverage
+- Aim for 80%+ coverage on core functionality
+- Use table-driven tests for multiple scenarios
+- Test error paths
+
+## Verification Before Push
+
+```bash
+# Format code
+task format
+
+# Verify builds
+go build ./...
+
+# Run linter
+task lint
+
+# Run tests
+task test
+```
+
+## Common Patterns to Watch For
+
+### Path Handling
+- Always use `filepath.Clean()` to prevent traversal
+- Check file existence with `os.Stat()`
+- Quote paths in shell scripts
+
+### Error Handling
+- Log extraction errors when parsing event data
+- Check tool availability before execution
+- Return clear error messages with context
+
+### Code Organization
+- Extract duplicated logic into helpers
+- Cache expensive checks (PATH lookups, etc.)
+- Document complex algorithms and limitations
+
+### Security
+- Use token-based analysis for command inspection
+- Validate all external inputs
+- Use case-insensitive comparisons consistently
+
+## Manual Review Focus
+- Architecture consistency
+- Performance implications
+- Security considerations
+- API design
+- Error handling patterns

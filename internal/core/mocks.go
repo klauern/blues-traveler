@@ -21,6 +21,7 @@ type MockFileSystem struct {
 	mu       sync.RWMutex
 }
 
+// NewMockFileSystem creates a new mock filesystem for testing
 func NewMockFileSystem() *MockFileSystem {
 	return &MockFileSystem{
 		Files: make(map[string][]byte),
@@ -28,7 +29,8 @@ func NewMockFileSystem() *MockFileSystem {
 	}
 }
 
-func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+// WriteFile writes data to a mock file in memory
+func (m *MockFileSystem) WriteFile(filename string, data []byte, _ os.FileMode) error {
 	if m.WriteErr != nil {
 		return m.WriteErr
 	}
@@ -46,7 +48,8 @@ func (m *MockFileSystem) WriteFile(filename string, data []byte, perm os.FileMod
 	return nil
 }
 
-func (m *MockFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+// OpenFile opens a file (mock implementation for testing)
+func (m *MockFileSystem) OpenFile(_ string, _ int, _ os.FileMode) (*os.File, error) {
 	if m.OpenErr != nil {
 		return nil, m.OpenErr
 	}
@@ -56,6 +59,7 @@ func (m *MockFileSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.
 	return os.CreateTemp("", "mock_*")
 }
 
+// Stat returns file information for the specified path (mock implementation)
 func (m *MockFileSystem) Stat(name string) (os.FileInfo, error) {
 	if m.StatErr != nil {
 		return nil, m.StatErr
@@ -92,16 +96,19 @@ type MockCommandExecutor struct {
 	mu        sync.RWMutex
 }
 
+// MockCommand represents a mock command execution
 type MockCommand struct {
 	Name string
 	Args []string
 }
 
+// MockCommandResponse represents the response from a mock command
 type MockCommandResponse struct {
 	Output []byte
 	Error  error
 }
 
+// NewMockCommandExecutor creates a new mock command executor for testing
 func NewMockCommandExecutor() *MockCommandExecutor {
 	return &MockCommandExecutor{
 		Commands:  []MockCommand{},
@@ -109,6 +116,7 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 	}
 }
 
+// ExecuteCommand executes a mock command and returns the pre-configured response
 func (m *MockCommandExecutor) ExecuteCommand(name string, args ...string) ([]byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -161,25 +169,30 @@ func (m *MockCommandExecutor) WasCommandExecuted(name string, args ...string) bo
 	defer m.mu.RUnlock()
 
 	for _, cmd := range m.Commands {
-		if cmd.Name == name {
-			if len(args) == 0 {
-				return true
-			}
-			if len(cmd.Args) >= len(args) {
-				match := true
-				for i, arg := range args {
-					if cmd.Args[i] != arg {
-						match = false
-						break
-					}
-				}
-				if match {
-					return true
-				}
-			}
+		if cmd.Name == name && m.argsMatch(cmd.Args, args) {
+			return true
 		}
 	}
 	return false
+}
+
+// argsMatch checks if the command arguments match the expected arguments
+func (m *MockCommandExecutor) argsMatch(cmdArgs, expectedArgs []string) bool {
+	// If no expected args, any command with matching name is a match
+	if len(expectedArgs) == 0 {
+		return true
+	}
+	// Command must have at least as many args as expected
+	if len(cmdArgs) < len(expectedArgs) {
+		return false
+	}
+	// Check if all expected args match
+	for i, arg := range expectedArgs {
+		if cmdArgs[i] != arg {
+			return false
+		}
+	}
+	return true
 }
 
 // MockRunner implements a test runner for cchooks that mimics cchooks.Runner structure
@@ -190,6 +203,7 @@ type MockRunner struct {
 	RunCalled   bool
 }
 
+// Run marks the runner as called (mock implementation for testing)
 func (m *MockRunner) Run() {
 	m.RunCalled = true
 	// Don't actually read from stdin in tests
@@ -227,14 +241,14 @@ func TestHookContext(settingsChecker func(string) bool) *HookContext {
 // TestEvent helpers for creating test events
 
 // NewMockPreToolUseEvent creates a mock PreToolUseEvent for testing
-func NewMockPreToolUseEvent(toolName string) *cchooks.PreToolUseEvent {
+func NewMockPreToolUseEvent(_ string) *cchooks.PreToolUseEvent {
 	// This would need to be implemented based on the cchooks library structure
 	// For now, returning nil as we'd need to examine the cchooks library more closely
 	return nil
 }
 
 // NewMockPostToolUseEvent creates a mock PostToolUseEvent for testing
-func NewMockPostToolUseEvent(toolName string) *cchooks.PostToolUseEvent {
+func NewMockPostToolUseEvent(_ string) *cchooks.PostToolUseEvent {
 	// This would need to be implemented based on the cchooks library structure
 	// For now, returning nil as we'd need to examine the cchooks library more closely
 	return nil

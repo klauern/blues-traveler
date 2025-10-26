@@ -1,3 +1,4 @@
+// Package compat provides backward compatibility shims for deprecated plugin registry API
 package compat
 
 import (

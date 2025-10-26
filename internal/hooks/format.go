@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -51,43 +52,54 @@ func (h *FormatHook) Run() error {
 	return nil
 }
 
-func (h *FormatHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *FormatHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Format code files after editing
-	if event.ToolName == "Edit" || event.ToolName == "Write" {
-		var filePath string
+	if event.ToolName != constants.ToolEdit && event.ToolName != constants.ToolWrite {
+		return cchooks.Allow()
+	}
 
-		switch event.ToolName {
-		case "Edit":
-			edit, err := event.InputAsEdit()
-			if err == nil {
-				filePath = edit.FilePath
-			}
-		case "Write":
-			write, err := event.InputAsWrite()
-			if err == nil {
-				filePath = write.FilePath
-			}
-		}
+	filePath := h.extractFilePath(event)
+	if filePath == "" {
+		return cchooks.Allow()
+	}
 
-		if filePath != "" {
-			// Log detailed event data if logging is enabled
-			if h.Context().LoggingEnabled {
-				details := make(map[string]interface{})
-				rawData := make(map[string]interface{})
-				rawData["tool_name"] = event.ToolName
-				details["file_path"] = filePath
-				details["action"] = "formatting"
+	h.logFormatEvent(event.ToolName, filePath)
 
-				h.LogHookEvent("format_file", event.ToolName, rawData, details)
-			}
-
-			if err := h.formatFile(filePath); err != nil {
-				return cchooks.PostBlock(fmt.Sprintf("Formatting failed for %s: %v", filePath, err))
-			}
-		}
+	if err := h.formatFile(filePath); err != nil {
+		return cchooks.PostBlock(fmt.Sprintf("Formatting failed for %s: %v", filePath, err))
 	}
 
 	return cchooks.Allow()
+}
+
+func (h *FormatHook) extractFilePath(event *cchooks.PostToolUseEvent) string {
+	switch event.ToolName {
+	case constants.ToolEdit:
+		if edit, err := event.InputAsEdit(); err == nil {
+			return edit.FilePath
+		}
+	case constants.ToolWrite:
+		if write, err := event.InputAsWrite(); err == nil {
+			return write.FilePath
+		}
+	}
+	return ""
+}
+
+func (h *FormatHook) logFormatEvent(toolName, filePath string) {
+	if !h.Context().LoggingEnabled {
+		return
+	}
+
+	details := map[string]interface{}{
+		"file_path": filePath,
+		"action":    "formatting",
+	}
+	rawData := map[string]interface{}{
+		"tool_name": toolName,
+	}
+
+	h.LogHookEvent("format_file", toolName, rawData, details)
 }
 
 func (h *FormatHook) formatFile(filePath string) error {

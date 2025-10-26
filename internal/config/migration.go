@@ -134,25 +134,35 @@ func (d *LegacyConfigDiscovery) walkProjectDirectories(basePath string, configs 
 
 		// Look for blues-traveler-config.json in .claude/hooks/ directories
 		if info.Name() == "blues-traveler-config.json" {
-			// Check if this is in a .claude/hooks directory
-			dir := filepath.Dir(path)
-			if filepath.Base(dir) == "hooks" && filepath.Base(filepath.Dir(dir)) == ".claude" {
-				// Get the project root (directory containing .claude)
-				projectRoot := filepath.Dir(filepath.Dir(dir))
-				absProjectRoot, err := filepath.Abs(projectRoot)
-				if err != nil {
-					return nil // Skip this config
-				}
-
-				configs[absProjectRoot] = path
-				if d.verbose {
-					fmt.Printf("  Found config: %s\n", path)
-				}
-			}
+			recordConfigIfValid(path, configs, d.verbose)
 		}
 
 		return nil
 	})
+}
+
+// recordConfigIfValid checks if path is in a valid .claude/hooks directory and records it
+func recordConfigIfValid(path string, configs map[string]string, verbose bool) {
+	// Check if this is in a .claude/hooks directory
+	dir := filepath.Dir(path)
+	if filepath.Base(dir) != "hooks" {
+		return
+	}
+	if filepath.Base(filepath.Dir(dir)) != ".claude" {
+		return
+	}
+
+	// Get the project root (directory containing .claude)
+	projectRoot := filepath.Dir(filepath.Dir(dir))
+	absProjectRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		return // Skip this config
+	}
+
+	configs[absProjectRoot] = path
+	if verbose {
+		fmt.Printf("  Found config: %s\n", path)
+	}
 }
 
 // MigrateConfigs migrates provided configurations to XDG structure

@@ -9,17 +9,20 @@ import (
 	"strings"
 )
 
+// HookCommand represents a single hook command configuration with type, command, and optional timeout
 type HookCommand struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 	Timeout *int   `json:"timeout,omitempty"`
 }
 
+// HookMatcher represents a matcher pattern with associated hook commands
 type HookMatcher struct {
 	Matcher string        `json:"matcher,omitempty"`
 	Hooks   []HookCommand `json:"hooks"`
 }
 
+// HooksConfig represents the hooks configuration organized by event type
 type HooksConfig struct {
 	PreToolUse       []HookMatcher `json:"PreToolUse,omitempty"`
 	PostToolUse      []HookMatcher `json:"PostToolUse,omitempty"`
@@ -38,6 +41,7 @@ type PluginConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
+// Settings represents the complete settings structure including hooks, plugins, and other configuration
 type Settings struct {
 	Hooks        HooksConfig             `json:"hooks,omitempty"`
 	Plugins      map[string]PluginConfig `json:"plugins,omitempty"`
@@ -45,24 +49,25 @@ type Settings struct {
 	Other        map[string]interface{}  `json:"-"`
 }
 
+// GetSettingsPath returns the path to the settings file (global or project-specific)
 func GetSettingsPath(global bool) (string, error) {
 	if global {
 		// Global settings: ~/.claude/settings.json
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %v", err)
+			return "", fmt.Errorf("failed to get home directory: %w", err)
 		}
 		return filepath.Join(homeDir, ".claude", "settings.json"), nil
-	} else {
-		// Project settings: ./.claude/settings.json
-		cwd, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %v", err)
-		}
-		return filepath.Join(cwd, ".claude", "settings.json"), nil
 	}
+	// Project settings: ./.claude/settings.json
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+	return filepath.Join(cwd, ".claude", "settings.json"), nil
 }
 
+// LoadSettings loads settings from the specified path, preserving unknown JSON fields
 func LoadSettings(settingsPath string) (*Settings, error) {
 	settings := &Settings{
 		Other: make(map[string]interface{}),
@@ -76,18 +81,18 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 
 	data, err := os.ReadFile(settingsPath) // #nosec G304 - controlled settings paths
 	if err != nil {
-		return nil, fmt.Errorf("failed to read settings file: %v", err)
+		return nil, fmt.Errorf("failed to read settings file: %w", err)
 	}
 
 	// First unmarshal into a generic map to preserve unknown fields
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse settings JSON: %v", err)
+		return nil, fmt.Errorf("failed to parse settings JSON: %w", err)
 	}
 
 	// Extract known fields
 	if err := json.Unmarshal(data, settings); err != nil {
-		return nil, fmt.Errorf("failed to parse settings: %v", err)
+		return nil, fmt.Errorf("failed to parse settings: %w", err)
 	}
 
 	// Store unknown fields (remove known keys first)
@@ -104,11 +109,13 @@ func LoadSettings(settingsPath string) (*Settings, error) {
 	return settings, nil
 }
 
+// SaveSettings saves settings to the specified path with proper formatting
 func SaveSettings(settingsPath string, settings *Settings) error {
 	// Ensure directory exists
 	dir := filepath.Dir(settingsPath)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+		fmt.Fprintf(os.Stderr, "failed to create directory %s: %v\n", dir, err)
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Merge known and unknown fields
@@ -136,16 +143,17 @@ func SaveSettings(settingsPath string, settings *Settings) error {
 
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %v", err)
+		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
 	if err := os.WriteFile(settingsPath, data, 0o600); err != nil {
-		return fmt.Errorf("failed to write settings file: %v", err)
+		return fmt.Errorf("failed to write settings file: %w", err)
 	}
 
 	return nil
 }
 
+// IsHooksConfigEmpty returns true if the hooks configuration has no hooks defined for any event
 func IsHooksConfigEmpty(hooks HooksConfig) bool {
 	return len(hooks.PreToolUse) == 0 &&
 		len(hooks.PostToolUse) == 0 &&
@@ -174,6 +182,7 @@ func (s *Settings) IsPluginEnabled(key string) bool {
 	return *cfg.Enabled
 }
 
+// AddHookToSettings adds or merges a hook into settings for the specified event
 func AddHookToSettings(settings *Settings, event, matcher, command string, timeout *int) MergeResult {
 	hookCmd := HookCommand{
 		Type:    "command",
@@ -185,6 +194,12 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 		Matcher: matcher,
 		Hooks:   []HookCommand{hookCmd},
 	}
+
+	// Resolve Cursor event aliases to canonical names
+	// This allows hooks to be installed using Cursor event names
+	// Note: We don't import core package to avoid circular dependency,
+	// so alias resolution happens at the command level, not here.
+	// This function receives already-resolved canonical event names.
 
 	var result MergeResult
 	switch event {
@@ -212,6 +227,9 @@ func AddHookToSettings(settings *Settings, event, matcher, command string, timeo
 	case "SessionStart":
 		result = mergeHookMatcher(settings.Hooks.SessionStart, hookMatcher)
 		settings.Hooks.SessionStart = result.Matchers
+	case "SessionEnd":
+		result = mergeHookMatcher(settings.Hooks.SessionEnd, hookMatcher)
+		settings.Hooks.SessionEnd = result.Matchers
 	}
 	return result
 }
@@ -225,10 +243,11 @@ type MergeResult struct {
 
 // extractHookType extracts the hook type from a blues-traveler command
 // Example: "/path/to/blues-traveler run debug --log" -> "debug"
+// Also handles: "/path/to/blues-traveler hooks run debug --log" -> "debug"
 func extractHookType(command string) string {
-	// Match full hook key after 'blues-traveler run ', capturing non-space sequence.
+	// Match both "blues-traveler run" and "blues-traveler hooks run" patterns
 	// This correctly captures config hooks like 'config:python:post-sample'.
-	re := regexp.MustCompile(`blues-traveler\s+run\s+([^\s]+)`) // capture until whitespace
+	re := regexp.MustCompile(`blues-traveler\s+(?:hooks\s+)?run\s+([^\s]+)`) // capture until whitespace
 	matches := re.FindStringSubmatch(command)
 	if len(matches) > 1 {
 		return matches[1]
@@ -238,67 +257,126 @@ func extractHookType(command string) string {
 
 // isBluesTravelerCommand checks if a command is a blues-traveler command
 func isBluesTravelerCommand(command string) bool {
-	return strings.Contains(command, "blues-traveler run")
+	return strings.Contains(command, "blues-traveler run") || strings.Contains(command, "blues-traveler hooks run")
 }
 
-func mergeHookMatcher(existing []HookMatcher, new HookMatcher) MergeResult {
+// checkExactDuplicate checks if a hook command is an exact duplicate
+func checkExactDuplicate(existingHook HookCommand, newHook HookCommand, matcherName string) *MergeResult {
+	if existingHook.Command == newHook.Command {
+		return &MergeResult{
+			Matchers:      nil,
+			WasDuplicate:  true,
+			DuplicateInfo: fmt.Sprintf("Hook command '%s' already exists for matcher '%s'", newHook.Command, matcherName),
+		}
+	}
+	return nil
+}
+
+// checkBluesTravelerConflict checks if two blues-traveler hooks conflict
+// Creates a copy of the input slice to avoid side effects on the original data
+func checkBluesTravelerConflict(existingHook HookCommand, newHook HookCommand, matcherName string, matcherIndex, hookIndex int, existing []HookMatcher) *MergeResult {
+	if !isBluesTravelerCommand(existingHook.Command) || !isBluesTravelerCommand(newHook.Command) {
+		return nil
+	}
+
+	existingType := extractHookType(existingHook.Command)
+	newType := extractHookType(newHook.Command)
+
+	if existingType != "" && existingType == newType {
+		// Create a copy of the existing matchers to avoid mutating the input
+		result := make([]HookMatcher, len(existing))
+		copy(result, existing)
+
+		// Copy the hooks slice for the affected matcher
+		result[matcherIndex].Hooks = make([]HookCommand, len(existing[matcherIndex].Hooks))
+		copy(result[matcherIndex].Hooks, existing[matcherIndex].Hooks)
+
+		// Replace the existing hook with the new one in the copy
+		result[matcherIndex].Hooks[hookIndex] = newHook
+
+		return &MergeResult{
+			Matchers:      result,
+			WasDuplicate:  true,
+			DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcherName),
+		}
+	}
+
+	return nil
+}
+
+// checkHookConflicts checks for conflicts between existing and new hooks
+func checkHookConflicts(existing []HookMatcher, newMatcher HookMatcher, matcherIndex int) *MergeResult {
+	for j, existingHook := range existing[matcherIndex].Hooks {
+		for _, newHook := range newMatcher.Hooks {
+			// Exact duplicate check
+			if result := checkExactDuplicate(existingHook, newHook, existing[matcherIndex].Matcher); result != nil {
+				result.Matchers = existing
+				return result
+			}
+
+			// Check if both are blues-traveler commands with the same hook type
+			if result := checkBluesTravelerConflict(existingHook, newHook, existing[matcherIndex].Matcher, matcherIndex, j, existing); result != nil {
+				return result
+			}
+		}
+	}
+	return nil
+}
+
+func mergeHookMatcher(existing []HookMatcher, newMatcher HookMatcher) MergeResult {
 	// Look for existing matcher
 	for i, matcher := range existing {
-		if matcher.Matcher == new.Matcher {
-			// Check for blues-traveler command conflicts within this matcher
-			for j, existingHook := range existing[i].Hooks {
-				for _, newHook := range new.Hooks {
-					// Exact duplicate check
-					if existingHook.Command == newHook.Command {
-						return MergeResult{
-							Matchers:      existing,
-							WasDuplicate:  true,
-							DuplicateInfo: fmt.Sprintf("Hook command '%s' already exists for matcher '%s'", newHook.Command, matcher.Matcher),
-						}
-					}
-
-					// Check if both are blues-traveler commands with the same hook type
-					if isBluesTravelerCommand(existingHook.Command) && isBluesTravelerCommand(newHook.Command) {
-						existingType := extractHookType(existingHook.Command)
-						newType := extractHookType(newHook.Command)
-						if existingType != "" && existingType == newType {
-							// Replace the existing hook with the new one
-							existing[i].Hooks[j] = newHook
-							return MergeResult{
-								Matchers:      existing,
-								WasDuplicate:  true,
-								DuplicateInfo: fmt.Sprintf("Replaced existing %s hook with updated command for matcher '%s'", newType, matcher.Matcher),
-							}
-						}
-					}
-				}
+		if matcher.Matcher == newMatcher.Matcher {
+			// Check for conflicts
+			if result := checkHookConflicts(existing, newMatcher, i); result != nil {
+				return *result
 			}
+
 			// No conflicts found, append to existing matcher
-			existing[i].Hooks = append(existing[i].Hooks, new.Hooks...)
+			existing[i].Hooks = append(existing[i].Hooks, newMatcher.Hooks...)
 			return MergeResult{
 				Matchers:     existing,
 				WasDuplicate: false,
 			}
 		}
 	}
+
 	// No existing matcher found, add new one
 	return MergeResult{
-		Matchers:     append(existing, new),
+		Matchers:     append(existing, newMatcher),
 		WasDuplicate: false,
 	}
 }
 
+// RemoveHookFromSettings removes all occurrences of a specific hook command from settings
 func RemoveHookFromSettings(settings *Settings, command string) bool {
+	return removeFromAllEvents(settings, func(matchers []HookMatcher, removed *bool) []HookMatcher {
+		return removeHookFromMatchers(matchers, command, removed)
+	})
+}
+
+// RemoveHookTypeFromSettings removes all hooks matching a hook type pattern.
+// This handles cases where hooks were installed with flags (--log, --format) or
+// when the executable path has changed.
+func RemoveHookTypeFromSettings(settings *Settings, hookType string) bool {
+	return removeFromAllEvents(settings, func(matchers []HookMatcher, removed *bool) []HookMatcher {
+		return removeHookTypeFromMatchers(matchers, hookType, removed)
+	})
+}
+
+// removeFromAllEvents applies a removal function to all event types in settings
+func removeFromAllEvents(settings *Settings, removalFn func([]HookMatcher, *bool) []HookMatcher) bool {
 	removed := false
 
-	settings.Hooks.PreToolUse = removeHookFromMatchers(settings.Hooks.PreToolUse, command, &removed)
-	settings.Hooks.PostToolUse = removeHookFromMatchers(settings.Hooks.PostToolUse, command, &removed)
-	settings.Hooks.UserPromptSubmit = removeHookFromMatchers(settings.Hooks.UserPromptSubmit, command, &removed)
-	settings.Hooks.Notification = removeHookFromMatchers(settings.Hooks.Notification, command, &removed)
-	settings.Hooks.Stop = removeHookFromMatchers(settings.Hooks.Stop, command, &removed)
-	settings.Hooks.SubagentStop = removeHookFromMatchers(settings.Hooks.SubagentStop, command, &removed)
-	settings.Hooks.PreCompact = removeHookFromMatchers(settings.Hooks.PreCompact, command, &removed)
-	settings.Hooks.SessionStart = removeHookFromMatchers(settings.Hooks.SessionStart, command, &removed)
+	settings.Hooks.PreToolUse = removalFn(settings.Hooks.PreToolUse, &removed)
+	settings.Hooks.PostToolUse = removalFn(settings.Hooks.PostToolUse, &removed)
+	settings.Hooks.UserPromptSubmit = removalFn(settings.Hooks.UserPromptSubmit, &removed)
+	settings.Hooks.Notification = removalFn(settings.Hooks.Notification, &removed)
+	settings.Hooks.Stop = removalFn(settings.Hooks.Stop, &removed)
+	settings.Hooks.SubagentStop = removalFn(settings.Hooks.SubagentStop, &removed)
+	settings.Hooks.PreCompact = removalFn(settings.Hooks.PreCompact, &removed)
+	settings.Hooks.SessionStart = removalFn(settings.Hooks.SessionStart, &removed)
+	settings.Hooks.SessionEnd = removalFn(settings.Hooks.SessionEnd, &removed)
 
 	return removed
 }
@@ -324,6 +402,72 @@ func removeHookFromMatchers(matchers []HookMatcher, command string, removed *boo
 	}
 
 	return result
+}
+
+func removeHookTypeFromMatchers(matchers []HookMatcher, hookType string, removed *bool) []HookMatcher {
+	var result []HookMatcher
+
+	for _, matcher := range matchers {
+		var filteredHooks []HookCommand
+		for _, hook := range matcher.Hooks {
+			// Check if this is a blues-traveler command matching the hook type
+			// Matches: "hooks run <hookType>" or "blues-traveler run <hookType>"
+			// Ignores: executable path, flags like --log, --log-format
+			if !matchesHookType(hook.Command, hookType) {
+				filteredHooks = append(filteredHooks, hook)
+			} else {
+				*removed = true
+			}
+		}
+
+		// Only keep matcher if it still has hooks
+		if len(filteredHooks) > 0 {
+			matcher.Hooks = filteredHooks
+			result = append(result, matcher)
+		}
+	}
+
+	return result
+}
+
+// matchesHookType checks if a command matches a hook type pattern
+// Example: matchesHookType("/path/blues-traveler hooks run security --log", "security") -> true
+// Example: matchesHookType("/path/blues-traveler run security --log", "security") -> true
+// Example: matchesHookType("/path/blues-traveler hooks run config:group:job", "config:group:job") -> true
+func matchesHookType(command, hookType string) bool {
+	// Must be a blues-traveler command
+	if !IsBluesTravelerCommand(command) {
+		return false
+	}
+
+	// Look for "hooks run <hookType>" or "blues-traveler run <hookType>" pattern
+	// The command may have additional flags after the hook type
+	patterns := []string{"hooks run " + hookType, "blues-traveler run " + hookType}
+	idx := -1
+	patternLen := 0
+
+	for _, pattern := range patterns {
+		if foundIdx := strings.Index(command, pattern); foundIdx != -1 {
+			idx = foundIdx
+			patternLen = len(pattern)
+			break
+		}
+	}
+
+	if idx == -1 {
+		return false
+	}
+
+	// Verify it's either at the end or followed by a space (for flags)
+	endIdx := idx + patternLen
+	if endIdx == len(command) {
+		return true
+	}
+	if endIdx < len(command) && (command[endIdx] == ' ' || command[endIdx] == '\t') {
+		return true
+	}
+
+	return false
 }
 
 // CountBluesTravelerInSettings counts all blues-traveler commands in the settings
@@ -440,17 +584,32 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 	if settings == nil || group == "" {
 		return 0
 	}
-	match := "config:" + group + ":"
-	removed := 0
 
-	// helper to filter a slice of matchers
-	filter := func(matchers []HookMatcher) []HookMatcher {
+	removed := 0
+	matchPattern := "config:" + group + ":"
+
+	// Create filter function that removes matching hooks
+	filter := makeConfigGroupFilter(matchPattern, &removed)
+
+	// Apply filter to specified event or all events
+	if event == "" {
+		filterAllEvents(settings, filter)
+	} else {
+		filterSingleEvent(settings, event, filter)
+	}
+
+	return removed
+}
+
+// makeConfigGroupFilter creates a filter function that removes hooks matching a config group
+func makeConfigGroupFilter(matchPattern string, removed *int) func([]HookMatcher) []HookMatcher {
+	return func(matchers []HookMatcher) []HookMatcher {
 		var result []HookMatcher
 		for _, m := range matchers {
 			var hooks []HookCommand
 			for _, h := range m.Hooks {
-				if IsBluesTravelerCommand(h.Command) && strings.Contains(h.Command, match) {
-					removed++
+				if IsBluesTravelerCommand(h.Command) && strings.Contains(h.Command, matchPattern) {
+					*removed++
 					continue
 				}
 				hooks = append(hooks, h)
@@ -462,8 +621,23 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 		}
 		return result
 	}
+}
 
-	// If event provided, only remove within that event; otherwise across all
+// filterAllEvents applies the filter to all event types
+func filterAllEvents(settings *Settings, filter func([]HookMatcher) []HookMatcher) {
+	settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
+	settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
+	settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
+	settings.Hooks.Notification = filter(settings.Hooks.Notification)
+	settings.Hooks.Stop = filter(settings.Hooks.Stop)
+	settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
+	settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
+	settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
+	settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
+}
+
+// filterSingleEvent applies the filter to a specific event type
+func filterSingleEvent(settings *Settings, event string, filter func([]HookMatcher) []HookMatcher) {
 	switch event {
 	case "PreToolUse":
 		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
@@ -483,19 +657,7 @@ func RemoveConfigGroupFromSettings(settings *Settings, group string, event strin
 		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
 	case "SessionEnd":
 		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
-	default:
-		settings.Hooks.PreToolUse = filter(settings.Hooks.PreToolUse)
-		settings.Hooks.PostToolUse = filter(settings.Hooks.PostToolUse)
-		settings.Hooks.UserPromptSubmit = filter(settings.Hooks.UserPromptSubmit)
-		settings.Hooks.Notification = filter(settings.Hooks.Notification)
-		settings.Hooks.Stop = filter(settings.Hooks.Stop)
-		settings.Hooks.SubagentStop = filter(settings.Hooks.SubagentStop)
-		settings.Hooks.PreCompact = filter(settings.Hooks.PreCompact)
-		settings.Hooks.SessionStart = filter(settings.Hooks.SessionStart)
-		settings.Hooks.SessionEnd = filter(settings.Hooks.SessionEnd)
 	}
-
-	return removed
 }
 
 // GetConfigGroupsInSettings returns a set of all config group names found in settings
@@ -505,36 +667,64 @@ func GetConfigGroupsInSettings(settings *Settings) map[string]bool {
 		return groups
 	}
 
-	// Helper to extract group names from matchers
-	extractGroups := func(matchers []HookMatcher) {
-		for _, matcher := range matchers {
-			for _, hook := range matcher.Hooks {
-				if IsBluesTravelerCommand(hook.Command) && strings.Contains(hook.Command, "config:") {
-					// Extract group name from "blues-traveler run config:groupname:jobname"
-					parts := strings.Split(hook.Command, ":")
-					if len(parts) >= 3 {
-						groupName := parts[1]
-						if groupName != "" {
-							groups[groupName] = true
-						}
-					}
-				}
+	// Get all matcher slices from hooks
+	allMatchers := getAllHookMatchers(&settings.Hooks)
+
+	// Extract group names from all matchers
+	for _, matchers := range allMatchers {
+		extractGroupsFromMatchers(matchers, groups)
+	}
+
+	return groups
+}
+
+// getAllHookMatchers returns all hook matcher slices from a HooksConfig
+func getAllHookMatchers(hooks *HooksConfig) [][]HookMatcher {
+	return [][]HookMatcher{
+		hooks.PreToolUse,
+		hooks.PostToolUse,
+		hooks.UserPromptSubmit,
+		hooks.Notification,
+		hooks.Stop,
+		hooks.SubagentStop,
+		hooks.PreCompact,
+		hooks.SessionStart,
+		hooks.SessionEnd,
+	}
+}
+
+// extractGroupsFromMatchers extracts config group names from hook matchers
+func extractGroupsFromMatchers(matchers []HookMatcher, groups map[string]bool) {
+	for _, matcher := range matchers {
+		for _, hook := range matcher.Hooks {
+			if groupName := extractConfigGroupName(hook.Command); groupName != "" {
+				groups[groupName] = true
 			}
 		}
 	}
+}
 
-	// Extract from all event types
-	extractGroups(settings.Hooks.PreToolUse)
-	extractGroups(settings.Hooks.PostToolUse)
-	extractGroups(settings.Hooks.UserPromptSubmit)
-	extractGroups(settings.Hooks.Notification)
-	extractGroups(settings.Hooks.Stop)
-	extractGroups(settings.Hooks.SubagentStop)
-	extractGroups(settings.Hooks.PreCompact)
-	extractGroups(settings.Hooks.SessionStart)
-	extractGroups(settings.Hooks.SessionEnd)
+// extractConfigGroupName extracts the group name from a config hook command
+// Returns empty string if not a config hook command
+func extractConfigGroupName(command string) string {
+	if !IsBluesTravelerCommand(command) || !strings.Contains(command, "config:") {
+		return ""
+	}
 
-	return groups
+	// Extract group name from "blues-traveler run config:groupname:jobname"
+	// Find the "config:" substring to avoid splitting Windows paths like "C:\..."
+	configIdx := strings.Index(command, "config:")
+	if configIdx == -1 {
+		return ""
+	}
+
+	// Parse only from the "config:" part onwards
+	configPart := command[configIdx+len("config:"):]
+	parts := strings.Split(configPart, ":")
+	if len(parts) >= 2 && parts[0] != "" {
+		return parts[0]
+	}
+	return ""
 }
 
 // IsPluginEnabled checks (project first, then global) settings to see if a plugin is enabled.

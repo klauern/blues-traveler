@@ -1,0 +1,206 @@
+---
+description: Configuration system, settings hierarchy, custom hooks YAML format, and XDG paths
+---
+
+# Configuration System & Custom Hooks
+
+## Configuration Hierarchy
+
+### 1. XDG-Compliant Paths (Preferred)
+```
+~/.config/blues-traveler/         # Respects XDG_CONFIG_HOME
+├── global.json                   # Global settings
+├── global.yml                    # Global custom hooks
+├── projects/
+│   └── <sanitized-name>.json    # Per-project settings
+│   └── <sanitized-name>.yml     # Per-project custom hooks
+└── registry.json                 # Project registry
+```
+
+### 2. Legacy Paths (Fallback)
+- Project: `./.claude/settings.json`
+- Global: `~/.claude/settings.json`
+
+## Settings Structure
+
+```go
+type Settings struct {
+    Plugins map[string]PluginConfig `json:"plugins"`
+    // Preserves unknown fields
+}
+
+type PluginConfig struct {
+    Enabled  *bool                   `json:"enabled,omitempty"`
+    Matchers map[string][]HookMatcher `json:"matchers,omitempty"`
+    // Hook-specific fields...
+}
+```
+
+## Settings Precedence
+
+```go
+// Project settings override global settings
+if cfg, ok := projectSettings.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+    return *cfg.Enabled  // Project wins
+}
+if cfg, ok := globalSettings.Plugins[pluginKey]; ok && cfg.Enabled != nil {
+    return *cfg.Enabled  // Global fallback
+}
+return true  // Default enabled
+```
+
+## Custom Hooks System
+
+Custom hooks enable project-specific automation without modifying blues-traveler code.
+
+### YAML Configuration Format
+
+```yaml
+group-name:
+  EventName:
+    jobs:
+      - name: job-name
+        run: command or script
+        only: condition expression
+        skip: skip condition
+        glob: ["*.ext"]
+        timeout: 30
+        workdir: /path
+        env:
+          KEY: value
+```
+
+### Job Fields
+
+**Required:**
+- `name` - Unique identifier
+- `run` - Command/script to execute
+
+**Optional:**
+- `only` - Run condition (expression)
+- `skip` - Skip condition (expression)
+- `glob` - File patterns filter
+- `timeout` - Seconds (default: 30)
+- `workdir` - Working directory
+- `env` - Additional environment
+
+### Expression Language
+
+#### Operators
+- `==`, `!=` - Equality
+- `&&`, `||`, `!` - Logical
+- `regex` - Regex match: `${VAR} regex "pattern"`
+- `matches` - Glob match: `${VAR} matches "*.go"`
+
+#### Examples
+```yaml
+only: ${TOOL_NAME} == "Edit" || ${TOOL_NAME} == "Write"
+skip: ${FILES_CHANGED} regex ".*_test\\.go$"
+only: ${TOOL_FILE} matches "*.py" && ${EVENT_NAME} == "PostToolUse"
+```
+
+### Available Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `EVENT_NAME` | Current event | `PreToolUse` |
+| `TOOL_NAME` | Tool being used | `Edit`, `Bash` |
+| `TOOL_FILE` | File being edited | `/path/to/file.go` |
+| `TOOL_OUTPUT_FILE` | Same as TOOL_FILE | `/path/to/file.go` |
+| `FILES_CHANGED` | Changed files (space-separated) | `main.go test.go` |
+| `TOOL_ARGS` | Raw tool arguments | Command string |
+| `USER_PROMPT` | User's prompt | User input text |
+| `PROJECT_ROOT` | Project directory | `/home/user/project` |
+
+### CLI Commands
+
+```bash
+# Validate configuration
+blues-traveler hooks custom validate
+
+# Sync all custom hooks
+blues-traveler hooks custom sync
+
+# Sync specific group
+blues-traveler hooks custom sync my-project
+
+# Install custom hook group
+blues-traveler hooks custom install my-project --event PostToolUse
+
+# List available groups
+blues-traveler hooks custom list
+
+# Show group configuration
+blues-traveler hooks custom show my-project
+```
+
+### Common Patterns
+
+#### Security Check
+```yaml
+security:
+  PreToolUse:
+    jobs:
+      - name: block-dangerous
+        run: |
+          if echo "$TOOL_ARGS" | grep -E "(rm -rf|curl.*sh)"; then
+            echo "Dangerous command blocked"
+            exit 1
+          fi
+        only: ${TOOL_NAME} == "Bash"
+```
+
+#### Auto-Format
+```yaml
+formatters:
+  PostToolUse:
+    jobs:
+      - name: format-go
+        run: gofumpt -w ${TOOL_FILE}
+        glob: ["*.go"]
+      - name: format-python
+        run: ruff format ${TOOL_FILE}
+        glob: ["*.py"]
+```
+
+#### Test Runner
+```yaml
+testing:
+  PostToolUse:
+    jobs:
+      - name: test-affected
+        run: go test ./...
+        only: ${FILES_CHANGED} regex "\\.go$"
+        skip: ${FILES_CHANGED} regex "_test\\.go$"
+        timeout: 120
+```
+
+## Migration Commands
+
+- `blues-traveler config migrate` - Migrate legacy configs to XDG
+- `blues-traveler config list` - Show tracked projects
+- `blues-traveler config status` - Show migration status
+- `blues-traveler config clean` - Remove orphaned configs
+
+## Key Files
+
+- [xdg.go](mdc:internal/config/xdg.go) - XDG path resolution
+- [migration.go](mdc:internal/config/migration.go) - Legacy migration
+- [enhanced_loading.go](mdc:internal/config/enhanced_loading.go) - Config loading
+- [settings.go](mdc:internal/config/settings.go) - Settings management
+- [hooks_config.go](mdc:internal/config/hooks_config.go) - Custom hooks parsing
+
+### Implementation
+- Config parsing: [internal/config/hooks_config.go](mdc:internal/config/hooks_config.go)
+- Runtime execution: [internal/hooks/config_hook.go](mdc:internal/hooks/config_hook.go)
+- Expression evaluation: [internal/core/expressions.go](mdc:internal/core/expressions.go)
+
+## Best Practices
+
+1. **Always respect `XDG_CONFIG_HOME`** environment variable
+2. **Preserve unknown JSON fields** when reading/writing
+3. **Create backups** before migration operations
+4. **Sanitize project paths** for use as filenames
+5. **Keep registry.json in sync** with actual config files
+6. **Test with `--dry-run`** before syncing custom hooks
+7. **Use project-specific configs** rather than global when possible

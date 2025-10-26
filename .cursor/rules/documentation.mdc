@@ -1,0 +1,209 @@
+---
+globs: "*.go,*.md"
+description: Documentation structure, Go doc requirements, markdown standards, and maintenance
+---
+
+# Documentation Standards & Structure
+
+## Project Documentation Structure
+
+### Core Documentation
+- [README.md](mdc:README.md) - Project overview and quick start
+- [CLAUDE.md](mdc:CLAUDE.md) - AI assistant guidance (always keep updated!)
+- [AGENTS.md](mdc:AGENTS.md) - Same as CLAUDE.md (keep synchronized)
+
+### User Guides
+- [docs/quick_start.md](mdc:docs/quick_start.md) - Getting started guide
+- [docs/developer_guide.md](mdc:docs/developer_guide.md) - Development guidelines
+- [docs/custom-hooks-guide.md](mdc:docs/custom-hooks-guide.md) - Custom hooks tutorial
+
+### Platform Documentation
+- [docs/cursor-support.md](mdc:docs/cursor-support.md) - Cursor IDE integration
+- [docs/archive/](mdc:docs/archive/) - Historical documentation
+
+### Cursor Rules (This Directory)
+- [architecture.mdc](mdc:.cursor/rules/architecture.mdc) - Core architecture, platform support, hooks
+- [development.mdc](mdc:.cursor/rules/development.mdc) - Development workflow, CLI, testing
+- [configuration.mdc](mdc:.cursor/rules/configuration.mdc) - Config system, custom hooks
+- [code-review.mdc](mdc:.cursor/rules/code-review.mdc) - Review standards, automated feedback
+- [ci-security.mdc](mdc:.cursor/rules/ci-security.mdc) - CI/CD, security scanning
+- [documentation.mdc](mdc:.cursor/rules/documentation.mdc) - This file
+
+## Go Documentation Requirements
+
+### Exported Types and Functions
+- **All exported types, functions, methods, and constants MUST have documentation comments**
+- Documentation comments must start with the name of the item being documented
+- Maintain at least 80% docstring coverage (enforced by CodeRabbit)
+
+### Documentation Format
+```go
+// TypeName represents what this type does.
+// Additional context can be added on subsequent lines.
+type TypeName struct {
+    // Field documentation if exported
+    Field string
+}
+
+// FunctionName does something specific and returns something.
+//
+// Parameters:
+//   - param1: description of first parameter
+//   - param2: description of second parameter
+//
+// Returns error if something goes wrong.
+func FunctionName(param1 string, param2 int) error {
+    // implementation
+}
+
+// MethodName implements InterfaceName.MethodName for specific purpose.
+func (t *TypeName) MethodName() error {
+    // implementation
+}
+```
+
+### Package Documentation
+- Each package should have a package-level comment in a `doc.go` file or at the top of the main file
+- Package comments should describe the package's purpose and main types
+
+### Interface Documentation
+- Document what the interface represents, not just what methods it has
+- Document each method in the interface
+- When implementing interface methods, reference the interface: `// MethodName implements Interface.MethodName`
+
+### Constants and Variables
+```go
+const (
+    // ConstantName describes what this constant represents
+    ConstantName = "value"
+
+    // AnotherConstant is used for...
+    AnotherConstant = 42
+)
+```
+
+### Test Documentation
+- Test functions don't require documentation comments unless they're testing complex scenarios
+- Use descriptive test names: `TestFunctionName_ScenarioDescription`
+- Document test tables and complex test setups
+
+### Command Documentation
+- CLI commands must have clear `Usage` and `Description` fields
+- Flag descriptions should explain the purpose and valid values
+- Use `ArgsUsage` to document positional arguments
+
+## Markdown Standards
+
+### Code Examples
+- Use realistic, working examples
+- Include imports and error handling
+- Follow Go idioms and project patterns
+
+### File References
+- Use MDC links: `[file.go](mdc:path/to/file.go)`
+- Use relative paths from workspace root
+- Link to specific sections when helpful
+
+### Version Information
+- Document version requirements (Go 1.25.0+)
+- Note deprecations with migration paths
+- Update AGENTS.md when architecture changes
+
+### Formatting
+- Use consistent heading levels
+- Include tables for comparisons
+- Add code fences with language hints
+- Keep line lengths reasonable for readability
+
+## Maintenance Checklist
+
+When making changes:
+1. ✅ Update affected documentation
+2. ✅ Keep AGENTS.md and CLAUDE.md in sync
+3. ✅ Update examples to match code
+4. ✅ Check all MDC links still work
+5. ✅ Ensure consistency across docs
+6. ✅ Update version references if needed
+
+## Documentation Patterns
+
+### Feature Documentation
+1. **What**: Clear description of the feature
+2. **Why**: Use case or problem being solved
+3. **How**: Implementation approach
+4. **Example**: Working code sample
+5. **Reference**: Links to relevant code/specs
+
+### API Documentation
+```go
+// FunctionName performs operation X on input Y to produce result Z.
+//
+// This function is useful when you need to process data in a specific way.
+// It handles edge cases A and B automatically.
+//
+// Parameters:
+//   - input: the data to process (must not be nil)
+//   - options: configuration options (can be nil for defaults)
+//
+// Returns:
+//   - result: the processed data
+//   - error: if input is invalid or processing fails
+//
+// Example:
+//   result, err := FunctionName(data, nil)
+//   if err != nil {
+//       log.Printf("processing failed: %v", err)
+//       return err
+//   }
+func FunctionName(input Data, options *Options) (Result, error) {
+```
+
+### Configuration Documentation
+- Show both YAML and JSON formats where applicable
+- Include all fields with descriptions
+- Provide real-world examples
+- Note defaults and constraints
+
+## Common Documentation Patterns
+
+### Hook Documentation
+- Purpose and use case
+- Event types supported
+- Configuration options
+- Example usage
+
+### Command Documentation
+- Full command syntax
+- All flags with descriptions
+- Example invocations
+- Common use cases
+
+### Error Documentation
+- When errors occur
+- How to diagnose
+- Resolution steps
+- Prevention tips
+
+## Fixing Documentation Coverage
+
+```bash
+# Check what needs documentation
+golint ./... | grep "should have comment"
+
+# Common fixes:
+# 1. Add package documentation
+# 2. Document all exported types
+# 3. Document public methods
+# 4. Use proper format (start with item name)
+```
+
+## Best Practices
+
+1. **Write for your audience** - assume Go knowledge but not project internals
+2. **Be concise but complete** - include essential information without verbosity
+3. **Use examples liberally** - show don't just tell
+4. **Keep synchronized** - update docs with code changes
+5. **Cross-reference** - link to related documentation
+6. **Version clearly** - note when features were added/deprecated
+
+**Last Updated**: When consolidating rules (reduced from 17 to 8 files)

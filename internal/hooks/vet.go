@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -34,43 +35,54 @@ func (h *VetHook) Run() error {
 	return nil
 }
 
-func (h *VetHook) postToolUseHandler(ctx context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+func (h *VetHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
 	// Type check Python files after editing
-	if event.ToolName == "Edit" || event.ToolName == "Write" {
-		var filePath string
+	if event.ToolName != constants.ToolEdit && event.ToolName != constants.ToolWrite {
+		return cchooks.Allow()
+	}
 
-		switch event.ToolName {
-		case "Edit":
-			edit, err := event.InputAsEdit()
-			if err == nil {
-				filePath = edit.FilePath
-			}
-		case "Write":
-			write, err := event.InputAsWrite()
-			if err == nil {
-				filePath = write.FilePath
-			}
-		}
+	filePath := h.extractFilePath(event)
+	if filePath == "" || !h.isPythonFile(filePath) {
+		return cchooks.Allow()
+	}
 
-		if filePath != "" && h.isPythonFile(filePath) {
-			// Log detailed event data if logging is enabled
-			if h.Context().LoggingEnabled {
-				details := make(map[string]interface{})
-				rawData := make(map[string]interface{})
-				rawData["tool_name"] = event.ToolName
-				details["file_path"] = filePath
-				details["action"] = "vetting"
+	h.logVetEvent(event.ToolName, filePath)
 
-				h.LogHookEvent("vet_file", event.ToolName, rawData, details)
-			}
-
-			if err := h.typeCheckFile(filePath); err != nil {
-				return cchooks.PostBlock(fmt.Sprintf("Vetting failed for %s: %v", filePath, err))
-			}
-		}
+	if err := h.typeCheckFile(filePath); err != nil {
+		return cchooks.PostBlock(fmt.Sprintf("Vetting failed for %s: %v", filePath, err))
 	}
 
 	return cchooks.Allow()
+}
+
+func (h *VetHook) extractFilePath(event *cchooks.PostToolUseEvent) string {
+	switch event.ToolName {
+	case constants.ToolEdit:
+		if edit, err := event.InputAsEdit(); err == nil {
+			return edit.FilePath
+		}
+	case constants.ToolWrite:
+		if write, err := event.InputAsWrite(); err == nil {
+			return write.FilePath
+		}
+	}
+	return ""
+}
+
+func (h *VetHook) logVetEvent(toolName, filePath string) {
+	if !h.Context().LoggingEnabled {
+		return
+	}
+
+	details := map[string]interface{}{
+		"file_path": filePath,
+		"action":    "vetting",
+	}
+	rawData := map[string]interface{}{
+		"tool_name": toolName,
+	}
+
+	h.LogHookEvent("vet_file", toolName, rawData, details)
 }
 
 func (h *VetHook) isPythonFile(filePath string) bool {

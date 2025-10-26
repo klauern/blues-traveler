@@ -1,0 +1,93 @@
+---
+description: Security hook implementation patterns and regex best practices
+globs: internal/hooks/security*.go
+---
+
+# Security Hook Patterns
+
+## Pre-Lowercased Input Patterns
+
+Security patterns receive already-lowercased input, so use simple patterns without `(?i)` flags:
+
+```go
+// ✅ CORRECT - simple patterns for lowercased input (line 111: cmdLower := strings.ToLower(bash.Command))
+regexes := map[string]*regexp.Regexp{
+    "disk erase": regexp.MustCompile(`\bdiskutil\s+erase`),
+    "TCC db write": regexp.MustCompile(`sqlite3\s+.*tcc\.db`),
+}
+
+// ❌ WRONG - unnecessary (?i) flag adds overhead
+regexes := map[string]*regexp.Regexp{
+    "disk erase": regexp.MustCompile(`(?i)\bdiskutil\s+erase`),  // Redundant when input is lowercased
+}
+```
+
+## Dangerous Path Prefixes
+
+All path prefixes must be lowercase since they're compared against lowercased paths:
+
+```go
+// ✅ CORRECT - lowercase prefixes
+dangerousPrefixes := []string{
+    "/system", "/library", "/volumes", "/usr", "/bin"
+}
+
+// ❌ WRONG - case mismatch
+dangerousPrefixes := []string{
+    "/system", "/Library", "/Volumes"  // won't match lowercased input!
+}
+```
+
+## Flag Detection
+
+Check for both lowercase and uppercase flag variants:
+
+```go
+// ✅ CORRECT - checks both cases
+if !strings.Contains(flagStr, "r") && !strings.Contains(flagStr, "R") {
+    return false  // Not recursive
+}
+
+// ❌ WRONG - misses lowercase -r flag
+if !strings.Contains(flagStr, "R") {
+    return false
+}
+```
+
+## Pattern Matching for URL Blocking
+
+Use proper glob pattern matching, not simple suffix checks:
+
+```go
+// ✅ CORRECT - handles wildcards properly
+func wildcardMatch(s, pattern string) bool {
+    rePat := regexp.QuoteMeta(pattern)
+    rePat = strings.ReplaceAll(rePat, `\*`, `.*`)
+    rePat = "^" + rePat
+    rx, err := regexp.Compile(rePat)
+    if err != nil {
+        return false
+    }
+    return rx.MatchString(s)
+}
+
+// ❌ WRONG - only matches trailing wildcards
+if strings.HasSuffix(prefix, "*") {
+    prefixWithoutWildcard := prefix[:len(prefix)-1]
+    if strings.HasPrefix(url, prefixWithoutWildcard) {
+        return true
+    }
+}
+```
+
+## Security Check Function Signatures
+
+Remove unused parameters to improve code clarity:
+
+```go
+// ✅ CORRECT - only needed parameters
+func (h *SecurityHook) runSecurityChecks(tokens []string, cmdLower string) (bool, string, string)
+
+// ❌ WRONG - unused parameter
+func (h *SecurityHook) runSecurityChecks(fullCmd string, tokens []string, cmdLower string) (bool, string, string)
+```

@@ -4,15 +4,23 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestNewXDGConfig(t *testing.T) {
 	// Test with XDG_CONFIG_HOME set
 	originalXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDGConfigHome)
+	t.Cleanup(func() {
+		if err := os.Setenv("XDG_CONFIG_HOME", originalXDGConfigHome); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	testConfigHome := "/tmp/test-xdg-config"
-	os.Setenv("XDG_CONFIG_HOME", testConfigHome)
+	if err := os.Setenv("XDG_CONFIG_HOME", testConfigHome); err != nil {
+		t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
+	}
 
 	xdg := NewXDGConfig()
 	expectedBaseDir := filepath.Join(testConfigHome, "blues-traveler")
@@ -21,7 +29,9 @@ func TestNewXDGConfig(t *testing.T) {
 	}
 
 	// Test without XDG_CONFIG_HOME
-	os.Unsetenv("XDG_CONFIG_HOME")
+	if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+		t.Fatalf("Failed to unset XDG_CONFIG_HOME: %v", err)
+	}
 	xdg = NewXDGConfig()
 	homeDir, _ := os.UserHomeDir()
 	expectedBaseDir = filepath.Join(homeDir, ".config", "blues-traveler")
@@ -55,17 +65,17 @@ func TestSanitizeProjectPath(t *testing.T) {
 
 func TestGetConfigPaths(t *testing.T) {
 	xdg := NewXDGConfig()
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 
 	// Test global config path
-	globalPath := xdg.GetGlobalConfigPath("json")
+	globalPath := xdg.GetGlobalConfigPath(FormatJSON)
 	expectedGlobal := filepath.Join(xdg.BaseDir, "global.json")
 	if globalPath != expectedGlobal {
 		t.Errorf("Expected global path %s, got %s", expectedGlobal, globalPath)
 	}
 
 	// Test project config path
-	projectConfigPath := xdg.GetProjectConfigPath(projectPath, "json")
+	projectConfigPath := xdg.GetProjectConfigPath(projectPath, FormatJSON)
 	sanitized := xdg.SanitizeProjectPath(projectPath)
 	expectedProject := filepath.Join(xdg.GetProjectsDir(), sanitized+".json")
 	if projectConfigPath != expectedProject {
@@ -87,13 +97,18 @@ func TestGetConfigPaths(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo,cyclop // Comprehensive CRUD operations test with state validation
 func TestRegistryOperations(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "xdg-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -111,8 +126,8 @@ func TestRegistryOperations(t *testing.T) {
 	}
 
 	// Test registering a project
-	projectPath := "/Users/user/dev/project"
-	err = xdg.RegisterProject(projectPath, "json")
+	projectPath := constants.TestProjectPath
+	err = xdg.RegisterProject(projectPath, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register project: %v", err)
 	}
@@ -130,7 +145,7 @@ func TestRegistryOperations(t *testing.T) {
 	if !exists {
 		t.Error("Project not found in registry")
 	}
-	if projectConfig.ConfigFormat != "json" {
+	if projectConfig.ConfigFormat != FormatJSON {
 		t.Errorf("Expected format json, got %s", projectConfig.ConfigFormat)
 	}
 
@@ -139,7 +154,7 @@ func TestRegistryOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get project config: %v", err)
 	}
-	if config.ConfigFormat != "json" {
+	if config.ConfigFormat != FormatJSON {
 		t.Errorf("Expected format json, got %s", config.ConfigFormat)
 	}
 
@@ -162,12 +177,16 @@ func TestConfigDataOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
 
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 	testData := map[string]interface{}{
 		"testKey": "testValue",
 		"nested": map[string]interface{}{
@@ -177,7 +196,7 @@ func TestConfigDataOperations(t *testing.T) {
 	}
 
 	// Test saving project config
-	err = xdg.SaveProjectConfig(projectPath, testData, "json")
+	err = xdg.SaveProjectConfig(projectPath, testData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save project config: %v", err)
 	}
@@ -198,12 +217,12 @@ func TestConfigDataOperations(t *testing.T) {
 		"globalKey": "globalValue",
 	}
 
-	err = xdg.SaveGlobalConfig(globalData, "json")
+	err = xdg.SaveGlobalConfig(globalData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save global config: %v", err)
 	}
 
-	loadedGlobalData, err := xdg.LoadGlobalConfig("json")
+	loadedGlobalData, err := xdg.LoadGlobalConfig(FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to load global config: %v", err)
 	}
@@ -219,12 +238,16 @@ func TestTOMLSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
 
-	projectPath := "/Users/user/dev/project"
+	projectPath := constants.TestProjectPath
 	testData := map[string]interface{}{
 		"title": "Test Configuration",
 		"database": map[string]interface{}{
@@ -265,7 +288,11 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -277,14 +304,14 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	}
 
 	// Register the project
-	err = xdg.RegisterProject(projectDir, "json")
+	err = xdg.RegisterProject(projectDir, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register project: %v", err)
 	}
 
 	// Create a config for a non-existent project
 	nonExistentProject := "/non/existent/project"
-	err = xdg.RegisterProject(nonExistentProject, "json")
+	err = xdg.RegisterProject(nonExistentProject, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to register non-existent project: %v", err)
 	}
@@ -299,7 +326,9 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 	}
 
 	// Remove the project directory
-	os.RemoveAll(projectDir)
+	if err := os.RemoveAll(projectDir); err != nil {
+		t.Fatalf("Failed to remove project dir: %v", err)
+	}
 
 	// Run cleanup
 	orphaned, err := xdg.CleanupOrphanedConfigs()
@@ -343,7 +372,11 @@ func TestErrorHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	xdg = &XDGConfig{BaseDir: tempDir}
 	testData := map[string]interface{}{"key": "value"}
@@ -359,7 +392,11 @@ func TestRegistryVersioning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	xdg := &XDGConfig{BaseDir: tempDir}
 
@@ -390,14 +427,18 @@ func TestConcurrentAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("cleanup failed: %v", err)
+		}
+	})
 
 	xdg := &XDGConfig{BaseDir: tempDir}
 
 	// Test sequential project registration first to establish baseline
 	for i := 0; i < 3; i++ {
 		projectPath := filepath.Join("/test/project", string(rune('A'+i)))
-		err := xdg.RegisterProject(projectPath, "json")
+		err := xdg.RegisterProject(projectPath, FormatJSON)
 		if err != nil {
 			t.Errorf("Failed to register project %s: %v", projectPath, err)
 		}

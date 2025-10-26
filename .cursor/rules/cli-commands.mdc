@@ -1,0 +1,96 @@
+---
+description: CLI command patterns and regex matching for blues-traveler hooks
+---
+
+# CLI Command Patterns
+
+## Hook Type Extraction Regex
+
+When extracting hook types from command strings, support both command patterns:
+
+```go
+// ✅ CORRECT - matches both patterns
+re := regexp.MustCompile(`blues-traveler\s+(?:hooks\s+)?run\s+([^\s]+)`)
+
+// This matches:
+// - "blues-traveler run security"
+// - "blues-traveler hooks run security"
+// - "/path/to/blues-traveler hooks run config:group:job"
+
+// ❌ WRONG - only matches old pattern
+re := regexp.MustCompile(`blues-traveler\s+run\s+([^\s]+)`)
+// Misses: "blues-traveler hooks run security"
+```
+
+## Command Detection
+
+Check for both command patterns when validating blues-traveler commands:
+
+```go
+// ✅ CORRECT - checks both patterns
+func isBluesTravelerCommand(command string) bool {
+    return strings.Contains(command, "blues-traveler run") ||
+           strings.Contains(command, "blues-traveler hooks run")
+}
+
+// ❌ WRONG - only checks old pattern
+func isBluesTravelerCommand(command string) bool {
+    return strings.Contains(command, "blues-traveler run")
+}
+```
+
+## Dynamic Binary Name
+
+Use `os.Executable()` to get the actual binary path, not hardcoded names:
+
+```go
+// ✅ CORRECT - works with any binary name
+execPath, err := os.Executable()
+if err != nil {
+    return "", fmt.Errorf("failed to get executable path: %w", err)
+}
+
+// Quote paths with spaces
+if strings.ContainsRune(execPath, ' ') {
+    execPath = `"` + execPath + `"`
+}
+
+hookCommand := fmt.Sprintf("%s hooks run %s", execPath, hookType)
+
+// ❌ WRONG - assumes binary is named "blues-traveler"
+hookCommand := fmt.Sprintf("blues-traveler hooks run %s", hookType)
+```
+
+## CLI Help Text
+
+Avoid showing hardcoded paths in help text - they may vary by platform:
+
+```go
+// ✅ CORRECT - generic description
+&cli.BoolFlag{
+    Name:  "global",
+    Usage: "Configure global settings",
+}
+
+// ❌ WRONG - shows specific path that might be wrong
+&cli.BoolFlag{
+    Name:  "global",
+    Usage: "Configure global settings (~/.claude/settings.json)",
+}
+```
+
+## Flag Presence Detection
+
+Use `cmd.IsSet()` to detect explicit flag presence, not just value checks:
+
+```go
+// ✅ CORRECT - respects explicit false
+if cmd.IsSet("compress") {
+    logConfig.LogRotation.Compress = cmd.Bool("compress")
+}
+
+// ❌ WRONG - can't explicitly set to false
+if cmd.Bool("compress") {
+    logConfig.LogRotation.Compress = true
+}
+```

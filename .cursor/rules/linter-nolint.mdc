@@ -1,0 +1,189 @@
+---
+description: Linter configuration, complexity thresholds, and nolint directive usage
+globs: *.go,.golangci.yml
+---
+
+# Linter Configuration & Complexity Management
+
+## Linter Setup
+
+The project uses **golangci-lint** with configuration in [.golangci.yml](mdc:.golangci.yml).
+
+### Enabled Linters
+
+**Complexity Analysis:**
+- `gocyclo` - Cyclomatic complexity (threshold: 15)
+- `gocognit` - Cognitive complexity (threshold: 20)
+- `cyclop` - Cyclomatic complexity with package averages (max: 15)
+- `funlen` - Function length (max: 120 lines, 60 statements)
+- `nestif` - Deeply nested if statements (max depth: 5)
+
+**Code Quality:**
+- `goconst` - Repeated strings that should be constants (min 3 occurrences)
+- `gocritic` - Comprehensive diagnostics
+- `revive` - Fast, configurable linter
+- `dupl` - Code clone detection
+- `unused`, `unparam`, `ineffassign` - Dead code detection
+- `errcheck`, `staticcheck` - Error handling and static analysis
+
+### Running the Linter
+
+```bash
+# Run all linters
+task lint
+
+# Or directly
+golangci-lint run
+
+# Format code first
+task format
+```
+
+## Using `//nolint` Directives
+
+When complexity is **justified and necessary**, use `//nolint` directives with clear explanations.
+
+### Syntax
+
+```go
+// FunctionComment describes what the function does
+//nolint:linter1,linter2 // Explanation of why this is acceptable
+func MyFunction() {
+    // implementation
+}
+```
+
+**Important:**
+- No space between `//` and `nolint`
+- No space between `nolint` and `:`
+- Multiple linters separated by commas (no spaces)
+- Always include a comment explaining why
+
+### Current Exceptions
+
+The project has **8 intentional exceptions** where complexity serves a purpose:
+
+#### CLI Commands (3 functions in [internal/cmd/config_xdg.go](mdc:internal/cmd/config_xdg.go))
+
+```go
+//nolint:gocognit // CLI command with rich user interaction and detailed output formatting
+func NewConfigListCmd() *cli.Command { ... }
+
+//nolint:gocognit // CLI command with interactive cleanup and detailed progress reporting
+func NewConfigCleanCmd() *cli.Command { ... }
+
+//nolint:gocognit // CLI command with multiple validation steps and comprehensive help output
+func NewConfigLogCmd() *cli.Command { ... }
+```
+
+**Rationale:** CLI commands naturally have higher complexity due to:
+- User interaction flows
+- Detailed help messages and error reporting
+- Multiple validation layers
+- Rich output formatting
+
+#### Test Functions (5 functions across test files)
+
+```go
+//nolint:gocognit,funlen // Comprehensive table-driven test with extensive test cases
+func TestRemoveHookTypeFromSettings(t *testing.T) { ... }
+
+//nolint:gocognit // Comprehensive test validating event alias mappings
+func TestGetEventAliases(t *testing.T) { ... }
+
+//nolint:gocyclo,cyclop // End-to-end migration test with multiple validation steps
+func TestActualMigration(t *testing.T) { ... }
+
+//nolint:gocyclo,cyclop // Comprehensive status validation across multiple scenarios
+func TestGetMigrationStatus(t *testing.T) { ... }
+
+//nolint:gocyclo,cyclop // Comprehensive CRUD operations test with state validation
+func TestRegistryOperations(t *testing.T) { ... }
+```
+
+**Rationale:** Test complexity is acceptable because:
+- Ensures comprehensive coverage
+- Tests multiple scenarios systematically
+- Table-driven approach is idiomatic Go
+- Complexity ensures robustness
+- Well-documented and maintainable
+
+## When to Use `//nolint`
+
+### ✅ Acceptable Use Cases
+
+1. **CLI Commands** with rich UX requirements
+   - Detailed help text
+   - Multiple validation layers
+   - Interactive prompts
+   - Comprehensive error messages
+
+2. **Comprehensive Tests** with extensive coverage
+   - Table-driven tests with many scenarios
+   - End-to-end integration tests
+   - Complex state validation
+
+3. **Generated Code** or code from third-party tools
+
+4. **Legacy Code** being incrementally refactored (document plan)
+
+### ❌ Avoid Using For
+
+1. **New production code** - Refactor to reduce complexity instead
+2. **Quick fixes** - Address the root cause
+3. **Convenience** - Linter rules exist for good reasons
+4. **Undocumented reasons** - Always explain why
+
+## Adding New Exceptions
+
+If you need to add a `//nolint` directive:
+
+1. **Try to refactor first** - Extract helper functions, split logic
+2. **Document the reason** - Be specific about why complexity is justified
+3. **Be selective** - Only suppress the specific linters needed
+4. **Review regularly** - Exceptions should be rare
+
+### Example Pattern
+
+```go
+// extractedHelper is pulled out to reduce complexity in main function
+func extractedHelper(data []string) error {
+    // Focused, single-purpose logic
+    return nil
+}
+
+// MainFunction now has lower complexity
+func MainFunction() error {
+    if err := extractedHelper(data); err != nil {
+        return fmt.Errorf("helper failed: %w", err)
+    }
+    // More logic...
+    return nil
+}
+```
+
+## Checking for New Issues
+
+Before committing:
+
+```bash
+# Run complete check workflow
+task check
+
+# Just linting
+task lint
+
+# Format code
+task format
+```
+
+All three commands should pass before pushing code.
+
+## Philosophy
+
+- **Complexity metrics matter** - They indicate code that's hard to maintain
+- **Exceptions should be rare** - Only when complexity serves a clear purpose
+- **Document everything** - Future you (and others) will thank you
+- **Refactor when possible** - Break down complex functions into smaller, testable units
+
+The goal is **readable, maintainable code** with occasional, well-justified exceptions for CLI UX and comprehensive testing.

@@ -1,0 +1,78 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Complexity Analysis (like pyscn's cyclomatic complexity)
+    - gocyclo        # Cyclomatic complexity
+    - gocognit       # Cognitive complexity
+    - cyclop         # Cyclomatic complexity with package averages
+    - funlen         # Function length
+    - nestif         # Deeply nested if statements
+
+    # Dead Code Detection (like pyscn's dead code detection)
+    - unused         # Unused constants, variables, functions
+    - unparam        # Unused function parameters
+    - ineffassign    # Ineffective assignments
+
+    # Code Duplication (like pyscn's clone detection)
+    - dupl           # Code clone detection
+
+    # Maintainability & Coupling
+    - maintidx       # Maintainability index
+    - misspell       # Spelling errors
+    - goconst        # Repeated strings that should be constants
+    - gocritic       # Comprehensive diagnostics
+    - revive         # Fast, configurable, extensible, flexible, and beautiful linter
+
+    # Additional Code Quality
+    - errcheck       # Unchecked errors
+    - staticcheck    # Advanced static analysis
+
+  settings:
+    gocyclo:
+      # Cyclomatic complexity threshold (pyscn uses 15)
+      min-complexity: 15
+
+    gocognit:
+      # Cognitive complexity threshold
+      min-complexity: 20
+
+    cyclop:
+      # Package average and max complexity
+      max-complexity: 15
+      package-average: 10
+
+    funlen:
+      # Maximum function length (increased to 120 for comprehensive table-driven tests)
+      lines: 120
+      statements: 60
+
+    nestif:
+      # Maximum nesting depth
+      min-complexity: 5
+
+    dupl:
+      # Threshold for duplicate code detection
+      threshold: 100
+
+    maintidx:
+      # Maintainability index threshold (0-100)
+      under: 20
+
+    goconst:
+      # Minimum occurrences to report
+      min-occurrences: 3
+
+  exclusions:
+    # Exclude vendor directories
+    paths:
+      - vendor
+
+issues:
+  # Show all issues
+  max-issues-per-linter: 0
+  max-same-issues: 0

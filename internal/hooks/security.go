@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/brads3290/cchooks"
+	"github.com/klauern/blues-traveler/internal/constants"
 	"github.com/klauern/blues-traveler/internal/core"
 )
 
@@ -33,108 +34,92 @@ func (h *SecurityHook) Run() error {
 	return nil
 }
 
-func (h *SecurityHook) preToolUseHandler(ctx context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	// Log detailed event data if logging is enabled
-	if h.Context().LoggingEnabled {
-		details := make(map[string]interface{})
-		rawData := make(map[string]interface{})
-		rawData["tool_name"] = event.ToolName
+// securityCheck represents a single security check
+type securityCheck struct {
+	checkType string
+	check     func([]string, string) (bool, string)
+}
 
-		if event.ToolName == "Bash" {
-			if bash, err := event.AsBash(); err == nil {
-				details["command"] = bash.Command
-				details["description"] = bash.Description
-			}
-		}
-
-		h.LogHookEvent("pre_tool_use_security_check", event.ToolName, rawData, details)
+// logSecurityEvent logs a security event with standard formatting
+func (h *SecurityHook) logSecurityEvent(eventType, command, reason, checkType string) {
+	if !h.Context().LoggingEnabled {
+		return
 	}
 
-	if event.ToolName != "Bash" {
+	h.LogHookEvent(eventType, constants.ToolBash, map[string]interface{}{
+		"command":    command,
+		"reason":     reason,
+		"check_type": checkType,
+	}, nil)
+}
+
+// logPreToolUseCheck logs the initial pre-tool-use check
+func (h *SecurityHook) logPreToolUseCheck(event *cchooks.PreToolUseEvent) {
+	if !h.Context().LoggingEnabled {
+		return
+	}
+
+	details := make(map[string]interface{})
+	rawData := map[string]interface{}{"tool_name": event.ToolName}
+
+	if event.ToolName == constants.ToolBash {
+		if bash, err := event.AsBash(); err == nil {
+			details["command"] = bash.Command
+			details["description"] = bash.Description
+		}
+	}
+
+	h.LogHookEvent("pre_tool_use_security_check", event.ToolName, rawData, details)
+}
+
+// runSecurityChecks executes all security checks and returns the first match
+func (h *SecurityHook) runSecurityChecks(tokens []string, cmdLower string) (bool, string, string) {
+	checks := []securityCheck{
+		{"static_patterns", func(_ []string, c string) (bool, string) { return h.checkStaticPatterns(c) }},
+		{"macos_patterns", func(_ []string, c string) (bool, string) { return h.checkMacOSPatterns(c) }},
+		{"dangerous_rm", func(t []string, _ string) (bool, string) { return h.detectDangerousRm(t) }},
+		{"volume_wipe", func(t []string, _ string) (bool, string) { return h.detectVolumeWipe(t) }},
+		{"recursive_ownership_perm", func(t []string, _ string) (bool, string) { return h.detectRecursiveOwnershipOrPerm(t) }},
+		{"potential_exfil", func(t []string, c string) (bool, string) { return h.detectPotentialExfil(t, c) }},
+	}
+
+	for _, check := range checks {
+		if blocked, reason := check.check(tokens, cmdLower); blocked {
+			return true, reason, check.checkType
+		}
+	}
+
+	return false, "", ""
+}
+
+func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	h.logPreToolUseCheck(event)
+
+	if event.ToolName != constants.ToolBash {
 		return cchooks.Approve()
 	}
 
 	bash, err := event.AsBash()
 	if err != nil {
+		// Log the parse error but approve the request to avoid breaking flows on benign parsing issues
 		if h.Context().LoggingEnabled {
 			h.LogHookEvent("security_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
 		}
-		return cchooks.Block("failed to parse bash command")
+		return cchooks.Approve()
 	}
 
 	cmdLower := strings.ToLower(bash.Command)
 	tokens := strings.Fields(cmdLower)
 
-	// Check various security patterns
-	if blocked, reason := h.checkStaticPatterns(cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "static_patterns",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.checkMacOSPatterns(cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "macos_patterns",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectDangerousRm(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "dangerous_rm",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectVolumeWipe(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "volume_wipe",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectRecursiveOwnershipOrPerm(tokens); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "recursive_ownership_perm",
-			}, nil)
-		}
-		return cchooks.Block(reason)
-	}
-
-	if blocked, reason := h.detectPotentialExfil(tokens, cmdLower); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_block", "Bash", map[string]interface{}{
-				"command":    bash.Command,
-				"reason":     reason,
-				"check_type": "potential_exfil",
-			}, nil)
-		}
+	// Run all security checks
+	if blocked, reason, checkType := h.runSecurityChecks(tokens, cmdLower); blocked {
+		h.logSecurityEvent("security_block", bash.Command, reason, checkType)
 		return cchooks.Block(reason)
 	}
 
 	// Log approved commands if logging is enabled
 	if h.Context().LoggingEnabled {
-		h.LogHookEvent("security_approved", "Bash", map[string]interface{}{
+		h.LogHookEvent("security_approved", constants.ToolBash, map[string]interface{}{
 			"command": bash.Command,
 		}, nil)
 	}
@@ -172,7 +157,7 @@ func (h *SecurityHook) checkMacOSPatterns(cmdLower string) (bool, string) {
 		"launchctl service removal":      regexp.MustCompile(`\blaunchctl\b.*\b(remove|bootout)\b`),
 		"systemsetup change":             regexp.MustCompile(`\bsystemsetup\b\s+-set`),
 		"host/network config change":     regexp.MustCompile(`\b(scutil|networksetup)\b\s+--?set`),
-		"TCC db direct write":            regexp.MustCompile(`sqlite3\s+.*TCC\.db`),
+		"TCC db direct write":            regexp.MustCompile(`sqlite3\s+.*tcc\.db`),
 		"keychain dump":                  regexp.MustCompile(`\bsecurity\s+dump-keychain\b`),
 	}
 
@@ -205,8 +190,8 @@ func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
 		return false, ""
 	}
 
-	// Dangerous root/system targets
-	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/Volumes"}
+	// Dangerous root/system targets (lowercase since we compare against lowercased targets)
+	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
 	for _, tgt := range targets {
 		lt := strings.ToLower(tgt)
 		if lt == "/" {

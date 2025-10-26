@@ -625,6 +625,41 @@ func (h *MyHook) Run() error {
 }
 ```
 
+## 🔄 Cursor IDE Compatibility
+
+Blues Traveler supports **Cursor IDE event name aliases** for cross-platform hook compatibility. You can use either Claude Code or Cursor event names when installing or configuring hooks.
+
+### Event Name Mapping
+
+| Claude Code Event | Cursor IDE Aliases | Description |
+|-------------------|-------------------|-------------|
+| `PreToolUse` | `beforeToolUse`, `beforeShellExecution`, `beforeFileEdit`, `beforeFileWrite` | Before tool execution |
+| `PostToolUse` | `afterToolUse`, `afterShellExecution`, `afterFileEdit`, `afterFileWrite` | After tool completion |
+| `UserPromptSubmit` | `onPromptSubmit`, `beforePrompt`, `onUserInput` | When user submits a prompt |
+| `Notification` | `onNotification`, `onPermissionRequest` | Permission requests |
+| `Stop` | `onStop`, `onAgentStop`, `afterResponse` | When agent stops |
+| `SubagentStop` | `onSubagentStop`, `afterSubagent`, `onTaskComplete` | When subagent stops |
+| `PreCompact` | `beforeCompact`, `onCompact` | Before compaction |
+| `SessionStart` | `onSessionStart`, `onStart`, `onSessionBegin` | Session start |
+| `SessionEnd` | `onSessionEnd`, `onEnd`, `onSessionClose` | Session end |
+
+### Using Cursor Event Names
+
+Both naming conventions work identically:
+
+```bash
+# Using Claude Code event names
+blues-traveler hooks install security --event PreToolUse
+
+# Using Cursor event names (automatically resolved)
+blues-traveler hooks install security --event beforeShellExecution
+
+# Custom hooks with Cursor names
+blues-traveler hooks custom sync --event afterFileEdit
+```
+
+The system automatically resolves Cursor aliases to their canonical Claude Code event names, ensuring hooks are stored and executed correctly in your settings.
+
 ## 🏗️ Architecture
 
 Blues Traveler uses a **static hook registry** architecture:
@@ -648,14 +683,14 @@ For detailed documentation, see:
 
 | Issue | Solution |
 |-------|----------|
-| Hook not found | Run `blues-traveler list` to see available hooks |
-| Hook not working | Check if enabled: `blues-traveler list-installed` |
+| Hook not found | Run `blues-traveler hooks list` to see available hooks |
+| Hook not working | Check if enabled: `blues-traveler hooks list --installed` |
 | Settings not applied | Verify path: project `./.claude/settings.json` or global `~/.claude/settings.json` |
 | Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
 | Logs not appearing | Use `--log` flag and check `~/.config/blues-traveler/` directory |
 | Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
-| Config sync issues | Use `--dry-run` to preview changes, check config with `config validate` |
-| Stale hook entries | Run `config sync` - it automatically cleans up removed groups |
+| Config sync issues | Use `--dry-run` to preview changes, check config with `hooks custom validate` |
+| Stale hook entries | Run `hooks custom sync` - it automatically cleans up removed groups |
 
 ## 🤝 Contributing
 

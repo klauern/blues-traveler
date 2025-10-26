@@ -1,0 +1,385 @@
+---
+globs: "*.go,*_test.go,internal/cmd/*.go,main.go"
+description: Development workflow, CLI commands, testing, and contribution guidelines
+---
+
+# Development Workflow & Guidelines
+
+## Quick Start
+
+```bash
+# Build the binary
+task build
+
+# Run all checks (format, lint, test)
+task check
+
+# Development workflow (format, lint, test, build)
+task dev
+
+# Run tests with coverage
+task test-coverage
+```
+
+## Task Commands
+
+See [Taskfile.yml](mdc:Taskfile.yml) for all available tasks:
+
+```bash
+task format          # Format Go code with gofumpt
+task lint            # Run golangci-lint (or go vet fallback)
+task test            # Run all tests
+task test-coverage   # Run tests with coverage report
+task build           # Build the binary
+task dev             # Complete dev workflow
+task check           # Run all checks
+```
+
+## CLI Command Implementation (urfave/cli v3)
+
+This project uses **urfave/cli v3**, NOT Cobra. See [docs/cobra-to-urfave-cli-migration.md](mdc:docs/cobra-to-urfave-cli-migration.md) for migration details.
+
+### Command Structure
+
+```go
+func NewMyCommand() *cli.Command {
+    return &cli.Command{
+        Name:      "mycommand",
+        Usage:     "Does something useful",
+        ArgsUsage: "[required-arg]",
+        Flags: []cli.Flag{
+            &cli.BoolFlag{
+                Name:    "flag-name",
+                Aliases: []string{"f"},
+                Value:   false,
+                Usage:   "Flag description",
+            },
+        },
+        Action: func(ctx context.Context, cmd *cli.Command) error {
+            // Command logic
+            return nil
+        },
+    }
+}
+```
+
+### Flag Types
+
+```go
+// String Flag
+&cli.StringFlag{
+    Name:    "name",
+    Aliases: []string{"n"},
+    Value:   "default",
+    Usage:   "Description",
+}
+
+// Bool Flag
+&cli.BoolFlag{
+    Name:    "enabled",
+    Aliases: []string{"e"},
+    Value:   false,
+    Usage:   "Description",
+}
+
+// Int Flag
+&cli.IntFlag{
+    Name:  "timeout",
+    Value: 30,
+    Usage: "Timeout in seconds",
+}
+```
+
+### Accessing Flags and Arguments
+
+```go
+Action: func(ctx context.Context, cmd *cli.Command) error {
+    // Get flag values
+    name := cmd.String("name")
+    enabled := cmd.Bool("enabled")
+    timeout := cmd.Int("timeout")
+
+    // Get arguments
+    args := cmd.Args().Slice()
+    if len(args) < 1 {
+        return fmt.Errorf("required argument missing")
+    }
+
+    return nil
+}
+```
+
+### Error Handling in Commands
+
+- Return errors from `Action` function (DO NOT call `os.Exit(1)`)
+- urfave/cli handles error display and exit codes
+- Use descriptive error messages with context
+
+```go
+if err := doSomething(); err != nil {
+    return fmt.Errorf("failed to do something: %w", err)
+}
+```
+
+### Binary Name Convention
+
+Use `constants.BinaryName` for consistent branding:
+
+```go
+import "github.com/klauern/blues-traveler/internal/constants"
+
+Usage: fmt.Sprintf("Install %s hook", constants.BinaryName)
+```
+
+## Testing Guidelines
+
+### Test Requirements
+
+When adding new features:
+
+1. **Create tests** following existing patterns
+2. **Test edge cases** and error conditions
+3. **Use table-driven tests** for multiple scenarios
+4. **Mock external dependencies** appropriately
+
+### Running Tests
+
+```bash
+# Run all tests
+task test
+
+# Run specific package
+go test ./internal/hooks/ -v
+
+# Run with coverage
+task test-coverage
+
+# Run tests with race detection
+go test -race ./...
+
+# Run specific test
+go test -v -run TestName ./internal/...
+```
+
+### Test Patterns
+
+#### Hook Tests
+
+See examples in [internal/hooks/security_test.go](mdc:internal/hooks/security_test.go):
+
+```go
+func TestMyHook(t *testing.T) {
+    ctx := &core.HookContext{
+        FileSystem: &core.MockFileSystem{},
+        CommandExecutor: &core.MockCommandExecutor{},
+        Settings: &config.Settings{
+            Plugins: map[string]config.PluginConfig{
+                "myhook": {Enabled: &[]bool{true}[0]},
+            },
+        },
+    }
+
+    hook := NewMyHook(ctx)
+
+    // Test hook properties
+    if hook.Key() != "myhook" {
+        t.Errorf("Expected key 'myhook', got '%s'", hook.Key())
+    }
+
+    // Test execution
+    if err := hook.Run(); err != nil {
+        t.Errorf("Hook.Run() failed: %v", err)
+    }
+}
+```
+
+#### Table-Driven Tests
+
+```go
+func TestSecurityPatterns(t *testing.T) {
+    tests := []struct {
+        name     string
+        command  string
+        expected bool
+    }{
+        {"safe command", "ls -la", false},
+        {"dangerous rm", "rm -rf /", true},
+        {"sudo command", "sudo rm file", true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := isDangerous(tt.command)
+            if result != tt.expected {
+                t.Errorf("got %v, want %v", result, tt.expected)
+            }
+        })
+    }
+}
+```
+
+#### Configuration Tests
+
+See [internal/config/xdg_test.go](mdc:internal/config/xdg_test.go):
+
+```go
+func TestXDGPaths(t *testing.T) {
+    // Setup test environment
+    t.Setenv("XDG_CONFIG_HOME", "/tmp/test-config")
+
+    // Test functionality
+    path := GetConfigDir()
+    expected := "/tmp/test-config/blues-traveler"
+
+    if path != expected {
+        t.Errorf("got %s, want %s", path, expected)
+    }
+}
+```
+
+#### Mock Usage
+
+Use mocks from [internal/core/mocks.go](mdc:internal/core/mocks.go):
+
+```go
+type MockFileSystem struct {
+    ReadFileFunc  func(string) ([]byte, error)
+    WriteFileFunc func(string, []byte, os.FileMode) error
+}
+
+func (m *MockFileSystem) ReadFile(path string) ([]byte, error) {
+    if m.ReadFileFunc != nil {
+        return m.ReadFileFunc(path)
+    }
+    return nil, nil
+}
+```
+
+### Test Coverage Goals
+
+- **Core functionality**: 80%+ coverage
+- **Hook implementations**: Test all major code paths
+- **CLI commands**: Test flag parsing and execution
+- **Configuration**: Test loading, precedence, migration
+
+### Common Test Scenarios
+
+- **Registry Tests**: Hook registration, concurrent access, duplicate handling
+- **Settings Tests**: Precedence (project vs global), JSON marshaling, field preservation
+- **Migration Tests**: Legacy config discovery, XDG migration, backup creation
+- **Platform Tests**: Event mapping, JSON transformation, error handling
+
+## Adding New Features
+
+### Adding a New Hook
+
+1. **Create implementation** in `internal/hooks/myhook.go`
+2. **Register hook** in [internal/hooks/init.go](mdc:internal/hooks/init.go)
+3. **Add tests** in `internal/hooks/myhook_test.go`
+4. **Update documentation**:
+   - [README.md](mdc:README.md) - Add to features list
+   - [AGENTS.md](mdc:AGENTS.md) - Add to built-in hooks table
+   - [docs/index.md](mdc:docs/index.md) - Update key hooks reference
+
+### Adding a New CLI Command
+
+1. **Create command** in `internal/cmd/mycommand.go`
+2. **Use urfave/cli v3** patterns (see command structure above)
+3. **Register command** in [main.go](mdc:main.go)
+4. **Add tests** in `internal/cmd/mycommand_test.go`
+5. **Update help text** and documentation
+
+### Main Application Structure
+
+See [main.go](mdc:main.go) for the app structure:
+
+```go
+func main() {
+    cmd := &cli.Command{
+        Name:  "blues-traveler",
+        Usage: "Claude Code hook runner and manager",
+        Commands: []*cli.Command{
+            // Register subcommands here
+        },
+    }
+
+    if err := cmd.Run(context.Background(), os.Args); err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+}
+```
+
+## Code Formatting
+
+Preferred formatter: `gofumpt`
+
+```bash
+# Format code
+task format
+
+# Or manually
+gofumpt -l -w .
+```
+
+## Commit Guidelines
+
+Use conventional commits: <https://www.conventionalcommits.org/en/v1.0.0/>
+
+```bash
+feat: add new hook for X
+fix: resolve issue with Y
+docs: update README with Z
+test: add tests for W
+refactor: simplify V
+chore: update dependencies
+```
+
+## Code Review Checklist
+
+- [ ] All tests pass (`task test`)
+- [ ] Code is formatted (`task format`)
+- [ ] Linter passes (`task lint`)
+- [ ] Documentation updated
+- [ ] Conventional commit message
+- [ ] No breaking changes (or clearly documented)
+- [ ] Backwards compatibility maintained
+
+## Key Implementation Notes
+
+### From Code Review 2024
+
+See [docs/code_review_2024.md](mdc:docs/code_review_2024.md):
+
+#### ✅ Implemented Fixes
+
+1. Settings precedence logic (project overrides global)
+2. CLI text consistency using `constants.BinaryName`
+3. Debug log security (0600 permissions, `.claude/hooks/debug.log`)
+4. Security hook pattern improvements
+5. Non-interactive uninstall with `--yes` flag
+
+#### 🔄 Recommended Improvements
+
+1. Log rotation integration (lumberjack configured but not wired)
+2. External tool detection (prettier, uvx, ruff, fd)
+3. Settings precedence tests
+4. Diagnose command for tool availability
+
+## Dependencies
+
+Key dependencies (see [go.mod](mdc:go.mod)):
+
+- `github.com/brads3290/cchooks` - Claude Code hooks library
+- `github.com/urfave/cli/v3` - CLI framework
+- `gopkg.in/yaml.v3` - YAML parsing
+- `github.com/natefinch/lumberjack` - Log rotation
+
+Go version: 1.25.0+
+
+## Resources
+
+- [Go Documentation](https://golang.org/doc/)
+- [urfave/cli v3](https://github.com/urfave/cli)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [Project Issues](https://github.com/klauern/blues-traveler/issues)
