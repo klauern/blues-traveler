@@ -3,6 +3,8 @@ package cmd
 import (
 	"runtime"
 	"testing"
+
+	"github.com/klauern/blues-traveler/internal/constants"
 )
 
 func TestSanitizeFileName(t *testing.T) {
@@ -99,26 +101,9 @@ func TestSanitizeFileName(t *testing.T) {
 			got, err := sanitizeFileName(tt.fileName)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("sanitizeFileName(%q) expected error containing %q, got nil", tt.fileName, tt.errMsg)
-				} else if tt.errMsg != "" && !containsString(err.Error(), tt.errMsg) {
-					// On Windows, "C:\\Windows\\System32" is caught by absolute path check
-					// On Unix, backslashes are caught by separator check
-					isWindowsAbsoluteCase := runtime.GOOS == "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "absolute paths not allowed")
-					isUnixBackslashCase := runtime.GOOS != "windows" && tt.name == "absolute path windows" && containsString(err.Error(), "path separators not allowed")
-
-					if !isWindowsAbsoluteCase && !isUnixBackslashCase {
-						t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", tt.fileName, err, tt.errMsg)
-					}
-				}
+				validateSanitizeError(t, tt.name, tt.fileName, tt.errMsg, err)
 			} else {
-				if err != nil {
-					t.Errorf("sanitizeFileName(%q) unexpected error: %v", tt.fileName, err)
-				}
-				// Verify the result has a proper extension
-				if got != "" && !hasSuffix(got, ".yml") && !hasSuffix(got, ".yaml") {
-					t.Errorf("sanitizeFileName(%q) = %q, expected .yml or .yaml extension", tt.fileName, got)
-				}
+				validateSanitizeSuccess(t, tt.fileName, got, err)
 			}
 		})
 	}
@@ -186,4 +171,47 @@ func toLower(s string) string {
 		}
 	}
 	return string(result)
+}
+
+// validateSanitizeError validates that sanitizeFileName returned the expected error
+func validateSanitizeError(t *testing.T, testName, fileName, expectedErrMsg string, err error) {
+	t.Helper()
+	if err == nil {
+		t.Errorf("sanitizeFileName(%q) expected error containing %q, got nil", fileName, expectedErrMsg)
+		return
+	}
+
+	if expectedErrMsg == "" {
+		return
+	}
+
+	if containsString(err.Error(), expectedErrMsg) {
+		return
+	}
+
+	// Platform-specific error message handling
+	isWindowsAbsoluteCase := runtime.GOOS == constants.GOOSWindows &&
+		testName == "absolute path windows" &&
+		containsString(err.Error(), "absolute paths not allowed")
+	isUnixBackslashCase := runtime.GOOS != constants.GOOSWindows &&
+		testName == "absolute path windows" &&
+		containsString(err.Error(), "path separators not allowed")
+
+	if !isWindowsAbsoluteCase && !isUnixBackslashCase {
+		t.Errorf("sanitizeFileName(%q) error = %v, want error containing %q", fileName, err, expectedErrMsg)
+	}
+}
+
+// validateSanitizeSuccess validates that sanitizeFileName succeeded with a valid result
+func validateSanitizeSuccess(t *testing.T, fileName, got string, err error) {
+	t.Helper()
+	if err != nil {
+		t.Errorf("sanitizeFileName(%q) unexpected error: %v", fileName, err)
+		return
+	}
+
+	// Verify the result has a proper extension
+	if got != "" && !hasSuffix(got, ".yml") && !hasSuffix(got, ".yaml") {
+		t.Errorf("sanitizeFileName(%q) = %q, expected .yml or .yaml extension", fileName, got)
+	}
 }
