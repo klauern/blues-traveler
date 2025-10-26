@@ -1,10 +1,6 @@
-version: 2
-
 run:
   timeout: 5m
   tests: true
-  skip-dirs:
-    - vendor
 
 linters:
   enable:
@@ -79,3 +75,7 @@ issues:
   new: false
 
   exclude-use-default: false
+
+  # Exclude vendor directories
+  exclude-dirs:
+    - vendor
