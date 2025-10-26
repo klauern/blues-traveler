@@ -32,52 +32,47 @@ linters:
     - errcheck       # Unchecked errors
     - staticcheck    # Advanced static analysis
 
-linters-settings:
-  gocyclo:
-    # Cyclomatic complexity threshold (pyscn uses 15)
-    min-complexity: 15
+  settings:
+    gocyclo:
+      # Cyclomatic complexity threshold (pyscn uses 15)
+      min-complexity: 15
 
-  gocognit:
-    # Cognitive complexity threshold
-    min-complexity: 20
+    gocognit:
+      # Cognitive complexity threshold
+      min-complexity: 20
 
-  cyclop:
-    # Package average and max complexity
-    max-complexity: 15
-    package-average: 10
-    skip-tests: false
+    cyclop:
+      # Package average and max complexity
+      max-complexity: 15
+      package-average: 10
 
-  funlen:
-    # Maximum function length
-    lines: 80
-    statements: 50
+    funlen:
+      # Maximum function length
+      lines: 80
+      statements: 50
 
-  nestif:
-    # Maximum nesting depth
-    min-complexity: 5
+    nestif:
+      # Maximum nesting depth
+      min-complexity: 5
 
-  dupl:
-    # Threshold for duplicate code detection
-    threshold: 100
+    dupl:
+      # Threshold for duplicate code detection
+      threshold: 100
 
-  maintidx:
-    # Maintainability index threshold (0-100)
-    under: 20
+    maintidx:
+      # Maintainability index threshold (0-100)
+      under: 20
 
-  goconst:
-    # Minimum occurrences to report
-    min-occurrences: 3
+    goconst:
+      # Minimum occurrences to report
+      min-occurrences: 3
+
+  exclusions:
+    # Exclude vendor directories
+    paths:
+      - vendor
 
 issues:
   # Show all issues
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  # Don't hide new issues in existing code
-  new: false
-
-  exclude-use-default: false
-
-  # Exclude vendor directories
-  exclude-dirs:
-    - vendor
