@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,39 @@ func NewConfigHook(groupName, jobName string, job config.HookJob, event string, 
 		groupName:   groupName,
 		envProvider: core.NewClaudeCodeEnvironmentProvider(),
 	}
+}
+
+// CursorHookResponse represents the JSON response format from Cursor-compatible hooks
+// Spec: https://cursor.com/docs/agent/hooks
+type CursorHookResponse struct {
+	Permission   string `json:"permission"`   // "allow", "deny", or "ask"
+	UserMessage  string `json:"userMessage"`  // Message displayed to the user
+	AgentMessage string `json:"agentMessage"` // Message sent to the AI agent
+	Continue     *bool  `json:"continue"`     // Whether to continue execution (nil if not specified)
+}
+
+// hookExecutionResult captures the result of running a hook command
+type hookExecutionResult struct {
+	exitCode int
+	stdout   string
+	stderr   string
+	err      error
+}
+
+// parseCursorResponse attempts to parse JSON output from a hook script
+// Returns nil if output is not valid JSON or doesn't match Cursor format
+func parseCursorResponse(output string) (*CursorHookResponse, error) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "{") {
+		return nil, nil // Not JSON, use fallback behavior
+	}
+
+	var response CursorHookResponse
+	if err := json.Unmarshal([]byte(trimmed), &response); err != nil {
+		return nil, fmt.Errorf("invalid JSON in hook output: %w", err)
+	}
+
+	return &response, nil
 }
 
 // Run executes the custom hook based on its configured event type and matcher
@@ -88,7 +122,7 @@ func (h *ConfigHook) shouldRun(env map[string]string) (bool, error) {
 	return true, nil
 }
 
-func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
+func (h *ConfigHook) runCommandWithEnv(env map[string]string) (*hookExecutionResult, error) {
 	// Prepare environment
 	mergedEnv := os.Environ()
 	for k, v := range env {
@@ -106,6 +140,12 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 		defer cancel()
 	}
 	cmd := exec.CommandContext(cmdCtx, "bash", "-lc", h.job.Run) // #nosec G204 -- user-configured command execution is intentional and safe
+
+	// Capture stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
 	// If we have the original raw JSON for this event, pass it to child stdin so
 	// nested blues-traveler invocations can consume it.
 	if h.lastRaw != "" {
@@ -116,26 +156,69 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) error {
 	}
 	cmd.Env = mergedEnv
 
-	// Run and translate deadline exceeded into a friendly timeout error
-	if err := cmd.Run(); err != nil {
-		if cmdCtx.Err() == context.DeadlineExceeded && h.job.Timeout > 0 {
-			return fmt.Errorf("command timed out after %ds", h.job.Timeout)
-		}
-		return err
+	// Run and capture result
+	result := &hookExecutionResult{
+		stdout: stdout.String(),
+		stderr: stderr.String(),
 	}
-	return nil
+
+	err := cmd.Run()
+	result.err = err
+
+	if err != nil {
+		// Translate deadline exceeded into a friendly timeout error
+		if cmdCtx.Err() == context.DeadlineExceeded && h.job.Timeout > 0 {
+			return result, fmt.Errorf("command timed out after %ds", h.job.Timeout)
+		}
+		// Try to extract exit code
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			result.exitCode = exitErr.ExitCode()
+		} else {
+			result.exitCode = 1
+		}
+		return result, err
+	}
+
+	result.exitCode = 0
+	return result, nil
 }
 
 func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
 	c := core.BuildPreToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PreToolUseEvent), c)
 
-	if err := h.executeIfShouldRun(env); err != nil {
+	result, err := h.executeIfShouldRunWithResult(env)
+	if err != nil {
 		// User-friendly message + technical details for agent
 		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
 		agentMsg := err.Error()
 		return core.BlockWithMessages(userMsg, agentMsg)
 	}
+
+	// Try to parse Cursor JSON response
+	if result != nil && result.stdout != "" {
+		cursorResp, parseErr := parseCursorResponse(result.stdout)
+
+		// Rule 3: Invalid JSON = block with "hook broken" message
+		if parseErr != nil {
+			userMsg := fmt.Sprintf("Hook '%s' returned invalid JSON", h.job.Name)
+			agentMsg := fmt.Sprintf("Hook output parsing failed: %v. Output: %s", parseErr, result.stdout)
+			return core.BlockWithMessages(userMsg, agentMsg)
+		}
+
+		// Rule 2: Partial JSON = proceed with available fields
+		if cursorResp != nil {
+			return h.handleCursorResponsePre(cursorResp)
+		}
+	}
+
+	// Rule 1: Non-zero exit + no JSON = block with alert + error message
+	if result != nil && result.exitCode != 0 {
+		userMsg := fmt.Sprintf("Hook '%s' failed with exit code %d", h.job.Name, result.exitCode)
+		agentMsg := fmt.Sprintf("Exit code: %d, stderr: %s", result.exitCode, result.stderr)
+		return core.BlockWithMessages(userMsg, agentMsg)
+	}
+
 	return cchooks.Approve()
 }
 
@@ -143,35 +226,180 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 	c := core.BuildPostToolUseContext(ctx, ev)
 	env := h.envProvider.GetEnvironment(string(core.PostToolUseEvent), c)
 
-	if err := h.executeIfShouldRun(env); err != nil {
+	result, err := h.executeIfShouldRunWithResult(env)
+	if err != nil {
 		// User-friendly message + technical details for agent
 		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
 		agentMsg := err.Error()
 		return core.PostBlockWithMessages(userMsg, agentMsg)
 	}
+
+	// Try to parse Cursor JSON response
+	if result != nil && result.stdout != "" {
+		cursorResp, parseErr := parseCursorResponse(result.stdout)
+
+		// Rule 3: Invalid JSON = block with "hook broken" message
+		if parseErr != nil {
+			userMsg := fmt.Sprintf("Hook '%s' returned invalid JSON", h.job.Name)
+			agentMsg := fmt.Sprintf("Hook output parsing failed: %v. Output: %s", parseErr, result.stdout)
+			return core.PostBlockWithMessages(userMsg, agentMsg)
+		}
+
+		// Rule 2: Partial JSON = proceed with available fields
+		if cursorResp != nil {
+			return h.handleCursorResponsePost(cursorResp)
+		}
+	}
+
+	// Rule 1: Non-zero exit + no JSON = block with alert + error message
+	if result != nil && result.exitCode != 0 {
+		userMsg := fmt.Sprintf("Hook '%s' failed with exit code %d", h.job.Name, result.exitCode)
+		agentMsg := fmt.Sprintf("Exit code: %d, stderr: %s", result.exitCode, result.stderr)
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+	}
+
 	return cchooks.Allow()
 }
 
-// executeIfShouldRun checks if the hook should run and executes it
+// executeIfShouldRun checks if the hook should run and executes it (legacy interface)
 func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
+	_, err := h.executeIfShouldRunWithResult(env)
+	return err
+}
+
+// executeIfShouldRunWithResult checks if the hook should run and executes it, returning the result
+func (h *ConfigHook) executeIfShouldRunWithResult(env map[string]string) (*hookExecutionResult, error) {
 	ok, err := h.shouldRun(env)
 	if err != nil {
-		return fmt.Errorf("config hook error: %w", err)
+		return nil, fmt.Errorf("config hook error: %w", err)
 	}
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	if err := h.runCommandWithEnv(env); err != nil {
-		return fmt.Errorf("job '%s' failed: %w", h.job.Name, err)
+	result, err := h.runCommandWithEnv(env)
+	if err != nil {
+		return result, fmt.Errorf("job '%s' failed: %w", h.job.Name, err)
 	}
-	return nil
+	return result, nil
+}
+
+// handleCursorResponsePre processes a Cursor JSON response for PreToolUse events
+func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.PreToolUseResponseInterface {
+	// Handle "continue: false" - blocks execution
+	if resp.Continue != nil && !*resp.Continue {
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.BlockWithMessages(userMsg, agentMsg)
+	}
+
+	// Handle permission field
+	switch strings.ToLower(resp.Permission) {
+	case "deny":
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.BlockWithMessages(userMsg, agentMsg)
+
+	case "ask":
+		// TODO: Implement "ask" mode when cchooks library supports it
+		// For now, treat as approve with messages
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.ApproveWithMessages(userMsg, agentMsg)
+
+	case "allow", "":
+		// Allow execution (empty permission means allow with partial JSON)
+		if resp.UserMessage != "" || resp.AgentMessage != "" {
+			return core.ApproveWithMessages(resp.UserMessage, resp.AgentMessage)
+		}
+		return cchooks.Approve()
+
+	default:
+		// Unknown permission value - block with error
+		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
+		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
+		return core.BlockWithMessages(userMsg, agentMsg)
+	}
+}
+
+// handleCursorResponsePost processes a Cursor JSON response for PostToolUse events
+func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.PostToolUseResponseInterface {
+	// Handle "continue: false" - blocks execution
+	if resp.Continue != nil && !*resp.Continue {
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+	}
+
+	// Handle permission field
+	switch strings.ToLower(resp.Permission) {
+	case "deny":
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+
+	case "ask":
+		// TODO: Implement "ask" mode when cchooks library supports it
+		// For now, treat as allow with messages
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.AllowWithMessages(userMsg, agentMsg)
+
+	case "allow", "":
+		// Allow execution (empty permission means allow with partial JSON)
+		if resp.UserMessage != "" || resp.AgentMessage != "" {
+			return core.AllowWithMessages(resp.UserMessage, resp.AgentMessage)
+		}
+		return cchooks.Allow()
+
+	default:
+		// Unknown permission value - block with error
+		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
+		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+	}
 }
 
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON
 // and executing the configured job when the event name matches this hook's event.
 func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResponse {
 	return func(_ context.Context, rawJSON string) *cchooks.RawResponse {
-		var rawEvent map[string]interface{}
+		var rawEvent map[string]any
 		if err := json.Unmarshal([]byte(rawJSON), &rawEvent); err != nil {
 			return nil
 		}
@@ -182,7 +410,7 @@ func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResp
 		// Store raw JSON to feed to any nested commands launched by this hook
 		h.lastRaw = rawJSON
 		// Build minimal context for env provider
-		ctxData := map[string]interface{}{}
+		ctxData := map[string]any{}
 		if v, ok := rawEvent["tool_name"].(string); ok {
 			ctxData["tool_name"] = v
 		}
@@ -191,7 +419,7 @@ func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResp
 		}
 		env := h.envProvider.GetEnvironment(evName, ctxData)
 		if ok, err := h.shouldRun(env); err == nil && ok {
-			_ = h.runCommandWithEnv(env)
+			_, _ = h.runCommandWithEnv(env)
 		}
 		return nil
 	}
