@@ -627,9 +627,19 @@ func (h *MyHook) Run() error {
 
 ## 🔄 Cursor IDE Compatibility
 
-Blues Traveler supports **Cursor IDE event name aliases** for cross-platform hook compatibility. You can use either Claude Code or Cursor event names when installing or configuring hooks.
+Blues Traveler is **fully compatible with Cursor IDE hooks**, supporting the official [Cursor hooks specification](https://cursor.com/docs/agent/hooks). Write hooks once and run them in both Cursor and Claude Code.
 
-### Event Name Mapping
+**📘 For comprehensive cross-platform hook development, see the [Cursor Compatibility Guide](docs/cursor-compatibility.md)**
+
+The guide includes:
+- Complete event name mapping table
+- JSON response format specification
+- Script examples that work in both systems
+- Configuration patterns for both platforms
+- Migration guide between systems
+- Testing and troubleshooting tips
+
+### Quick Event Name Reference
 
 | Claude Code Event | Cursor IDE Aliases | Description |
 |-------------------|-------------------|-------------|
@@ -675,6 +685,7 @@ Blues Traveler uses a **static hook registry** architecture:
 For detailed documentation, see:
 
 - **[Quick Start Guide](docs/quick_start.md)** - Get up and running in minutes
+- **[Cursor Compatibility Guide](docs/cursor-compatibility.md)** - Write hooks for both Cursor IDE and Claude Code
 - **[Developer Guide](docs/developer_guide.md)** - Create custom hooks
 - **[Architecture Design](docs/unified_pipeline_design.md)** - Technical deep dive
 - **[Documentation Index](docs/index.md)** - All documentation
