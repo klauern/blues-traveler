@@ -312,8 +312,8 @@ func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.P
 		return core.BlockWithMessages(userMsg, agentMsg)
 
 	case "ask":
-		// TODO: Implement "ask" mode when cchooks library supports it
-		// For now, treat as approve with messages
+		// Use AskWithMessages which will prompt for user approval when cchooks supports it
+		// Currently falls back to approve with messages (see AskWithMessages implementation)
 		userMsg := resp.UserMessage
 		if userMsg == "" {
 			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
@@ -322,7 +322,7 @@ func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.P
 		if agentMsg == "" {
 			agentMsg = userMsg
 		}
-		return core.ApproveWithMessages(userMsg, agentMsg)
+		return core.AskWithMessages(userMsg, agentMsg)
 
 	case "allow", "":
 		// Allow execution (empty permission means allow with partial JSON)
@@ -368,8 +368,8 @@ func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.
 		return core.PostBlockWithMessages(userMsg, agentMsg)
 
 	case "ask":
-		// TODO: Implement "ask" mode when cchooks library supports it
-		// For now, treat as allow with messages
+		// Use AllowWithMessages for PostToolUse (no Ask equivalent in PostToolUse context)
+		// The "ask" permission is more relevant for PreToolUse; here we just allow with messages
 		userMsg := resp.UserMessage
 		if userMsg == "" {
 			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)

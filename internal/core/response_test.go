@@ -183,12 +183,57 @@ func TestAllowWithMessagesDualParams(t *testing.T) {
 	}
 }
 
+// TestAskWithMessagesSingleParam tests AskWithMessages with a single parameter.
+func TestAskWithMessagesSingleParam(t *testing.T) {
+	msg := "This operation requires confirmation"
+	resp := AskWithMessages(msg)
+
+	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	if !ok {
+		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != msg {
+		t.Errorf("Expected userMessage %q, got %q", msg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != msg {
+		t.Errorf("Expected agentMessage %q, got %q", msg, dualResp.GetAgentMessage())
+	}
+
+	if dualResp.PreToolUseResponse == nil {
+		t.Error("Embedded PreToolUseResponse should not be nil")
+	}
+}
+
+// TestAskWithMessagesDualParams tests AskWithMessages with separate messages.
+func TestAskWithMessagesDualParams(t *testing.T) {
+	userMsg := "This operation requires your confirmation"
+	agentMsg := "Attempting to execute: sudo rm -rf /tmp/cache"
+
+	resp := AskWithMessages(userMsg, agentMsg)
+
+	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	if !ok {
+		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != userMsg {
+		t.Errorf("Expected userMessage %q, got %q", userMsg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != agentMsg {
+		t.Errorf("Expected agentMessage %q, got %q", agentMsg, dualResp.GetAgentMessage())
+	}
+}
+
 // TestPreToolUseInterfaceCompliance verifies that DualMessagePreToolResponse
 // implements cchooks.PreToolUseResponseInterface.
 func TestPreToolUseInterfaceCompliance(_ *testing.T) {
 	// This should compile - if it doesn't, we're not implementing the interface correctly
 	_ = BlockWithMessages("test")
 	_ = ApproveWithMessages("test")
+	_ = AskWithMessages("test")
 }
 
 // TestPostToolUseInterfaceCompliance verifies that DualMessagePostToolResponse

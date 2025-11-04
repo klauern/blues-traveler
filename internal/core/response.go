@@ -81,6 +81,41 @@ func ApproveWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseR
 	}
 }
 
+// AskWithMessages creates a permission request for PreToolUse events with
+// context messages for users and agents. This function prompts the user to
+// manually approve or deny the operation.
+//
+// IMPORTANT: This function currently falls back to ApproveWithMessages() because
+// cchooks v0.7.0 does not yet support the Ask() response type. When cchooks adds
+// Ask() support, this implementation will be updated to use it.
+//
+// If agentMsg is omitted, userMsg is sent to both audiences.
+// If agentMsg is provided, userMsg goes to the user and agentMsg goes to the agent.
+//
+// Usage:
+//
+//	// Request user approval with context
+//	return core.AskWithMessages(
+//	    "This operation requires your confirmation",
+//	    "Attempting to execute: sudo rm -rf /tmp/cache",
+//	)
+//
+// TODO: Update to use cchooks.Ask() when available in cchooks library
+func AskWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseResponseInterface {
+	agent := userMsg
+	if len(agentMsg) > 0 {
+		agent = agentMsg[0]
+	}
+
+	// TODO: Replace cchooks.Approve() with cchooks.Ask() when available
+	// Currently falls back to approve with messages as a workaround
+	return &DualMessagePreToolResponse{
+		PreToolUseResponse: cchooks.Approve(),
+		userMessage:        userMsg,
+		agentMessage:       agent,
+	}
+}
+
 // PostBlockWithMessages creates a blocking response for PostToolUse events with
 // separate messages for users and agents.
 //
