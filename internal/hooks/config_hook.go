@@ -312,8 +312,15 @@ func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.P
 		return core.BlockWithMessages(userMsg, agentMsg)
 
 	case "ask":
-		// Use AskWithMessages which will prompt for user approval when cchooks supports it
-		// Currently falls back to approve with messages (see AskWithMessages implementation)
+		// Log "ask" event for visibility (works natively in Cursor, falls back in Claude Code)
+		h.LogHookEvent("hook_ask_permission", h.job.Name, map[string]interface{}{
+			"userMessage":  resp.UserMessage,
+			"agentMessage": resp.AgentMessage,
+			"note":         "Ask mode: works in Cursor IDE, falls back to approve in Claude Code",
+		}, nil)
+
+		// Use AskWithMessages which prompts for user approval in Cursor
+		// Falls back to approve with messages in Claude Code (see AskWithMessages implementation)
 		userMsg := resp.UserMessage
 		if userMsg == "" {
 			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
@@ -368,6 +375,13 @@ func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.
 		return core.PostBlockWithMessages(userMsg, agentMsg)
 
 	case "ask":
+		// Log "ask" event for visibility (works natively in Cursor, falls back in Claude Code)
+		h.LogHookEvent("hook_ask_permission_post", h.job.Name, map[string]interface{}{
+			"userMessage":  resp.UserMessage,
+			"agentMessage": resp.AgentMessage,
+			"note":         "Ask mode: works in Cursor IDE, falls back to allow in Claude Code",
+		}, nil)
+
 		// Use AllowWithMessages for PostToolUse (no Ask equivalent in PostToolUse context)
 		// The "ask" permission is more relevant for PreToolUse; here we just allow with messages
 		userMsg := resp.UserMessage

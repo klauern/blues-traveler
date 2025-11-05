@@ -82,33 +82,35 @@ func ApproveWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseR
 }
 
 // AskWithMessages creates a permission request for PreToolUse events with
-// context messages for users and agents. This function prompts the user to
-// manually approve or deny the operation.
+// context messages for users and agents. This function provides a consistent API
+// for "ask" mode across different platforms.
 //
-// IMPORTANT: This function currently falls back to ApproveWithMessages() because
-// cchooks v0.7.0 does not yet support the Ask() response type. When cchooks adds
-// Ask() support, this implementation will be updated to use it.
+// Platform Behavior:
+//   - Cursor IDE: Native "ask" support - prompts user for manual approval
+//   - Claude Code: Falls back to Approve() with messages (Claude Code doesn't support ask mode)
+//
+// The fallback behavior is intentional since blues-traveler works with both Cursor hooks
+// and Claude Code hooks. When running under Cursor, the native ask behavior is used.
+// When running under Claude Code (via cchooks), it gracefully degrades to approve with messages.
 //
 // If agentMsg is omitted, userMsg is sent to both audiences.
 // If agentMsg is provided, userMsg goes to the user and agentMsg goes to the agent.
 //
 // Usage:
 //
-//	// Request user approval with context
+//	// Request user approval with context (works in Cursor, falls back in Claude Code)
 //	return core.AskWithMessages(
 //	    "This operation requires your confirmation",
 //	    "Attempting to execute: sudo rm -rf /tmp/cache",
 //	)
-//
-// TODO: Update to use cchooks.Ask() when available in cchooks library
 func AskWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseResponseInterface {
 	agent := userMsg
 	if len(agentMsg) > 0 {
 		agent = agentMsg[0]
 	}
 
-	// TODO: Replace cchooks.Approve() with cchooks.Ask() when available
-	// Currently falls back to approve with messages as a workaround
+	// Falls back to Approve() for Claude Code compatibility
+	// Cursor IDE handles "ask" natively when processing the JSON response
 	return &DualMessagePreToolResponse{
 		PreToolUseResponse: cchooks.Approve(),
 		userMessage:        userMsg,

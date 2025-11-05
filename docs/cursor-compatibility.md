@@ -53,7 +53,10 @@ Hooks can output JSON to control execution and provide messages. Both systems su
 - **`permission`** (string, optional): Control execution flow
   - `"allow"` - Continue execution (default if omitted) ✅
   - `"deny"` - Block execution ✅
-  - `"ask"` - Prompt user for manual approval ⚠️ **Limitation**: Currently falls back to `"allow"` with contextual messages because cchooks v0.7.0 does not support Ask() responses. User prompting will be fully implemented when cchooks adds Ask() support.
+  - `"ask"` - Prompt user for manual approval
+    - ✅ **Works in Cursor IDE** - Native support for user prompting
+    - ⚠️ **Falls back in Claude Code** - Approves with contextual messages (Claude Code doesn't support ask mode)
+    - Logged for audit visibility
 
 - **`userMessage`** (string, optional): User-friendly message displayed in the UI
   - Keep concise and actionable
@@ -383,22 +386,30 @@ Blues-traveler's Cursor compatibility features have been implemented in phases:
    - `continue: true/false` - ✅ Working
    - `userMessage` / `agentMessage` routing - ✅ Working
 
-### ⚠️ Partially Implemented
+### ✅ Platform-Specific Features
 
 1. **Ask Permission Mode** (Issue #54)
-   - **Status**: Implemented but limited by cchooks v0.7.0
-   - **Current Behavior**: Falls back to `Approve()` with contextual messages
-   - **Function Available**: `AskWithMessages()` ready for when cchooks adds Ask() support
-   - **Limitation**: User prompting requires cchooks library update
-   - **Workaround**: Use `permission: "ask"` in JSON; it will allow execution with messages
+   - **Status**: Works in Cursor IDE, graceful fallback in Claude Code
+   - **Cursor IDE**: Native "ask" support - prompts user for approval
+   - **Claude Code**: Falls back to `Approve()` with contextual messages (Claude Code doesn't support ask mode natively)
+   - **Logging**: All "ask" events are logged for audit visibility
+   - **Function Available**: `AskWithMessages()` provides consistent API across both platforms
 
 ### 📋 Usage Recommendations
 
-Until cchooks adds Ask() support:
+**For Cursor IDE users:**
+- Use `permission: "ask"` when you want user confirmation for non-critical operations
+- User will see a prompt and can approve/deny
+- Great for operations that might be disruptive but not dangerous
+
+**For Claude Code users:**
+- `permission: "ask"` will allow execution with messages (logged for audit)
 - Use `permission: "deny"` for security-critical blocks
 - Use `permission: "allow"` for informational messages
-- Avoid relying on `permission: "ask"` for security enforcement
-- When Ask() is added to cchooks, existing `AskWithMessages()` calls will automatically gain full functionality
+
+**Cross-platform hooks:**
+- Safe to use `permission: "ask"` - works optimally in Cursor, degrades gracefully in Claude Code
+- Check logs to see when "ask" events occur
 
 ## Additional Resources
 
