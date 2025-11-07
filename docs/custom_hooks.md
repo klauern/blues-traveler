@@ -1,6 +1,6 @@
 # Custom Hooks Guide
 
-Custom hooks let you define project- or user-specific automation for Claude Code events using simple YAML or JSON. This approach can replace most built-in hooks (security, formatting, testing) with scripts tailored to your workflow, while keeping the core model secure and predictable.
+Custom hooks let you define project- or user-specific automation for Claude Code events using simple YAML or JSON. This approach can replace most built-in hooks (security, formatting, testing, performance monitoring) with scripts tailored to your workflow, while keeping the core model secure and predictable.
 
 ## Why Custom Hooks
 
@@ -73,6 +73,7 @@ blues-traveler hooks custom install my-project --event PostToolUse
 - Formatting: Run formatters in `PostToolUse` conditioned on `Edit/Write` and file globs
 - Testing/Vet: Trigger tests and linters after edits
 - Audit/Debug: Emit logs from your scripts or rely on built-in logging flags
+- Performance: Monitor tool execution timing with `PreToolUse` and `PostToolUse` handlers
 
 Built-ins remain for convenience; custom hooks are recommended for most workflows.
 
