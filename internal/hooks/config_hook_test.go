@@ -207,7 +207,6 @@ func TestCursorResponsePermissionValues(t *testing.T) {
 		t.Run("permission_"+perm, func(t *testing.T) {
 			output := `{"permission": "` + perm + `"}`
 			resp, err := parseCursorResponse(output)
-
 			if err != nil {
 				t.Errorf("parseCursorResponse() error = %v for permission %q", err, perm)
 				return
@@ -252,7 +251,6 @@ func TestCursorResponseContinueField(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := parseCursorResponse(tt.output)
-
 			if err != nil {
 				t.Errorf("parseCursorResponse() error = %v", err)
 				return
@@ -330,7 +328,6 @@ func TestCursorResponseMessageFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := parseCursorResponse(tt.output)
-
 			if err != nil {
 				t.Errorf("parseCursorResponse() error = %v", err)
 				return
