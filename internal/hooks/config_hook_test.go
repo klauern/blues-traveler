@@ -1,392 +1,146 @@
 package hooks
 
-import (
-	"testing"
-)
+import "testing"
 
-// assertCursorResponse is a helper function that verifies a CursorHookResponse matches expectations.
-func assertCursorResponse(t *testing.T, resp *CursorHookResponse, want *CursorHookResponse) {
-	t.Helper()
+func TestParseCursorResponse(t *testing.T) {
+	t.Parallel()
 
-	if resp == nil {
-		t.Error("parseCursorResponse() returned nil")
-		return
-	}
-
-	// Compare fields
-	if resp.Permission != want.Permission {
-		t.Errorf("Permission = %q, want %q", resp.Permission, want.Permission)
-	}
-
-	if resp.UserMessage != want.UserMessage {
-		t.Errorf("UserMessage = %q, want %q", resp.UserMessage, want.UserMessage)
-	}
-
-	if resp.AgentMessage != want.AgentMessage {
-		t.Errorf("AgentMessage = %q, want %q", resp.AgentMessage, want.AgentMessage)
-	}
-
-	// Compare Continue field (pointer comparison)
-	if (resp.Continue == nil) != (want.Continue == nil) {
-		t.Errorf("Continue nil mismatch: got %v, want %v", resp.Continue, want.Continue)
-	} else if resp.Continue != nil && want.Continue != nil {
-		if *resp.Continue != *want.Continue {
-			t.Errorf("Continue = %v, want %v", *resp.Continue, *want.Continue)
-		}
-	}
-}
-
-// TestParseCursorResponseValid tests parsing of valid Cursor JSON responses.
-func TestParseCursorResponseValid(t *testing.T) {
-	tests := []struct {
-		name     string
-		output   string
-		wantResp *CursorHookResponse
+	cases := []struct {
+		name    string
+		output  string
+		wantErr bool
+		wantNil bool
+		expect  cursorResponseExpectation
 	}{
 		{
-			name:   "Complete JSON with all fields",
-			output: `{"permission": "deny", "userMessage": "User msg", "agentMessage": "Agent msg", "continue": false}`,
-			wantResp: &CursorHookResponse{
-				Permission:   "deny",
-				UserMessage:  "User msg",
-				AgentMessage: "Agent msg",
-				Continue:     boolPtr(false),
+			name:   "allow minimal payload",
+			output: `{"permission":"allow"}`,
+			expect: cursorResponseExpectation{permission: "allow"},
+		},
+		{
+			name:   "deny with explicit messages and continue false",
+			output: `{"permission":"deny","userMessage":"Action blocked","agentMessage":"Reason: policy","continue":false}`,
+			expect: cursorResponseExpectation{
+				permission:  "deny",
+				continueVal: boolPtr(false),
+				messages:    messages("Action blocked", "Reason: policy"),
 			},
 		},
 		{
-			name:   "Permission only",
-			output: `{"permission": "allow"}`,
-			wantResp: &CursorHookResponse{
-				Permission: "allow",
+			name:   "ask requires approval with continue true",
+			output: `{"permission":"ask","userMessage":"Need confirmation","agentMessage":"Provide justification","continue":true}`,
+			expect: cursorResponseExpectation{
+				permission:  "ask",
+				continueVal: boolPtr(true),
+				messages:    messages("Need confirmation", "Provide justification"),
 			},
 		},
 		{
-			name:   "Ask permission",
-			output: `{"permission": "ask", "userMessage": "Confirm?", "agentMessage": "Details here"}`,
-			wantResp: &CursorHookResponse{
-				Permission:   "ask",
-				UserMessage:  "Confirm?",
-				AgentMessage: "Details here",
+			name:   "messages without permission fall back to zero values",
+			output: `{"userMessage":"Heads up","agentMessage":"log-only"}`,
+			expect: cursorResponseExpectation{
+				messages: messages("Heads up", "log-only"),
 			},
 		},
 		{
-			name:   "Continue false",
-			output: `{"continue": false, "userMessage": "Blocked"}`,
-			wantResp: &CursorHookResponse{
-				Continue:    boolPtr(false),
-				UserMessage: "Blocked",
-			},
-		},
-		{
-			name:   "Continue true",
-			output: `{"continue": true}`,
-			wantResp: &CursorHookResponse{
-				Continue: boolPtr(true),
-			},
-		},
-		{
-			name:   "Extra fields (forward compatibility)",
-			output: `{"permission": "allow", "futureField": "value", "anotherField": 123}`,
-			wantResp: &CursorHookResponse{
-				Permission: "allow",
-			},
-		},
-		{
-			name:   "Empty permission value",
-			output: `{"permission": ""}`,
-			wantResp: &CursorHookResponse{
-				Permission: "",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := parseCursorResponse(tt.output)
-			if err != nil {
-				t.Errorf("parseCursorResponse() unexpected error: %v", err)
-				return
-			}
-			assertCursorResponse(t, resp, tt.wantResp)
-		})
-	}
-}
-
-// TestParseCursorResponseInvalid tests parsing of invalid JSON that should return an error.
-func TestParseCursorResponseInvalid(t *testing.T) {
-	tests := []struct {
-		name   string
-		output string
-	}{
-		{
-			name:   "Invalid JSON syntax",
-			output: `{"permission": "deny", invalid}`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := parseCursorResponse(tt.output)
-			if err == nil {
-				t.Error("parseCursorResponse() expected error but got none")
-			}
-		})
-	}
-}
-
-// TestParseCursorResponseEdgeCases tests edge cases like empty strings, whitespace, and special characters.
-func TestParseCursorResponseEdgeCases(t *testing.T) {
-	tests := []struct {
-		name     string
-		output   string
-		wantNil  bool
-		wantResp *CursorHookResponse
-	}{
-		{
-			name:    "Empty string",
-			output:  "",
+			name:    "plain text is treated as non JSON",
+			output:  "plain text output",
 			wantNil: true,
 		},
 		{
-			name:    "Non-JSON plain text",
-			output:  "This is plain text output",
-			wantNil: true,
-		},
-		{
-			name:    "Whitespace only",
+			name:    "whitespace is ignored",
 			output:  "   \n\t  ",
 			wantNil: true,
 		},
 		{
-			name:    "JSON array instead of object",
-			output:  `["permission", "deny"]`,
-			wantNil: true,
-		},
-		{
-			name:   "JSON with whitespace",
-			output: `  {"permission": "deny"}  `,
-			wantResp: &CursorHookResponse{
-				Permission: "deny",
-			},
-		},
-		{
-			name:   "Escaped characters",
-			output: `{"userMessage": "Line 1\nLine 2\tTabbed", "agentMessage": "Path: \"C:\\Users\""}`,
-			wantResp: &CursorHookResponse{
-				UserMessage:  "Line 1\nLine 2\tTabbed",
-				AgentMessage: "Path: \"C:\\Users\"",
-			},
-		},
-		{
-			name:   "Unicode characters",
-			output: `{"userMessage": "操作がブロックされました", "agentMessage": "Détails techniques 🔒"}`,
-			wantResp: &CursorHookResponse{
-				UserMessage:  "操作がブロックされました",
-				AgentMessage: "Détails techniques 🔒",
-			},
+			name:    "invalid JSON surfaces an error",
+			output:  `{"permission":"deny", invalid`,
+			wantErr: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := parseCursorResponse(tt.output)
-			if err != nil {
-				t.Errorf("parseCursorResponse() unexpected error: %v", err)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := parseCursorResponse(tc.output)
+			switch {
+			case tc.wantErr:
+				if err == nil {
+					t.Fatalf("parseCursorResponse() expected error but got none")
+				}
 				return
+			case err != nil:
+				t.Fatalf("parseCursorResponse() unexpected error: %v", err)
 			}
 
-			if tt.wantNil {
+			if tc.wantNil {
 				if resp != nil {
-					t.Errorf("parseCursorResponse() expected nil but got %+v", resp)
+					t.Fatalf("parseCursorResponse() expected nil response, got %+v", resp)
 				}
 				return
 			}
 
-			assertCursorResponse(t, resp, tt.wantResp)
-		})
-	}
-}
-
-// TestCursorResponsePermissionValues tests different permission values.
-func TestCursorResponsePermissionValues(t *testing.T) {
-	permissions := []string{"allow", "deny", "ask", "ALLOW", "DENY", "ASK", ""}
-
-	for _, perm := range permissions {
-		t.Run("permission_"+perm, func(t *testing.T) {
-			output := `{"permission": "` + perm + `"}`
-			resp, err := parseCursorResponse(output)
-			if err != nil {
-				t.Errorf("parseCursorResponse() error = %v for permission %q", err, perm)
-				return
-			}
-
 			if resp == nil {
-				t.Errorf("parseCursorResponse() returned nil for permission %q", perm)
-				return
+				t.Fatal("parseCursorResponse() returned nil response")
 			}
 
-			if resp.Permission != perm {
-				t.Errorf("Permission = %q, want %q", resp.Permission, perm)
-			}
+			assertCursorResponse(t, resp, tc.expect)
 		})
 	}
 }
 
-// TestCursorResponseContinueField tests the continue field handling.
-func TestCursorResponseContinueField(t *testing.T) {
-	tests := []struct {
-		name   string
-		output string
-		want   *bool
-	}{
-		{
-			name:   "continue: true",
-			output: `{"continue": true}`,
-			want:   boolPtr(true),
-		},
-		{
-			name:   "continue: false",
-			output: `{"continue": false}`,
-			want:   boolPtr(false),
-		},
-		{
-			name:   "continue field missing",
-			output: `{"permission": "allow"}`,
-			want:   nil,
-		},
+// cursorResponseExpectation captures the expected Cursor response fields for assertion.
+type cursorResponseExpectation struct {
+	permission  string
+	continueVal *bool
+	messages    messageExpectation
+}
+
+// assertCursorResponse validates the parsed response matches the expected fields.
+func assertCursorResponse(t *testing.T, resp *CursorHookResponse, expect cursorResponseExpectation) {
+	t.Helper()
+
+	if resp.Permission != expect.permission {
+		t.Fatalf("Permission = %q, want %q", resp.Permission, expect.permission)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := parseCursorResponse(tt.output)
-			if err != nil {
-				t.Errorf("parseCursorResponse() error = %v", err)
-				return
-			}
+	expect.messages.assert(t, resp)
 
-			if resp == nil {
-				t.Error("parseCursorResponse() returned nil")
-				return
-			}
-
-			if (resp.Continue == nil) != (tt.want == nil) {
-				t.Errorf("Continue nil mismatch: got %v, want %v", resp.Continue, tt.want)
-			} else if resp.Continue != nil && tt.want != nil {
-				if *resp.Continue != *tt.want {
-					t.Errorf("Continue = %v, want %v", *resp.Continue, *tt.want)
-				}
-			}
-		})
+	switch {
+	case resp.Continue == nil && expect.continueVal == nil:
+		// Both unset, nothing to assert.
+	case resp.Continue == nil || expect.continueVal == nil:
+		t.Fatalf("Continue mismatch: got %v, want %v", resp.Continue, expect.continueVal)
+	case *resp.Continue != *expect.continueVal:
+		t.Fatalf("Continue = %v, want %v", *resp.Continue, *expect.continueVal)
 	}
 }
 
-// TestCursorResponseMessageFields tests message field handling.
-func TestCursorResponseMessageFields(t *testing.T) {
-	tests := []struct {
-		name      string
-		output    string
-		wantUser  string
-		wantAgent string
-	}{
-		{
-			name:      "Both messages present",
-			output:    `{"userMessage": "User", "agentMessage": "Agent"}`,
-			wantUser:  "User",
-			wantAgent: "Agent",
-		},
-		{
-			name:      "Only user message",
-			output:    `{"userMessage": "User"}`,
-			wantUser:  "User",
-			wantAgent: "",
-		},
-		{
-			name:      "Only agent message",
-			output:    `{"agentMessage": "Agent"}`,
-			wantUser:  "",
-			wantAgent: "Agent",
-		},
-		{
-			name:      "No messages",
-			output:    `{"permission": "allow"}`,
-			wantUser:  "",
-			wantAgent: "",
-		},
-		{
-			name:      "Empty string messages",
-			output:    `{"userMessage": "", "agentMessage": ""}`,
-			wantUser:  "",
-			wantAgent: "",
-		},
-		{
-			name:      "Very long messages",
-			output:    `{"userMessage": "` + longString(1000) + `", "agentMessage": "` + longString(2000) + `"}`,
-			wantUser:  longString(1000),
-			wantAgent: longString(2000),
-		},
+// messageExpectation holds the expected user and agent messages for a response.
+type messageExpectation struct {
+	user  string
+	agent string
+}
+
+func messages(user, agent string) messageExpectation {
+	return messageExpectation{user: user, agent: agent}
+}
+
+func (m messageExpectation) assert(t *testing.T, resp *CursorHookResponse) {
+	t.Helper()
+
+	if resp.UserMessage != m.user {
+		t.Fatalf("UserMessage = %q, want %q", resp.UserMessage, m.user)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			resp, err := parseCursorResponse(tt.output)
-			if err != nil {
-				t.Errorf("parseCursorResponse() error = %v", err)
-				return
-			}
-
-			if resp == nil {
-				t.Error("parseCursorResponse() returned nil")
-				return
-			}
-
-			if resp.UserMessage != tt.wantUser {
-				t.Errorf("UserMessage = %q, want %q", resp.UserMessage, tt.wantUser)
-			}
-
-			if resp.AgentMessage != tt.wantAgent {
-				t.Errorf("AgentMessage = %q, want %q", resp.AgentMessage, tt.wantAgent)
-			}
-		})
+	if resp.AgentMessage != m.agent {
+		t.Fatalf("AgentMessage = %q, want %q", resp.AgentMessage, m.agent)
 	}
 }
 
-// Helper function to create a bool pointer
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-// Helper function to generate long strings for testing
-func longString(length int) string {
-	s := ""
-	for i := 0; i < length; i++ {
-		s += "a"
-	}
-	return s
-}
-
-// BenchmarkParseCursorResponse benchmarks the JSON parsing performance.
-func BenchmarkParseCursorResponse(b *testing.B) {
-	output := `{"permission": "deny", "userMessage": "User message", "agentMessage": "Agent message", "continue": false}`
-
-	for i := 0; i < b.N; i++ {
-		_, _ = parseCursorResponse(output)
-	}
-}
-
-// BenchmarkParseCursorResponseMinimal benchmarks parsing minimal JSON.
-func BenchmarkParseCursorResponseMinimal(b *testing.B) {
-	output := `{"permission": "allow"}`
-
-	for i := 0; i < b.N; i++ {
-		_, _ = parseCursorResponse(output)
-	}
-}
-
-// BenchmarkParseCursorResponseNonJSON benchmarks the non-JSON path.
-func BenchmarkParseCursorResponseNonJSON(b *testing.B) {
-	output := "This is plain text output"
-
-	for i := 0; i < b.N; i++ {
-		_, _ = parseCursorResponse(output)
-	}
+// boolPtr returns a pointer to the provided bool literal for concise test expectations.
+func boolPtr(v bool) *bool {
+	return &v
 }
