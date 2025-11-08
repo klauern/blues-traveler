@@ -43,8 +43,8 @@ func TestSettingsPrecedence(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		projectEnabled  *bool  // nil means not set
-		globalEnabled   *bool  // nil means not set
+		projectEnabled  *bool // nil means not set
+		globalEnabled   *bool // nil means not set
 		expectedEnabled bool
 		description     string
 	}{
@@ -394,8 +394,8 @@ func TestSettingsPrecedenceMultiplePlugins(t *testing.T) {
 	// Create project settings with multiple plugins
 	projectSettings := &Settings{
 		Plugins: map[string]PluginConfig{
-			"plugin1": {Enabled: boolPtr(true)},   // Override global
-			"plugin2": {Enabled: boolPtr(false)},  // Override global
+			"plugin1": {Enabled: boolPtr(true)},  // Override global
+			"plugin2": {Enabled: boolPtr(false)}, // Override global
 			// plugin3 not in project, should use global
 		},
 	}
@@ -403,10 +403,10 @@ func TestSettingsPrecedenceMultiplePlugins(t *testing.T) {
 	// Create global settings with multiple plugins
 	globalSettings := &Settings{
 		Plugins: map[string]PluginConfig{
-			"plugin1": {Enabled: boolPtr(false)},  // Should be overridden
-			"plugin2": {Enabled: boolPtr(true)},   // Should be overridden
-			"plugin3": {Enabled: boolPtr(true)},   // Should be used
-			"plugin4": {Enabled: boolPtr(false)},  // Should be used
+			"plugin1": {Enabled: boolPtr(false)}, // Should be overridden
+			"plugin2": {Enabled: boolPtr(true)},  // Should be overridden
+			"plugin3": {Enabled: boolPtr(true)},  // Should be used
+			"plugin4": {Enabled: boolPtr(false)}, // Should be used
 		},
 	}
 
@@ -426,11 +426,11 @@ func TestSettingsPrecedenceMultiplePlugins(t *testing.T) {
 		plugin   string
 		expected bool
 	}{
-		{"plugin1", true},   // Project overrides global
-		{"plugin2", false},  // Project overrides global
-		{"plugin3", true},   // Global used
-		{"plugin4", false},  // Global used
-		{"plugin5", true},   // Not in either, default enabled
+		{"plugin1", true},  // Project overrides global
+		{"plugin2", false}, // Project overrides global
+		{"plugin3", true},  // Global used
+		{"plugin4", false}, // Global used
+		{"plugin5", true},  // Not in either, default enabled
 	}
 
 	for _, tt := range tests {

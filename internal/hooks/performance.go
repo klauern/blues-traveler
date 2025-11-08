@@ -15,11 +15,11 @@ import (
 // PerformanceHook implements performance monitoring logic
 type PerformanceHook struct {
 	*core.BaseHook
-	logger      *log.Logger
-	logFile     *os.File
-	startTimes  map[string]time.Time
-	totalTime   time.Duration
-	toolCount   int
+	logger     *log.Logger
+	logFile    *os.File
+	startTimes map[string]time.Time
+	totalTime  time.Duration
+	toolCount  int
 }
 
 // NewPerformanceHook creates a new performance hook instance
