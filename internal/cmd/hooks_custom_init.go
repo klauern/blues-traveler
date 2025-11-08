@@ -11,10 +11,9 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// generateSampleConfig creates the sample configuration content
-func generateSampleConfig(global bool, group string) string {
-	if global {
-		return fmt.Sprintf(`# Global hooks configuration for group '%s'
+// generateGlobalSampleConfig creates the global configuration content
+func generateGlobalSampleConfig(group string) string {
+	return fmt.Sprintf(`# Global hooks configuration for group '%s'
 # This is your personal global configuration. Add real hooks here.
 # See README.md in this directory for documentation and examples.
 %s:
@@ -26,8 +25,10 @@ func generateSampleConfig(global bool, group string) string {
   #       run: ./my-script.sh
   #       glob: ["*.go"]
 `, group, group)
-	}
+}
 
+// generateProjectSampleConfig creates the project sample configuration content
+func generateProjectSampleConfig(group string) string {
 	return fmt.Sprintf(`# Sample hooks configuration for group '%s'
 %s:
   PreToolUse:
@@ -75,6 +76,14 @@ func generateSampleConfig(global bool, group string) string {
       - name: session-end-sample
         run: echo "SessionEnd EVENT=${EVENT_NAME}"
 `, group, group)
+}
+
+// generateSampleConfig creates the sample configuration content
+func generateSampleConfig(global bool, group string) string {
+	if global {
+		return generateGlobalSampleConfig(group)
+	}
+	return generateProjectSampleConfig(group)
 }
 
 // sanitizeFileName validates and sanitizes a filename to prevent path traversal

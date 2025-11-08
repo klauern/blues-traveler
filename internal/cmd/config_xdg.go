@@ -30,6 +30,39 @@ func NewConfigCmd() *cli.Command {
 	}
 }
 
+// executeMigrateCommand executes the config migrate command
+func executeMigrateCommand(dryRun, verbose, all bool) error {
+	xdg := config.NewXDGConfig()
+	discovery := config.NewLegacyConfigDiscovery(xdg)
+	discovery.SetVerbose(verbose)
+
+	printMigrateSearchInfo(xdg, verbose, all)
+
+	// Discover and migrate
+	configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
+	if err != nil {
+		return fmt.Errorf("discovery failed: %w", err)
+	}
+
+	if len(configs) == 0 {
+		printNoConfigsFound(all)
+		return nil
+	}
+
+	printFoundConfigs(configs, verbose)
+
+	result, err := discovery.MigrateConfigs(configs, dryRun)
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	// Display results
+	fmt.Print(config.FormatMigrationResult(result, dryRun))
+	printMigrationSummary(result, dryRun, xdg.GetConfigDir())
+
+	return nil
+}
+
 // NewConfigMigrateCmd creates the config migrate subcommand
 func NewConfigMigrateCmd() *cli.Command {
 	return &cli.Command{
@@ -60,39 +93,11 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			dryRun := cmd.Bool("dry-run")
-			verbose := cmd.Bool("verbose")
-			all := cmd.Bool("all")
-
-			xdg := config.NewXDGConfig()
-			discovery := config.NewLegacyConfigDiscovery(xdg)
-			discovery.SetVerbose(verbose)
-
-			printMigrateSearchInfo(xdg, verbose, all)
-
-			// Discover and migrate
-			configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
-			if err != nil {
-				return fmt.Errorf("discovery failed: %w", err)
-			}
-
-			if len(configs) == 0 {
-				printNoConfigsFound(all)
-				return nil
-			}
-
-			printFoundConfigs(configs, verbose)
-
-			result, err := discovery.MigrateConfigs(configs, dryRun)
-			if err != nil {
-				return fmt.Errorf("migration failed: %w", err)
-			}
-
-			// Display results
-			fmt.Print(config.FormatMigrationResult(result, dryRun))
-			printMigrationSummary(result, dryRun, xdg.GetConfigDir())
-
-			return nil
+			return executeMigrateCommand(
+				cmd.Bool("dry-run"),
+				cmd.Bool("verbose"),
+				cmd.Bool("all"),
+			)
 		},
 	}
 }
@@ -148,6 +153,52 @@ func printVerboseHint() {
 	fmt.Printf("Use --verbose flag for detailed information.\n")
 }
 
+// executeListPathsOnly displays only project paths
+func executeListPathsOnly(projects []string) {
+	printPathsOnly(projects)
+}
+
+// executeListVerbose displays projects with optional verbose output
+func executeListVerbose(xdg *config.XDGConfig, projects []string, verbose bool) {
+	printProjectSummary(projects)
+
+	for _, project := range projects {
+		printProjectBasic(project)
+
+		if verbose {
+			printProjectVerbose(xdg, project)
+		}
+
+		fmt.Println()
+	}
+
+	if !verbose {
+		printVerboseHint()
+	}
+}
+
+// executeListCommand executes the config list command
+func executeListCommand(verbose, pathsOnly bool) error {
+	xdg := config.NewXDGConfig()
+	projects, err := xdg.ListProjects()
+	if err != nil {
+		return fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	if len(projects) == 0 {
+		printEmptyProjectsMessage(pathsOnly)
+		return nil
+	}
+
+	if pathsOnly {
+		executeListPathsOnly(projects)
+		return nil
+	}
+
+	executeListVerbose(xdg, projects, verbose)
+	return nil
+}
+
 // NewConfigListCmd creates the config list subcommand
 func NewConfigListCmd() *cli.Command {
 	return &cli.Command{
@@ -168,42 +219,10 @@ func NewConfigListCmd() *cli.Command {
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			verbose := cmd.Bool("verbose")
-			pathsOnly := cmd.Bool("paths-only")
-
-			xdg := config.NewXDGConfig()
-			projects, err := xdg.ListProjects()
-			if err != nil {
-				return fmt.Errorf("failed to list projects: %w", err)
-			}
-
-			if len(projects) == 0 {
-				printEmptyProjectsMessage(pathsOnly)
-				return nil
-			}
-
-			if pathsOnly {
-				printPathsOnly(projects)
-				return nil
-			}
-
-			printProjectSummary(projects)
-
-			for _, project := range projects {
-				printProjectBasic(project)
-
-				if verbose {
-					printProjectVerbose(xdg, project)
-				}
-
-				fmt.Println()
-			}
-
-			if !verbose {
-				printVerboseHint()
-			}
-
-			return nil
+			return executeListCommand(
+				cmd.Bool("verbose"),
+				cmd.Bool("paths-only"),
+			)
 		},
 	}
 }
@@ -419,6 +438,29 @@ func performCleanup(xdg *config.XDGConfig) error {
 	return nil
 }
 
+// executeCleanDryRun executes a dry-run cleanup check
+func executeCleanDryRun(xdg *config.XDGConfig) error {
+	fmt.Println("Dry run: checking for orphaned configurations...")
+	orphaned, err := findOrphanedProjects(xdg)
+	if err != nil {
+		return err
+	}
+	printOrphanedProjects(orphaned)
+	return nil
+}
+
+// executeCleanCommand executes the config clean command
+func executeCleanCommand(dryRun bool) error {
+	xdg := config.NewXDGConfig()
+
+	if dryRun {
+		return executeCleanDryRun(xdg)
+	}
+
+	fmt.Println("Cleaning up orphaned configurations...")
+	return performCleanup(xdg)
+}
+
 // NewConfigCleanCmd creates the config clean subcommand
 func NewConfigCleanCmd() *cli.Command {
 	return &cli.Command{
@@ -434,23 +476,55 @@ func NewConfigCleanCmd() *cli.Command {
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			dryRun := cmd.Bool("dry-run")
-			xdg := config.NewXDGConfig()
-
-			if dryRun {
-				fmt.Println("Dry run: checking for orphaned configurations...")
-				orphaned, err := findOrphanedProjects(xdg)
-				if err != nil {
-					return err
-				}
-				printOrphanedProjects(orphaned)
-			} else {
-				fmt.Println("Cleaning up orphaned configurations...")
-				return performCleanup(xdg)
-			}
-
-			return nil
+			return executeCleanCommand(cmd.Bool("dry-run"))
 		},
+	}
+}
+
+// displayLegacyConfigStatus displays legacy configuration status
+func displayLegacyConfigStatus(status *config.MigrationStatus) {
+	fmt.Printf("Legacy Configuration (.claude/hooks/):\n")
+	if status.HasLegacyConfig {
+		fmt.Printf("  ✓ Found: %s\n", status.LegacyConfigPath)
+	} else {
+		fmt.Printf("  ✗ Not found: %s\n", status.LegacyConfigPath)
+	}
+}
+
+// displayXDGConfigStatus displays XDG configuration status
+func displayXDGConfigStatus(status *config.MigrationStatus) {
+	fmt.Printf("\nXDG Configuration (~/.config/blues-traveler/):\n")
+	if status.HasXDGConfig {
+		fmt.Printf("  ✓ Found: %s\n", status.XDGConfigPath)
+	} else {
+		fmt.Printf("  ✗ Not found\n")
+	}
+}
+
+// displayMigrationStatus displays migration status
+func displayMigrationStatus(status *config.MigrationStatus) {
+	fmt.Printf("\nMigration Status:\n")
+	switch {
+	case status.NeedsMigration:
+		fmt.Printf("  ⚠ Migration needed\n")
+		fmt.Printf("  Run: blues-traveler config migrate\n")
+	case status.HasXDGConfig:
+		fmt.Printf("  ✓ Already migrated to XDG\n")
+	case !status.HasLegacyConfig:
+		fmt.Printf("  ✓ No configuration found (will use defaults)\n")
+	}
+}
+
+// displayStatusRecommendations displays recommendations based on status
+func displayStatusRecommendations(status *config.MigrationStatus) {
+	fmt.Printf("\nRecommendations:\n")
+	switch {
+	case status.NeedsMigration:
+		fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
+	case status.HasXDGConfig:
+		fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
+	default:
+		fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
 	}
 }
 
@@ -486,45 +560,10 @@ func NewConfigStatusCmd() *cli.Command {
 			}
 
 			fmt.Printf("Configuration Status for: %s\n\n", status.ProjectPath)
-
-			// Legacy configuration
-			fmt.Printf("Legacy Configuration (.claude/hooks/):\n")
-			if status.HasLegacyConfig {
-				fmt.Printf("  ✓ Found: %s\n", status.LegacyConfigPath)
-			} else {
-				fmt.Printf("  ✗ Not found: %s\n", status.LegacyConfigPath)
-			}
-
-			// XDG configuration
-			fmt.Printf("\nXDG Configuration (~/.config/blues-traveler/):\n")
-			if status.HasXDGConfig {
-				fmt.Printf("  ✓ Found: %s\n", status.XDGConfigPath)
-			} else {
-				fmt.Printf("  ✗ Not found\n")
-			}
-
-			// Migration status
-			fmt.Printf("\nMigration Status:\n")
-			switch {
-			case status.NeedsMigration:
-				fmt.Printf("  ⚠ Migration needed\n")
-				fmt.Printf("  Run: blues-traveler config migrate\n")
-			case status.HasXDGConfig:
-				fmt.Printf("  ✓ Already migrated to XDG\n")
-			case !status.HasLegacyConfig:
-				fmt.Printf("  ✓ No configuration found (will use defaults)\n")
-			}
-
-			// Recommendations
-			fmt.Printf("\nRecommendations:\n")
-			switch {
-			case status.NeedsMigration:
-				fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
-			case status.HasXDGConfig:
-				fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
-			default:
-				fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
-			}
+			displayLegacyConfigStatus(status)
+			displayXDGConfigStatus(status)
+			displayMigrationStatus(status)
+			displayStatusRecommendations(status)
 
 			return nil
 		},
