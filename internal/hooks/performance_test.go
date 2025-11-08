@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 )
 
 func TestPerformanceHook_NewPerformanceHook(t *testing.T) {
-	ctx := core.NewHookContext(nil, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(nil)
 	hook := NewPerformanceHook(ctx)
 
 	if hook == nil {
@@ -29,12 +28,7 @@ func TestPerformanceHook_NewPerformanceHook(t *testing.T) {
 
 func TestPerformanceHook_Disabled(t *testing.T) {
 	// Create a hook context with performance disabled
-	settings := &core.Settings{
-		Plugins: map[string]core.PluginConfig{
-			"performance": {Enabled: boolPtr(false)},
-		},
-	}
-	ctx := core.NewHookContext(settings, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(func(string) bool { return false })
 	hook := NewPerformanceHook(ctx)
 
 	if hook.IsEnabled() {
@@ -49,7 +43,7 @@ func TestPerformanceHook_Disabled(t *testing.T) {
 }
 
 func TestPerformanceHook_PreToolUseHandler(t *testing.T) {
-	ctx := core.NewHookContext(nil, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(nil)
 	perfHook := NewPerformanceHook(ctx).(*PerformanceHook)
 
 	// Create a pre-tool event
@@ -71,7 +65,7 @@ func TestPerformanceHook_PreToolUseHandler(t *testing.T) {
 }
 
 func TestPerformanceHook_PostToolUseHandler(t *testing.T) {
-	ctx := core.NewHookContext(nil, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(nil)
 	perfHook := NewPerformanceHook(ctx).(*PerformanceHook)
 
 	// Set up a start time
@@ -97,7 +91,7 @@ func TestPerformanceHook_PostToolUseHandler(t *testing.T) {
 }
 
 func TestPerformanceHook_TimingAccuracy(t *testing.T) {
-	ctx := core.NewHookContext(nil, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(nil)
 	perfHook := NewPerformanceHook(ctx).(*PerformanceHook)
 
 	toolName := "TestTool"
@@ -124,7 +118,7 @@ func TestPerformanceHook_TimingAccuracy(t *testing.T) {
 }
 
 func TestPerformanceHook_MultipleTools(t *testing.T) {
-	ctx := core.NewHookContext(nil, false, "", os.Stdout, os.Stderr, core.NewMemoryFileSystem())
+	ctx := core.TestHookContext(nil)
 	perfHook := NewPerformanceHook(ctx).(*PerformanceHook)
 
 	// Start multiple tools
@@ -151,9 +145,4 @@ func TestPerformanceHook_MultipleTools(t *testing.T) {
 	if _, ok := perfHook.startTimes["Bash"]; ok {
 		t.Error("Expected Bash start time to be cleaned up")
 	}
-}
-
-// Helper function to create bool pointer
-func boolPtr(b bool) *bool {
-	return &b
 }
