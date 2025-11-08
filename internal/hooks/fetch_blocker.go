@@ -160,7 +160,7 @@ func (h *FetchBlockerHook) loadPrefixesFromFile(filePath string) ([]BlockedPrefi
 		return nil, nil // File doesn't exist, not an error
 	}
 
-	file, err := os.Open(filePath) // #nosec G304 - controlled config file paths
+	file, err := os.Open(filePath) // #nosec G304 - paths constructed from os.Getwd()/os.UserHomeDir() + fixed ".claude/blocked-urls.txt" suffix
 	if err != nil {
 		return nil, nil // File can't be opened, not an error
 	}

@@ -110,7 +110,7 @@ func resolveAndValidateEvent(event string, isValidEventType func(string) bool, v
 }
 
 // loadAndValidateSettings loads settings from the specified path
-func loadAndValidateSettings(settingsPath string, global bool) (*config.Settings, error) {
+func loadAndValidateSettings(settingsPath string) (*config.Settings, error) {
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
@@ -170,7 +170,7 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	}
 
 	// Load existing settings
-	settings, err := loadAndValidateSettings(settingsPath, flags.global)
+	settings, err := loadAndValidateSettings(settingsPath)
 	if err != nil {
 		return err
 	}

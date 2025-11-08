@@ -1,13 +1,5 @@
 {
   "version": 1,
   "description": "Vulnerability exclusions for blues-traveler",
-  "exclude": [
-    {
-      "vulnerability": "*",
-      "modules": [
-        "std"
-      ],
-      "derived": true
-    }
-  ]
+  "exclude": []
 }

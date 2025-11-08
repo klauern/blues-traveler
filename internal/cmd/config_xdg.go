@@ -387,7 +387,7 @@ func findOrphanedProjects(xdg *config.XDGConfig) ([]string, error) {
 }
 
 // printOrphanedProjects prints the list of orphaned projects
-func printOrphanedProjects(orphaned []string, action string) {
+func printOrphanedProjects(orphaned []string) {
 	fmt.Printf("Found %d orphaned configuration(s):\n", len(orphaned))
 	for _, project := range orphaned {
 		fmt.Printf("  - %s\n", project)
@@ -443,7 +443,7 @@ func NewConfigCleanCmd() *cli.Command {
 				if err != nil {
 					return err
 				}
-				printOrphanedProjects(orphaned, "would be removed")
+				printOrphanedProjects(orphaned)
 			} else {
 				fmt.Println("Cleaning up orphaned configurations...")
 				return performCleanup(xdg)
