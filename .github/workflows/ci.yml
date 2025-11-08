@@ -136,10 +136,11 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
+    - name: Install Gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
     - name: Run Gosec Security Scanner
-      uses: securego/gosec@master
-      with:
-        args: '-severity medium -exclude=G204 ./...'
+      run: gosec -severity medium -exclude=G204 ./...
 
     - name: Run govulncheck
       uses: golang/govulncheck-action@v1
