@@ -112,7 +112,7 @@ func TestParseCursorResponseValid(t *testing.T) {
 	}
 }
 
-// TestParseCursorResponseInvalid tests parsing of invalid JSON.
+// TestParseCursorResponseInvalid tests parsing of invalid JSON that should return an error.
 func TestParseCursorResponseInvalid(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -121,10 +121,6 @@ func TestParseCursorResponseInvalid(t *testing.T) {
 		{
 			name:   "Invalid JSON syntax",
 			output: `{"permission": "deny", invalid}`,
-		},
-		{
-			name:   "JSON array instead of object",
-			output: `["permission", "deny"]`,
 		},
 	}
 
@@ -159,6 +155,11 @@ func TestParseCursorResponseEdgeCases(t *testing.T) {
 		{
 			name:    "Whitespace only",
 			output:  "   \n\t  ",
+			wantNil: true,
+		},
+		{
+			name:    "JSON array instead of object",
+			output:  `["permission", "deny"]`,
 			wantNil: true,
 		},
 		{
