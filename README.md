@@ -21,6 +21,7 @@ Blues Traveler provides **pre-built hooks** that integrate seamlessly with Claud
 | **✅ Vet** | Code quality and best practices enforcement | `PostToolUse` with code changes |
 | **🚫 Fetch Blocker** | Blocks web fetches requiring authentication | `PreToolUse` events |
 | **🔍 Find Blocker** | Suggests `fd` instead of `find` for better performance | `PreToolUse` events |
+| **⚡ Performance** | Monitors hook execution performance and timing | Any event type |
 
 Note: Custom hooks can implement all of the above (and more) using your own scripts. Built-ins are provided for quick setup; custom hooks are recommended for most workflows.
 
@@ -303,6 +304,22 @@ blues-traveler hooks install security --event PreToolUse
 blues-traveler hooks install format --event PostToolUse --matcher "Edit,Write"
 blues-traveler hooks install debug --event PreToolUse --log
 blues-traveler hooks install find-blocker --event PreToolUse  # Use fd instead
+```
+
+### Performance Monitoring
+
+Monitor hook execution performance and timing:
+
+```bash
+# Monitor all tool usage performance
+blues-traveler hooks install performance --event PreToolUse
+blues-traveler hooks install performance --event PostToolUse
+
+# With logging enabled for detailed metrics
+blues-traveler hooks install performance --event PreToolUse --log --log-format jsonl
+
+# Check performance logs
+cat .claude/hooks/performance.log
 ```
 
 ### Custom Hooks Sync
