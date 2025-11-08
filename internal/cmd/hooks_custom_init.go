@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// generateGlobalSampleConfig creates the global configuration content
+// generateGlobalSampleConfig creates the global configuration content.
 func generateGlobalSampleConfig(group string) string {
 	return fmt.Sprintf(`# Global hooks configuration for group '%s'
 # This is your personal global configuration. Add real hooks here.
@@ -27,7 +27,7 @@ func generateGlobalSampleConfig(group string) string {
 `, group, group)
 }
 
-// generateProjectSampleConfig creates the project sample configuration content
+// generateProjectSampleConfig creates the project sample configuration content.
 func generateProjectSampleConfig(group string) string {
 	return fmt.Sprintf(`# Sample hooks configuration for group '%s'
 %s:
@@ -78,7 +78,7 @@ func generateProjectSampleConfig(group string) string {
 `, group, group)
 }
 
-// generateSampleConfig creates the sample configuration content
+// generateSampleConfig creates the sample configuration content.
 func generateSampleConfig(global bool, group string) string {
 	if global {
 		return generateGlobalSampleConfig(group)
@@ -86,7 +86,7 @@ func generateSampleConfig(global bool, group string) string {
 	return generateProjectSampleConfig(group)
 }
 
-// sanitizeFileName validates and sanitizes a filename to prevent path traversal
+// sanitizeFileName validates and sanitizes a filename to prevent path traversal.
 func sanitizeFileName(fileName string) (string, error) {
 	// Reject empty, ".", or ".." names
 	if fileName == "" || fileName == "." || fileName == ".." {
@@ -114,7 +114,7 @@ func sanitizeFileName(fileName string) (string, error) {
 	return base, nil
 }
 
-// writePerGroupConfig writes a per-group config file to .claude/hooks/<name>.yml
+// writePerGroupConfig writes a per-group config file to .claude/hooks/<name>.yml.
 func writePerGroupConfig(global bool, fileName string, sample string, overwrite bool) (string, error) {
 	dir, err := config.EnsureClaudeDir(global)
 	if err != nil {
@@ -145,7 +145,7 @@ func writePerGroupConfig(global bool, fileName string, sample string, overwrite 
 	return target, nil
 }
 
-// writeGlobalDefaultConfig creates a minimal global configuration
+// writeGlobalDefaultConfig creates a minimal global configuration.
 func writeGlobalDefaultConfig(overwrite bool) (string, error) {
 	configPath, err := config.GetLogConfigPath(true)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// installFlags holds the parsed command flags
+// installFlags holds the parsed command flags.
 type installFlags struct {
 	global     bool
 	event      string
@@ -23,7 +23,7 @@ type installFlags struct {
 	logFormat  string
 }
 
-// parseInstallFlags extracts and validates flags from the command
+// parseInstallFlags extracts and validates flags from the command.
 func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
 	flags := installFlags{
 		global:     cmd.Bool("global"),
@@ -45,7 +45,7 @@ func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
 	return flags, nil
 }
 
-// buildInstallHookCommand constructs the hook command string for install
+// buildInstallHookCommand constructs the hook command string for install.
 func buildInstallHookCommand(hookType string, flags installFlags) (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
@@ -69,7 +69,7 @@ func buildInstallHookCommand(hookType string, flags installFlags) (string, error
 	return hookCommand, nil
 }
 
-// handleDuplicateHookResult processes duplicate detection results
+// handleDuplicateHookResult processes duplicate detection results.
 func handleDuplicateHookResult(result config.MergeResult) bool {
 	if !result.WasDuplicate {
 		return false
@@ -85,7 +85,7 @@ func handleDuplicateHookResult(result config.MergeResult) bool {
 	return true
 }
 
-// printHookInstallSuccess displays success message
+// printHookInstallSuccess displays success message.
 func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, settingsPath string) {
 	fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
 	fmt.Printf("   Event: %s\n", event)
@@ -95,7 +95,7 @@ func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, setti
 	fmt.Println()
 }
 
-// resolveAndValidateEvent resolves event alias and validates it
+// resolveAndValidateEvent resolves event alias and validates it.
 func resolveAndValidateEvent(event string, isValidEventType func(string) bool, validEventTypes func() []string) (string, error) {
 	resolvedEvent := core.ResolveEventAlias(event)
 	if resolvedEvent == "" {
@@ -109,7 +109,7 @@ func resolveAndValidateEvent(event string, isValidEventType func(string) bool, v
 	return resolvedEvent, nil
 }
 
-// loadAndValidateSettings loads settings from the specified path
+// loadAndValidateSettings loads settings from the specified path.
 func loadAndValidateSettings(settingsPath string) (*config.Settings, error) {
 	settings, err := config.LoadSettings(settingsPath)
 	if err != nil {
@@ -118,7 +118,7 @@ func loadAndValidateSettings(settingsPath string) (*config.Settings, error) {
 	return settings, nil
 }
 
-// saveSettingsIfNeeded saves settings only if not a duplicate
+// saveSettingsIfNeeded saves settings only if not a duplicate.
 func saveSettingsIfNeeded(settingsPath string, settings *config.Settings, isDuplicateNoChange bool) error {
 	if !isDuplicateNoChange {
 		if err := config.SaveSettings(settingsPath, settings); err != nil {
@@ -128,14 +128,14 @@ func saveSettingsIfNeeded(settingsPath string, settings *config.Settings, isDupl
 	return nil
 }
 
-// performPostInstallActions runs post-install actions for specific hook types
+// performPostInstallActions runs post-install actions for specific hook types.
 func performPostInstallActions(hookType string, global bool) {
 	if hookType == "fetch-blocker" {
 		createSampleBlockedUrlsFile(global)
 	}
 }
 
-// showInstallSuccessMessages shows success messages if not a duplicate
+// showInstallSuccessMessages shows success messages if not a duplicate.
 func showInstallSuccessMessages(hookType string, scope string, flags installFlags, hookCommand string, settingsPath string, isDuplicateNoChange bool) {
 	if !isDuplicateNoChange {
 		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
@@ -144,7 +144,7 @@ func showInstallSuccessMessages(hookType string, scope string, flags installFlag
 	}
 }
 
-// installHookAction performs the hook installation
+// installHookAction performs the hook installation.
 func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
 	// Resolve and validate event
 	resolvedEvent, err := resolveAndValidateEvent(flags.event, isValidEventType, validEventTypes)
@@ -204,7 +204,7 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	return nil
 }
 
-// executeInstallCommand executes the hooks install command
+// executeInstallCommand executes the hooks install command.
 func executeInstallCommand(hookType string, flags installFlags, getPlugin func(string) (interface {
 	Run() error
 	Description() string
@@ -218,7 +218,7 @@ func executeInstallCommand(hookType string, flags installFlags, getPlugin func(s
 	return installHookAction(hookType, flags, isValidEventType, validEventTypes)
 }
 
-// newHooksInstallCommand creates the install command
+// newHooksInstallCommand creates the install command.
 func newHooksInstallCommand(getPlugin func(string) (interface {
 	Run() error
 	Description() string
@@ -285,7 +285,7 @@ This will automatically configure the hook to run for the specified events.`,
 	}
 }
 
-// executeUninstallSpecificHook uninstalls a specific hook type
+// executeUninstallSpecificHook uninstalls a specific hook type.
 func executeUninstallSpecificHook(hookType string, global bool) error {
 	// Get settings path
 	settingsPath, err := config.GetSettingsPath(global)
@@ -326,7 +326,7 @@ func executeUninstallSpecificHook(hookType string, global bool) error {
 	return nil
 }
 
-// executeUninstallCommand executes the hooks uninstall command
+// executeUninstallCommand executes the hooks uninstall command.
 func executeUninstallCommand(hookType string, global, skipConfirmation bool) error {
 	// Handle 'all' case
 	if hookType == "all" {
@@ -336,7 +336,7 @@ func executeUninstallCommand(hookType string, global, skipConfirmation bool) err
 	return executeUninstallSpecificHook(hookType, global)
 }
 
-// newHooksUninstallCommand creates the uninstall command
+// newHooksUninstallCommand creates the uninstall command.
 func newHooksUninstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:        "uninstall",
@@ -373,7 +373,7 @@ func newHooksUninstallCommand() *cli.Command {
 	}
 }
 
-// getBlockedUrlsSampleContent returns the sample content for blocked-urls.txt
+// getBlockedUrlsSampleContent returns the sample content for blocked-urls.txt.
 func getBlockedUrlsSampleContent() string {
 	return `# Blocked URL prefixes for fetch-blocker hook
 # Format: prefix|suggestion (suggestion is optional)
@@ -401,7 +401,7 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 `
 }
 
-// determineBlockedUrlsDir determines the target directory for blocked-urls.txt
+// determineBlockedUrlsDir determines the target directory for blocked-urls.txt.
 func determineBlockedUrlsDir(global bool) (string, string, error) {
 	if global {
 		homeDir, err := os.UserHomeDir()
@@ -418,12 +418,12 @@ func determineBlockedUrlsDir(global bool) (string, string, error) {
 	return filepath.Join(cwd, ".claude"), constants.ScopeProject, nil
 }
 
-// ensureBlockedUrlsDir ensures the directory exists
+// ensureBlockedUrlsDir ensures the directory exists.
 func ensureBlockedUrlsDir(targetDir string) error {
 	return os.MkdirAll(targetDir, 0o750)
 }
 
-// createSampleBlockedUrlsFile creates a sample blocked-urls.txt file for the fetch-blocker hook
+// createSampleBlockedUrlsFile creates a sample blocked-urls.txt file for the fetch-blocker hook.
 func createSampleBlockedUrlsFile(global bool) {
 	// Determine the target directory
 	targetDir, scope, err := determineBlockedUrlsDir(global)
@@ -457,7 +457,7 @@ func createSampleBlockedUrlsFile(global bool) {
 	fmt.Printf("   Edit this file to add your own blocked URL prefixes.\n")
 }
 
-// promptUninstallAllConfirmation prompts user for confirmation to uninstall all hooks
+// promptUninstallAllConfirmation prompts user for confirmation to uninstall all hooks.
 func promptUninstallAllConfirmation(scope string) bool {
 	fmt.Printf("Continue? (y/N): ")
 	var response string

@@ -102,7 +102,7 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 	}
 }
 
-// printEmptyProjectsMessage prints message when no projects are found
+// printEmptyProjectsMessage prints message when no projects are found.
 func printEmptyProjectsMessage(pathsOnly bool) {
 	if !pathsOnly {
 		fmt.Println("No projects found in XDG configuration registry.")
@@ -110,24 +110,24 @@ func printEmptyProjectsMessage(pathsOnly bool) {
 	}
 }
 
-// printPathsOnly outputs just the project paths
+// printPathsOnly outputs just the project paths.
 func printPathsOnly(projects []string) {
 	for _, project := range projects {
 		fmt.Println(project)
 	}
 }
 
-// printProjectSummary outputs the project summary header
+// printProjectSummary outputs the project summary header.
 func printProjectSummary(projects []string) {
 	fmt.Printf("Found %d project(s) in XDG configuration registry:\n\n", len(projects))
 }
 
-// printProjectBasic outputs basic project information
+// printProjectBasic outputs basic project information.
 func printProjectBasic(project string) {
 	fmt.Printf("Project: %s\n", project)
 }
 
-// printProjectVerbose outputs detailed project information
+// printProjectVerbose outputs detailed project information.
 func printProjectVerbose(xdg *config.XDGConfig, project string) {
 	projectConfig, err := xdg.GetProjectConfig(project)
 	if err != nil {
@@ -148,17 +148,17 @@ func printProjectVerbose(xdg *config.XDGConfig, project string) {
 	}
 }
 
-// printVerboseHint prints hint about using verbose flag
+// printVerboseHint prints hint about using verbose flag.
 func printVerboseHint() {
 	fmt.Printf("Use --verbose flag for detailed information.\n")
 }
 
-// executeListPathsOnly displays only project paths
+// executeListPathsOnly displays only project paths.
 func executeListPathsOnly(projects []string) {
 	printPathsOnly(projects)
 }
 
-// executeListVerbose displays projects with optional verbose output
+// executeListVerbose displays projects with optional verbose output.
 func executeListVerbose(xdg *config.XDGConfig, projects []string, verbose bool) {
 	printProjectSummary(projects)
 
@@ -177,7 +177,7 @@ func executeListVerbose(xdg *config.XDGConfig, projects []string, verbose bool) 
 	}
 }
 
-// executeListCommand executes the config list command
+// executeListCommand executes the config list command.
 func executeListCommand(verbose, pathsOnly bool) error {
 	xdg := config.NewXDGConfig()
 	projects, err := xdg.ListProjects()
@@ -438,7 +438,7 @@ func performCleanup(xdg *config.XDGConfig) error {
 	return nil
 }
 
-// executeCleanDryRun executes a dry-run cleanup check
+// executeCleanDryRun executes a dry-run cleanup check.
 func executeCleanDryRun(xdg *config.XDGConfig) error {
 	fmt.Println("Dry run: checking for orphaned configurations...")
 	orphaned, err := findOrphanedProjects(xdg)
@@ -449,7 +449,7 @@ func executeCleanDryRun(xdg *config.XDGConfig) error {
 	return nil
 }
 
-// executeCleanCommand executes the config clean command
+// executeCleanCommand executes the config clean command.
 func executeCleanCommand(dryRun bool) error {
 	xdg := config.NewXDGConfig()
 
@@ -481,7 +481,7 @@ func NewConfigCleanCmd() *cli.Command {
 	}
 }
 
-// displayLegacyConfigStatus displays legacy configuration status
+// displayLegacyConfigStatus displays legacy configuration status.
 func displayLegacyConfigStatus(status *config.MigrationStatus) {
 	fmt.Printf("Legacy Configuration (.claude/hooks/):\n")
 	if status.HasLegacyConfig {
@@ -491,7 +491,7 @@ func displayLegacyConfigStatus(status *config.MigrationStatus) {
 	}
 }
 
-// displayXDGConfigStatus displays XDG configuration status
+// displayXDGConfigStatus displays XDG configuration status.
 func displayXDGConfigStatus(status *config.MigrationStatus) {
 	fmt.Printf("\nXDG Configuration (~/.config/blues-traveler/):\n")
 	if status.HasXDGConfig {
@@ -501,7 +501,7 @@ func displayXDGConfigStatus(status *config.MigrationStatus) {
 	}
 }
 
-// displayMigrationStatus displays migration status
+// displayMigrationStatus displays migration status.
 func displayMigrationStatus(status *config.MigrationStatus) {
 	fmt.Printf("\nMigration Status:\n")
 	switch {
@@ -515,7 +515,7 @@ func displayMigrationStatus(status *config.MigrationStatus) {
 	}
 }
 
-// displayStatusRecommendations displays recommendations based on status
+// displayStatusRecommendations displays recommendations based on status.
 func displayStatusRecommendations(status *config.MigrationStatus) {
 	fmt.Printf("\nRecommendations:\n")
 	switch {
@@ -686,7 +686,7 @@ func NewConfigLogCmd() *cli.Command {
 
 // Helper functions for migrate command
 
-// printMigrateSearchInfo displays information about the migration search scope
+// printMigrateSearchInfo displays information about the migration search scope.
 func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
 	if !verbose {
 		return
@@ -699,7 +699,7 @@ func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
 	}
 }
 
-// printNoConfigsFound displays message when no legacy configs are found
+// printNoConfigsFound displays message when no legacy configs are found.
 func printNoConfigsFound(all bool) {
 	if all {
 		fmt.Printf("No legacy configurations found to migrate.\n")
@@ -709,7 +709,7 @@ func printNoConfigsFound(all bool) {
 	}
 }
 
-// printFoundConfigs displays discovered configuration files
+// printFoundConfigs displays discovered configuration files.
 func printFoundConfigs(configs map[string]string, verbose bool) {
 	fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
 
@@ -722,7 +722,7 @@ func printFoundConfigs(configs map[string]string, verbose bool) {
 	}
 }
 
-// printMigrationSummary displays summary after migration
+// printMigrationSummary displays summary after migration.
 func printMigrationSummary(result *config.MigrationResult, dryRun bool, configDir string) {
 	if !dryRun && result.TotalMigrated > 0 {
 		fmt.Printf("\nMigration completed successfully!\n")
