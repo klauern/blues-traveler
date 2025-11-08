@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -188,20 +189,25 @@ func TestAskWithMessagesSingleParam(t *testing.T) {
 	msg := "This operation requires confirmation"
 	resp := AskWithMessages(msg)
 
-	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	askResp, ok := resp.(*AskPreToolResponse)
 	if !ok {
-		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+		t.Fatal("AskWithMessages should return *AskPreToolResponse")
 	}
 
-	if dualResp.GetUserMessage() != msg {
-		t.Errorf("Expected userMessage %q, got %q", msg, dualResp.GetUserMessage())
+	if askResp.GetUserMessage() != msg {
+		t.Errorf("Expected userMessage %q, got %q", msg, askResp.GetUserMessage())
 	}
 
-	if dualResp.GetAgentMessage() != msg {
-		t.Errorf("Expected agentMessage %q, got %q", msg, dualResp.GetAgentMessage())
+	if askResp.GetAgentMessage() != msg {
+		t.Errorf("Expected agentMessage %q, got %q", msg, askResp.GetAgentMessage())
 	}
 
-	if dualResp.PreToolUseResponse == nil {
+	fallback, ok := askResp.ClaudeFallback().(*DualMessagePreToolResponse)
+	if !ok {
+		t.Fatal("Claude fallback should be *DualMessagePreToolResponse")
+	}
+
+	if fallback.PreToolUseResponse == nil {
 		t.Error("Embedded PreToolUseResponse should not be nil")
 	}
 }
@@ -213,27 +219,66 @@ func TestAskWithMessagesDualParams(t *testing.T) {
 
 	resp := AskWithMessages(userMsg, agentMsg)
 
-	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	askResp, ok := resp.(*AskPreToolResponse)
 	if !ok {
-		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+		t.Fatal("AskWithMessages should return *AskPreToolResponse")
 	}
 
-	if dualResp.GetUserMessage() != userMsg {
-		t.Errorf("Expected userMessage %q, got %q", userMsg, dualResp.GetUserMessage())
+	if askResp.GetUserMessage() != userMsg {
+		t.Errorf("Expected userMessage %q, got %q", userMsg, askResp.GetUserMessage())
 	}
 
-	if dualResp.GetAgentMessage() != agentMsg {
-		t.Errorf("Expected agentMessage %q, got %q", agentMsg, dualResp.GetAgentMessage())
+	if askResp.GetAgentMessage() != agentMsg {
+		t.Errorf("Expected agentMessage %q, got %q", agentMsg, askResp.GetAgentMessage())
+	}
+}
+
+// TestAskWithMessagesJSONSerialization ensures the ask response encodes Cursor-compatible JSON.
+func TestAskWithMessagesJSONSerialization(t *testing.T) {
+	userMsg := "Requires confirmation"
+	agentMsg := "Details for agent"
+
+	resp := AskWithMessages(userMsg, agentMsg)
+
+	askResp, ok := resp.(*AskPreToolResponse)
+	if !ok {
+		t.Fatal("AskWithMessages should return *AskPreToolResponse")
+	}
+
+	data, err := json.Marshal(askResp)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+
+	var payload map[string]string
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+
+	if payload["permission"] != "ask" {
+		t.Errorf("Expected permission 'ask', got %q", payload["permission"])
+	}
+
+	if payload["userMessage"] != userMsg {
+		t.Errorf("Expected userMessage %q, got %q", userMsg, payload["userMessage"])
+	}
+
+	if payload["agentMessage"] != agentMsg {
+		t.Errorf("Expected agentMessage %q, got %q", agentMsg, payload["agentMessage"])
 	}
 }
 
 // TestPreToolUseInterfaceCompliance verifies that DualMessagePreToolResponse
 // implements cchooks.PreToolUseResponseInterface.
-func TestPreToolUseInterfaceCompliance(_ *testing.T) {
+func TestPreToolUseInterfaceCompliance(t *testing.T) {
 	// This should compile - if it doesn't, we're not implementing the interface correctly
 	_ = BlockWithMessages("test")
 	_ = ApproveWithMessages("test")
 	_ = AskWithMessages("test")
+
+	if _, ok := AskWithMessages("test").(CursorPermissionResponse); !ok {
+		t.Fatal("AskWithMessages should implement CursorPermissionResponse")
+	}
 }
 
 // TestPostToolUseInterfaceCompliance verifies that DualMessagePostToolResponse

@@ -9,7 +9,7 @@ Blues-traveler supports the [Cursor hooks specification](https://cursor.com/docs
 - **Event name aliases**: Use Cursor event names that auto-translate to Claude Code events
 - **JSON response format**: Standard response structure for both systems ✅ **Implemented**
 - **Dual-message support**: Separate messages for users vs AI agents ✅ **Implemented**
-- **Permission model**: allow/deny/ask permissions ⚠️ **Partial** (ask mode falls back to allow with messages)
+- **Permission model**: allow/deny/ask permissions ✅ **Full** (ask degrades to allow with messages when running under Claude)
 
 ## Event Name Mapping
 
@@ -54,8 +54,8 @@ Hooks can output JSON to control execution and provide messages. Both systems su
   - `"allow"` - Continue execution (default if omitted) ✅
   - `"deny"` - Block execution ✅
   - `"ask"` - Prompt user for manual approval
-    - ✅ **Works in Cursor IDE** - Native support for user prompting
-    - ⚠️ **Falls back in Claude Code** - Approves with contextual messages (Claude Code doesn't support ask mode)
+    - ✅ **Works in Cursor IDE** when Blues-traveler detects the Cursor platform (auto-detected env vars or `BT_HOOK_PLATFORM=cursor`)
+    - ✅ **Graceful fallback in Claude Code** - Approves with contextual messages when ask isn't supported
     - Logged for audit visibility
 
 - **`userMessage`** (string, optional): User-friendly message displayed in the UI
@@ -233,6 +233,9 @@ Both systems provide hook scripts with contextual environment variables:
 | `FILES_CHANGED` | Both | List of files modified |
 | `USER_PROMPT` | Both (UserPromptSubmit only) | User's prompt text |
 | `CWD` | Both | Current working directory |
+| `BT_HOOK_PLATFORM` | Both | Override platform detection (`cursor` or `claude`) |
+
+> ℹ️ Blues-traveler automatically detects Cursor by checking common `CURSOR_*` environment variables. Set `BT_HOOK_PLATFORM=cursor` to force Cursor semantics (including permission prompts) when testing locally.
 
 ## Migration Guide
 

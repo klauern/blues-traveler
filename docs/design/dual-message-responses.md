@@ -118,7 +118,8 @@ func BlockWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseRes
 func ApproveWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseResponseInterface
 
 // AskWithMessages creates a permission request for PreToolUse events.
-// User must manually approve; agent receives full context.
+// Returns *core.AskPreToolResponse so Cursor serializes `permission: "ask"`
+// while Claude gracefully falls back to approve semantics.
 func AskWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseResponseInterface
 
 

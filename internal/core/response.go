@@ -1,6 +1,8 @@
 package core
 
 import (
+	"encoding/json"
+
 	"github.com/brads3290/cchooks"
 )
 
@@ -20,6 +22,45 @@ type DualMessagePostToolResponse struct {
 	*cchooks.PostToolUseResponse
 	userMessage  string
 	agentMessage string
+}
+
+// CursorPermissionResponse represents responses that can map to Cursor's permission schema.
+type CursorPermissionResponse interface {
+	cchooks.PreToolUseResponseInterface
+	CursorPermission() string
+	ClaudeFallback() cchooks.PreToolUseResponseInterface
+}
+
+// AskPreToolResponse is a specialized response for permission prompts.
+//
+// Cursor expects "permission: ask" semantics, while Claude Code continues to
+// interpret the fallback approve response.
+type AskPreToolResponse struct {
+	*DualMessagePreToolResponse
+}
+
+// CursorPermission returns the Cursor permission token.
+func (r *AskPreToolResponse) CursorPermission() string {
+	return "ask"
+}
+
+// ClaudeFallback returns the Claude-compatible response when Cursor permissions aren't supported.
+func (r *AskPreToolResponse) ClaudeFallback() cchooks.PreToolUseResponseInterface {
+	return r.DualMessagePreToolResponse
+}
+
+// MarshalJSON emits Cursor-compatible JSON for ask responses.
+func (r *AskPreToolResponse) MarshalJSON() ([]byte, error) {
+	payload := struct {
+		Permission   string `json:"permission"`
+		UserMessage  string `json:"userMessage,omitempty"`
+		AgentMessage string `json:"agentMessage,omitempty"`
+	}{
+		Permission:   r.CursorPermission(),
+		UserMessage:  r.GetUserMessage(),
+		AgentMessage: r.GetAgentMessage(),
+	}
+	return json.Marshal(payload)
 }
 
 // BlockWithMessages creates a blocking response for PreToolUse events with
@@ -109,13 +150,13 @@ func AskWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseRespo
 		agent = agentMsg[0]
 	}
 
-	// Falls back to Approve() for Claude Code compatibility
-	// Cursor IDE handles "ask" natively when processing the JSON response
-	return &DualMessagePreToolResponse{
+	dual := &DualMessagePreToolResponse{
 		PreToolUseResponse: cchooks.Approve(),
 		userMessage:        userMsg,
 		agentMessage:       agent,
 	}
+
+	return &AskPreToolResponse{DualMessagePreToolResponse: dual}
 }
 
 // PostBlockWithMessages creates a blocking response for PostToolUse events with

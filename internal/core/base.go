@@ -147,6 +147,7 @@ type HookContext struct {
 	LoggingEnabled  bool
 	LoggingDir      string
 	LoggingFormat   string
+	Platform        Platform
 }
 
 // DefaultHookContext returns a context with real implementations
@@ -159,6 +160,7 @@ func DefaultHookContext() *HookContext {
 		LoggingEnabled:  false,
 		LoggingDir:      ".claude/hooks",
 		LoggingFormat:   config.LoggingFormatJSONL,
+		Platform:        DetectPlatform(),
 	}
 }
 
