@@ -1,4 +1,4 @@
-# version: "2"  # Temporarily commented - golangci-lint v1.x doesn't support v2 config format
+version: "2"
 
 run:
   timeout: 5m

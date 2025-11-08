@@ -311,44 +311,46 @@ func (h *ConfigHook) executeIfShouldRunWithResult(env map[string]string) (*hookE
 	return result, nil
 }
 
+// resolveMessages fills in default messages if user/agent messages are empty
+func (h *ConfigHook) resolveMessages(userMsg, agentMsg, defaultMsg string) (string, string) {
+	if userMsg == "" {
+		userMsg = defaultMsg
+	}
+	if agentMsg == "" {
+		agentMsg = userMsg
+	}
+	return userMsg, agentMsg
+}
+
 // handleCursorResponse processes a Cursor JSON response using the provided event handler
 func (h *ConfigHook) handleCursorResponse(resp *CursorHookResponse, handler EventHandler) any {
 	// Handle "continue: false" - blocks execution
 	if resp.Continue != nil && !*resp.Continue {
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' blocked execution", h.job.Name),
+		)
 		return handler.createBlockResponse(userMsg, agentMsg)
 	}
 
 	// Handle permission field
 	switch strings.ToLower(resp.Permission) {
 	case "deny":
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' denied permission", h.job.Name),
+		)
 		return handler.createBlockResponse(userMsg, agentMsg)
 
 	case "ask":
 		// Ask mode - prompt user for manual approval
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name),
+		)
 		return handler.createAskResponse(userMsg, agentMsg)
 
 	case "allow", "":
