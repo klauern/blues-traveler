@@ -3,18 +3,37 @@ version: "2"
 run:
   timeout: 5m
   tests: true
-  skip-dirs:
-    - vendor
 
 # Workaround for Go 1.25 compatibility issue with golangci-lint 2.6.1
 # The printf linter in goanalysis crashes with Go 1.25.
-# Using fallback to go vet in task for now.
+# Using fallback to go vet in Taskfile lint task.
 linters:
-  disable-all: true
   enable:
     # Only enable the safest linters that don't crash with Go 1.25
     - misspell       # Spelling errors (fast linter)
     - asciicheck     # Non-ASCII identifiers (fast linter)
+  disable:
+    # Disable all goanalysis linters to avoid printf analyzer bug
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - gocyclo
+    - gocognit
+    - nestif
+    - cyclop
+    - funlen
+    - dupl
+    - goconst
+    - asasalint
+    - bidichk
+    - nilerr
+    - nilnil
+    - nolintlint
+    - prealloc
+    - predeclared
 
 issues:
   max-issues-per-linter: 0
