@@ -261,12 +261,6 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 	return cchooks.Allow()
 }
 
-// executeIfShouldRun checks if the hook should run and executes it (legacy interface)
-func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
-	_, err := h.executeIfShouldRunWithResult(env)
-	return err
-}
-
 // executeIfShouldRunWithResult checks if the hook should run and executes it, returning the result
 func (h *ConfigHook) executeIfShouldRunWithResult(env map[string]string) (*hookExecutionResult, error) {
 	ok, err := h.shouldRun(env)
