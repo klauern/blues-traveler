@@ -228,9 +228,9 @@ Both systems provide hook scripts with contextual environment variables:
 | Variable | Available In | Description |
 |----------|-------------|-------------|
 | `HOOK_EVENT_NAME` | Both | Event that triggered the hook |
-| `TOOL_NAME` | Both | Name of tool being used (Bash, Edit, Write, etc.) |
+| `TOOL_NAME` | Both | Bash |
 | `TOOL_INPUT` | Both | Input/arguments to the tool |
-| `FILES_CHANGED` | Both | List of files modified |
+| `FILES_CHANGED` | Both | Space-separated list of files modified |
 | `USER_PROMPT` | Both (UserPromptSubmit only) | User's prompt text |
 | `CWD` | Both | Current working directory |
 | `BT_HOOK_PLATFORM` | Both | Override platform detection (`cursor` or `claude`) |

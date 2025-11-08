@@ -67,7 +67,7 @@ Welcome to the Blues Traveler documentation. This index will help you find the i
 
 ## Project Structure
 
-```
+```text
 blues-traveler/
 ├── README.md                 # Main user documentation (urfave/cli v3 based)
 ├── AGENTS.md                 # AI assistant guidance (formerly CLAUDE.md)

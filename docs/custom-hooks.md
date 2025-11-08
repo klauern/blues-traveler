@@ -39,7 +39,11 @@ Examples with new variables/operators:
   ```
 
 Notes:
-- Environment variables exposed: `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`, plus custom `env` from job. For Edit/Write in PostToolUse, `FILES_CHANGED`, `TOOL_FILE`, and `TOOL_OUTPUT_FILE` are populated with the target file.
+- Environment variables exposed: `EVENT_NAME`, `TOOL_NAME`, `PROJECT_ROOT`, plus custom
+  `env` from job. For Edit/Write in PostToolUse, `FILES_CHANGED`, `TOOL_FILE`, and
+  `TOOL_OUTPUT_FILE` are populated with the target file. `FILES_CHANGED` is
+  space-separated (matching the `strings.Join(..., " ")` behavior in the environment
+  builder).
 - Expression evaluator is minimal: supports `${VAR}` substitution, `==`, `!=`, `matches`, `&&`, `||`, unary `!`, and glob patterns on the right side of `matches`.
   - Added `regex`: `${FILES_CHANGED} regex ".*\\.rb$"` (matches any token when multiple files are present).
 
