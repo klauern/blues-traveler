@@ -288,6 +288,141 @@ func (h *ConfigHook) executeIfShouldRunWithResult(env map[string]string) (*hookE
 }
 
 // handleCursorResponsePre processes a Cursor JSON response for PreToolUse events
+func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.PreToolUseResponseInterface {
+	// Handle "continue: false" - blocks execution
+	if resp.Continue != nil && !*resp.Continue {
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.BlockWithMessages(userMsg, agentMsg)
+	}
+
+	// Handle permission field
+	switch strings.ToLower(resp.Permission) {
+	case "deny":
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.BlockWithMessages(userMsg, agentMsg)
+
+	case "ask":
+		// Log "ask" event for visibility (works natively in Cursor, falls back in Claude Code)
+		h.LogHookEvent("hook_ask_permission", h.job.Name, map[string]interface{}{
+			"userMessage":  resp.UserMessage,
+			"agentMessage": resp.AgentMessage,
+			"note":         "Ask mode: works in Cursor IDE, falls back to approve in Claude Code",
+		}, nil)
+
+		// Use AskWithMessages which prompts for user approval in Cursor
+		// Falls back to approve with messages in Claude Code (see AskWithMessages implementation)
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		askResp := core.AskWithMessages(userMsg, agentMsg)
+		if cursorResp, ok := askResp.(core.CursorPermissionResponse); ok {
+			platform := core.PlatformUnknown
+			if ctx := h.Context(); ctx != nil {
+				platform = ctx.Platform.OrDefault()
+			}
+			if platform.SupportsCursorAsk() {
+				return cursorResp
+			}
+			return cursorResp.ClaudeFallback()
+		}
+		return askResp
+
+	case "allow", "":
+		// Allow execution (empty permission means allow with partial JSON)
+		if resp.UserMessage != "" || resp.AgentMessage != "" {
+			return core.ApproveWithMessages(resp.UserMessage, resp.AgentMessage)
+		}
+		return cchooks.Approve()
+
+	default:
+		// Unknown permission value - block with error
+		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
+		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
+		return core.BlockWithMessages(userMsg, agentMsg)
+	}
+}
+
+// handleCursorResponsePost processes a Cursor JSON response for PostToolUse events
+func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.PostToolUseResponseInterface {
+	// Handle "continue: false" - blocks execution
+	if resp.Continue != nil && !*resp.Continue {
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+	}
+
+	// Handle permission field
+	switch strings.ToLower(resp.Permission) {
+	case "deny":
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+
+	case "ask":
+		// Log "ask" event for visibility (works natively in Cursor, falls back in Claude Code)
+		h.LogHookEvent("hook_ask_permission_post", h.job.Name, map[string]interface{}{
+			"userMessage":  resp.UserMessage,
+			"agentMessage": resp.AgentMessage,
+			"note":         "Ask mode: works in Cursor IDE, falls back to allow in Claude Code",
+		}, nil)
+
+		// Use AllowWithMessages for PostToolUse (no Ask equivalent in PostToolUse context)
+		// The "ask" permission is more relevant for PreToolUse; here we just allow with messages
+		userMsg := resp.UserMessage
+		if userMsg == "" {
+			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
+		}
+		agentMsg := resp.AgentMessage
+		if agentMsg == "" {
+			agentMsg = userMsg
+		}
+		return core.AllowWithMessages(userMsg, agentMsg)
+
+	case "allow", "":
+		// Allow execution (empty permission means allow with partial JSON)
+		if resp.UserMessage != "" || resp.AgentMessage != "" {
+			return core.AllowWithMessages(resp.UserMessage, resp.AgentMessage)
+		}
+		return cchooks.Allow()
+
+	default:
+		// Unknown permission value - block with error
+		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
+		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
+		return core.PostBlockWithMessages(userMsg, agentMsg)
+	}
+}
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON
 // and executing the configured job when the event name matches this hook's event.
 func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResponse {

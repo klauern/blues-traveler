@@ -1,6 +1,11 @@
 package hooks
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/klauern/blues-traveler/internal/config"
+	"github.com/klauern/blues-traveler/internal/core"
+)
 
 func TestParseCursorResponse(t *testing.T) {
 	t.Parallel()
@@ -115,6 +120,76 @@ func assertCursorResponse(t *testing.T, resp *CursorHookResponse, expect cursorR
 		t.Fatalf("Continue mismatch: got %v, want %v", resp.Continue, expect.continueVal)
 	case *resp.Continue != *expect.continueVal:
 		t.Fatalf("Continue = %v, want %v", *resp.Continue, *expect.continueVal)
+	}
+}
+
+func newTestConfigHookWithPlatform(t *testing.T, platform core.Platform) *ConfigHook {
+	t.Helper()
+
+	ctx := &core.HookContext{
+		FileSystem:      core.NewMockFileSystem(),
+		CommandExecutor: core.NewMockCommandExecutor(),
+		RunnerFactory:   core.MockRunnerFactory,
+		SettingsChecker: func(string) bool { return true },
+		Platform:        platform,
+	}
+
+	job := config.HookJob{Name: "ask-job"}
+	hook := NewConfigHook("group", job.Name, job, string(core.PreToolUseEvent), ctx)
+	cfgHook, ok := hook.(*ConfigHook)
+	if !ok {
+		t.Fatal("NewConfigHook should return *ConfigHook")
+	}
+	return cfgHook
+}
+
+func TestHandleCursorResponsePreAskCursorPlatform(t *testing.T) {
+	hook := newTestConfigHookWithPlatform(t, core.PlatformCursor)
+
+	result := hook.handleCursorResponsePre(&CursorHookResponse{
+		Permission:   "ask",
+		UserMessage:  "Confirm action?",
+		AgentMessage: "Agent details",
+	})
+
+	askResp, ok := result.(*core.AskPreToolResponse)
+	if !ok {
+		t.Fatalf("Expected *core.AskPreToolResponse, got %T", result)
+	}
+
+	if askResp.CursorPermission() != "ask" {
+		t.Errorf("Expected Cursor permission 'ask', got %q", askResp.CursorPermission())
+	}
+
+	if askResp.GetUserMessage() != "Confirm action?" {
+		t.Errorf("Unexpected user message: %q", askResp.GetUserMessage())
+	}
+
+	if askResp.GetAgentMessage() != "Agent details" {
+		t.Errorf("Unexpected agent message: %q", askResp.GetAgentMessage())
+	}
+}
+
+func TestHandleCursorResponsePreAskClaudeFallback(t *testing.T) {
+	hook := newTestConfigHookWithPlatform(t, core.PlatformClaude)
+
+	result := hook.handleCursorResponsePre(&CursorHookResponse{
+		Permission:   "ask",
+		UserMessage:  "Confirm action?",
+		AgentMessage: "Agent details",
+	})
+
+	dualResp, ok := result.(*core.DualMessagePreToolResponse)
+	if !ok {
+		t.Fatalf("Expected fallback *core.DualMessagePreToolResponse, got %T", result)
+	}
+
+	if dualResp.GetUserMessage() != "Confirm action?" {
+		t.Errorf("Unexpected user message: %q", dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != "Agent details" {
+		t.Errorf("Unexpected agent message: %q", dualResp.GetAgentMessage())
 	}
 }
 
