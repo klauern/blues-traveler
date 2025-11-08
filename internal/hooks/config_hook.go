@@ -183,55 +183,81 @@ func (h *ConfigHook) runCommandWithEnv(env map[string]string) (*hookExecutionRes
 	return result, nil
 }
 
-func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	c := core.BuildPreToolUseContext(ctx, ev)
-	env := h.envProvider.GetEnvironment(string(core.PreToolUseEvent), c)
+// EventHandler defines the interface for handling different event types
+type EventHandler interface {
+	buildContext(context.Context, any) map[string]any
+	getEventName() string
+	createBlockResponse(userMsg, agentMsg string) any
+	createAskResponse(userMsg, agentMsg string) any
+	createAllowResponse() any
+	createAllowWithMessagesResponse(userMsg, agentMsg string) any
+}
 
-	result, err := h.executeIfShouldRunWithResult(env)
-	if err != nil {
-		// User-friendly message + technical details for agent
-		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
-		agentMsg := err.Error()
-		return core.BlockWithMessages(userMsg, agentMsg)
-	}
+// PreToolUseHandler implements EventHandler for PreToolUse events
+type PreToolUseHandler struct{}
 
-	// Try to parse Cursor JSON response
-	if result != nil && result.stdout != "" {
-		cursorResp, parseErr := parseCursorResponse(result.stdout)
+func (h PreToolUseHandler) buildContext(ctx context.Context, ev any) map[string]any {
+	return core.BuildPreToolUseContext(ctx, ev.(*cchooks.PreToolUseEvent))
+}
 
-		// Rule 3: Invalid JSON = block with "hook broken" message
-		if parseErr != nil {
-			userMsg := fmt.Sprintf("Hook '%s' returned invalid JSON", h.job.Name)
-			agentMsg := fmt.Sprintf("Hook output parsing failed: %v. Output: %s", parseErr, result.stdout)
-			return core.BlockWithMessages(userMsg, agentMsg)
-		}
+func (h PreToolUseHandler) getEventName() string {
+	return string(core.PreToolUseEvent)
+}
 
-		// Rule 2: Partial JSON = proceed with available fields
-		if cursorResp != nil {
-			return h.handleCursorResponsePre(cursorResp)
-		}
-	}
+func (h PreToolUseHandler) createBlockResponse(userMsg, agentMsg string) any {
+	return core.BlockWithMessages(userMsg, agentMsg)
+}
 
-	// Rule 1: Non-zero exit + no JSON = block with alert + error message
-	if result != nil && result.exitCode != 0 {
-		userMsg := fmt.Sprintf("Hook '%s' failed with exit code %d", h.job.Name, result.exitCode)
-		agentMsg := fmt.Sprintf("Exit code: %d, stderr: %s", result.exitCode, result.stderr)
-		return core.BlockWithMessages(userMsg, agentMsg)
-	}
+func (h PreToolUseHandler) createAskResponse(userMsg, agentMsg string) any {
+	return core.AskWithMessages(userMsg, agentMsg)
+}
 
+func (h PreToolUseHandler) createAllowResponse() any {
 	return cchooks.Approve()
 }
 
-func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
-	c := core.BuildPostToolUseContext(ctx, ev)
-	env := h.envProvider.GetEnvironment(string(core.PostToolUseEvent), c)
+func (h PreToolUseHandler) createAllowWithMessagesResponse(userMsg, agentMsg string) any {
+	return core.ApproveWithMessages(userMsg, agentMsg)
+}
+
+// PostToolUseHandler implements EventHandler for PostToolUse events
+type PostToolUseHandler struct{}
+
+func (h PostToolUseHandler) buildContext(ctx context.Context, ev any) map[string]any {
+	return core.BuildPostToolUseContext(ctx, ev.(*cchooks.PostToolUseEvent))
+}
+
+func (h PostToolUseHandler) getEventName() string {
+	return string(core.PostToolUseEvent)
+}
+
+func (h PostToolUseHandler) createBlockResponse(userMsg, agentMsg string) any {
+	return core.PostBlockWithMessages(userMsg, agentMsg)
+}
+
+func (h PostToolUseHandler) createAskResponse(userMsg, agentMsg string) any {
+	return core.AskPostWithMessages(userMsg, agentMsg)
+}
+
+func (h PostToolUseHandler) createAllowResponse() any {
+	return cchooks.Allow()
+}
+
+func (h PostToolUseHandler) createAllowWithMessagesResponse(userMsg, agentMsg string) any {
+	return core.AllowWithMessages(userMsg, agentMsg)
+}
+
+// executeAndHandleResponse is the common logic for both pre and post handlers
+func (h *ConfigHook) executeAndHandleResponse(ctx context.Context, ev any, handler EventHandler) any {
+	c := handler.buildContext(ctx, ev)
+	env := h.envProvider.GetEnvironment(handler.getEventName(), c)
 
 	result, err := h.executeIfShouldRunWithResult(env)
 	if err != nil {
 		// User-friendly message + technical details for agent
 		userMsg := fmt.Sprintf("Hook '%s' execution failed", h.job.Name)
 		agentMsg := err.Error()
-		return core.PostBlockWithMessages(userMsg, agentMsg)
+		return handler.createBlockResponse(userMsg, agentMsg)
 	}
 
 	// Try to parse Cursor JSON response
@@ -242,12 +268,12 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 		if parseErr != nil {
 			userMsg := fmt.Sprintf("Hook '%s' returned invalid JSON", h.job.Name)
 			agentMsg := fmt.Sprintf("Hook output parsing failed: %v. Output: %s", parseErr, result.stdout)
-			return core.PostBlockWithMessages(userMsg, agentMsg)
+			return handler.createBlockResponse(userMsg, agentMsg)
 		}
 
 		// Rule 2: Partial JSON = proceed with available fields
 		if cursorResp != nil {
-			return h.handleCursorResponsePost(cursorResp)
+			return h.handleCursorResponse(cursorResp, handler)
 		}
 	}
 
@@ -255,16 +281,18 @@ func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEve
 	if result != nil && result.exitCode != 0 {
 		userMsg := fmt.Sprintf("Hook '%s' failed with exit code %d", h.job.Name, result.exitCode)
 		agentMsg := fmt.Sprintf("Exit code: %d, stderr: %s", result.exitCode, result.stderr)
-		return core.PostBlockWithMessages(userMsg, agentMsg)
+		return handler.createBlockResponse(userMsg, agentMsg)
 	}
 
-	return cchooks.Allow()
+	return handler.createAllowResponse()
 }
 
-// executeIfShouldRun checks if the hook should run and executes it (legacy interface)
-func (h *ConfigHook) executeIfShouldRun(env map[string]string) error {
-	_, err := h.executeIfShouldRunWithResult(env)
-	return err
+func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	return h.executeAndHandleResponse(ctx, ev, PreToolUseHandler{}).(cchooks.PreToolUseResponseInterface)
+}
+
+func (h *ConfigHook) postHandler(ctx context.Context, ev *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+	return h.executeAndHandleResponse(ctx, ev, PostToolUseHandler{}).(cchooks.PostToolUseResponseInterface)
 }
 
 // executeIfShouldRunWithResult checks if the hook should run and executes it, returning the result
@@ -283,115 +311,60 @@ func (h *ConfigHook) executeIfShouldRunWithResult(env map[string]string) (*hookE
 	return result, nil
 }
 
-// handleCursorResponsePre processes a Cursor JSON response for PreToolUse events
-func (h *ConfigHook) handleCursorResponsePre(resp *CursorHookResponse) cchooks.PreToolUseResponseInterface {
-	// Handle "continue: false" - blocks execution
-	if resp.Continue != nil && !*resp.Continue {
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.BlockWithMessages(userMsg, agentMsg)
+// resolveMessages fills in default messages if user/agent messages are empty
+func (h *ConfigHook) resolveMessages(userMsg, agentMsg, defaultMsg string) (string, string) {
+	if userMsg == "" {
+		userMsg = defaultMsg
 	}
-
-	// Handle permission field
-	switch strings.ToLower(resp.Permission) {
-	case "deny":
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.BlockWithMessages(userMsg, agentMsg)
-
-	case "ask":
-		// TODO: Implement "ask" mode when cchooks library supports it
-		// For now, treat as approve with messages
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.ApproveWithMessages(userMsg, agentMsg)
-
-	case "allow", "":
-		// Allow execution (empty permission means allow with partial JSON)
-		if resp.UserMessage != "" || resp.AgentMessage != "" {
-			return core.ApproveWithMessages(resp.UserMessage, resp.AgentMessage)
-		}
-		return cchooks.Approve()
-
-	default:
-		// Unknown permission value - block with error
-		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
-		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
-		return core.BlockWithMessages(userMsg, agentMsg)
+	if agentMsg == "" {
+		agentMsg = userMsg
 	}
+	return userMsg, agentMsg
 }
 
-// handleCursorResponsePost processes a Cursor JSON response for PostToolUse events
-func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.PostToolUseResponseInterface {
+// handleCursorResponse processes a Cursor JSON response using the provided event handler
+func (h *ConfigHook) handleCursorResponse(resp *CursorHookResponse, handler EventHandler) any {
 	// Handle "continue: false" - blocks execution
 	if resp.Continue != nil && !*resp.Continue {
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' blocked execution", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.PostBlockWithMessages(userMsg, agentMsg)
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' blocked execution", h.job.Name),
+		)
+		return handler.createBlockResponse(userMsg, agentMsg)
 	}
 
 	// Handle permission field
 	switch strings.ToLower(resp.Permission) {
 	case "deny":
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' denied permission", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.PostBlockWithMessages(userMsg, agentMsg)
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' denied permission", h.job.Name),
+		)
+		return handler.createBlockResponse(userMsg, agentMsg)
 
 	case "ask":
-		// TODO: Implement "ask" mode when cchooks library supports it
-		// For now, treat as allow with messages
-		userMsg := resp.UserMessage
-		if userMsg == "" {
-			userMsg = fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name)
-		}
-		agentMsg := resp.AgentMessage
-		if agentMsg == "" {
-			agentMsg = userMsg
-		}
-		return core.AllowWithMessages(userMsg, agentMsg)
+		// Ask mode - prompt user for manual approval
+		userMsg, agentMsg := h.resolveMessages(
+			resp.UserMessage,
+			resp.AgentMessage,
+			fmt.Sprintf("Hook '%s' requests confirmation", h.job.Name),
+		)
+		return handler.createAskResponse(userMsg, agentMsg)
 
 	case "allow", "":
 		// Allow execution (empty permission means allow with partial JSON)
 		if resp.UserMessage != "" || resp.AgentMessage != "" {
-			return core.AllowWithMessages(resp.UserMessage, resp.AgentMessage)
+			return handler.createAllowWithMessagesResponse(resp.UserMessage, resp.AgentMessage)
 		}
-		return cchooks.Allow()
+		return handler.createAllowResponse()
 
 	default:
 		// Unknown permission value - block with error
 		userMsg := fmt.Sprintf("Hook '%s' returned unknown permission: %s", h.job.Name, resp.Permission)
 		agentMsg := fmt.Sprintf("Unknown permission '%s' in response", resp.Permission)
-		return core.PostBlockWithMessages(userMsg, agentMsg)
+		return handler.createBlockResponse(userMsg, agentMsg)
 	}
 }
 

@@ -4,6 +4,13 @@ import (
 	"github.com/brads3290/cchooks"
 )
 
+// Decision constants for hook responses
+// These extend the cchooks constants to support the "ask" permission mode
+const (
+	PreToolUseAsk  = "ask"
+	PostToolUseAsk = "ask"
+)
+
 // DualMessagePreToolResponse wraps PreToolUse responses with dual messages.
 // It embeds the actual cchooks.PreToolUseResponse to satisfy the interface,
 // and adds separate messages for end-users and AI agents.
@@ -134,6 +141,78 @@ func AllowWithMessages(userMsg string, agentMsg ...string) cchooks.PostToolUseRe
 
 	return &DualMessagePostToolResponse{
 		PostToolUseResponse: cchooks.Allow(),
+		userMessage:         userMsg,
+		agentMessage:        agent,
+	}
+}
+
+// Ask creates a PreToolUseResponse that requests user confirmation before proceeding.
+// This is part of the 3-way permission model (allow/deny/ask) for Cursor compatibility.
+func Ask(reason string) *cchooks.PreToolUseResponse {
+	return &cchooks.PreToolUseResponse{Decision: PreToolUseAsk, Reason: reason}
+}
+
+// AskPost creates a PostToolUseResponse that requests user confirmation.
+// This is part of the 3-way permission model (allow/deny/ask) for Cursor compatibility.
+func AskPost(reason string) *cchooks.PostToolUseResponse {
+	return &cchooks.PostToolUseResponse{Decision: PostToolUseAsk, Reason: reason}
+}
+
+// AskWithMessages creates an ask response for PreToolUse events with
+// separate messages for users and agents. This prompts the user for manual
+// approval before proceeding with the tool use.
+//
+// If agentMsg is omitted, userMsg is sent to both audiences.
+// If agentMsg is provided, userMsg goes to the user and agentMsg goes to the agent.
+//
+// Usage:
+//
+//	// Ask with single message
+//	return core.AskWithMessages("Do you want to proceed?")
+//
+//	// Ask with different messages for user and agent
+//	return core.AskWithMessages(
+//	    "Hook 'security-check' requests confirmation",
+//	    "Potentially sensitive operation detected: modifying .env file",
+//	)
+func AskWithMessages(userMsg string, agentMsg ...string) cchooks.PreToolUseResponseInterface {
+	agent := userMsg
+	if len(agentMsg) > 0 {
+		agent = agentMsg[0]
+	}
+
+	return &DualMessagePreToolResponse{
+		PreToolUseResponse: Ask(userMsg),
+		userMessage:        userMsg,
+		agentMessage:       agent,
+	}
+}
+
+// AskPostWithMessages creates an ask response for PostToolUse events with
+// separate messages for users and agents. This prompts the user for manual
+// approval after a tool has completed.
+//
+// If agentMsg is omitted, userMsg is sent to both audiences.
+// If agentMsg is provided, userMsg goes to the user and agentMsg goes to the agent.
+//
+// Usage:
+//
+//	// Ask with single message
+//	return core.AskPostWithMessages("Confirm the result?")
+//
+//	// Ask with different messages for user and agent
+//	return core.AskPostWithMessages(
+//	    "Hook 'audit' requests review",
+//	    "Detected 5 changes to sensitive files - please review",
+//	)
+func AskPostWithMessages(userMsg string, agentMsg ...string) cchooks.PostToolUseResponseInterface {
+	agent := userMsg
+	if len(agentMsg) > 0 {
+		agent = agentMsg[0]
+	}
+
+	return &DualMessagePostToolResponse{
+		PostToolUseResponse: AskPost(userMsg),
 		userMessage:         userMsg,
 		agentMessage:        agent,
 	}

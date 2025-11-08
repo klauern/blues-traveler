@@ -173,10 +173,10 @@ func (h *SecurityHook) checkMacOSPatterns(cmdLower string) (bool, string) {
 	return false, ""
 }
 
-// detectDangerousRm blocks destructive rm invocations aimed at root / system paths
-func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
+// parseRmCommand parses rm command tokens into flags and targets
+func (h *SecurityHook) parseRmCommand(tokens []string) ([]string, []string) {
 	if len(tokens) < 2 || tokens[0] != "rm" {
-		return false, ""
+		return nil, nil
 	}
 
 	flags := []string{}
@@ -188,27 +188,49 @@ func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
 			targets = append(targets, t)
 		}
 	}
+	return flags, targets
+}
 
+// hasRecursiveFlag checks if the flags contain recursive options
+func (h *SecurityHook) hasRecursiveFlag(flags []string) bool {
 	flagStr := strings.Join(flags, " ")
-	if !strings.Contains(flagStr, "r") && !strings.Contains(flagStr, "R") {
+	return strings.Contains(flagStr, "r") || strings.Contains(flagStr, "R")
+}
+
+// isDangerousRmTarget checks if a target is dangerous for rm operations
+func (h *SecurityHook) isDangerousRmTarget(target string) (bool, string) {
+	lt := strings.ToLower(target)
+	if lt == "/" {
+		return true, "blocked rm: targets filesystem root"
+	}
+	// Wildcards at root level
+	if strings.HasPrefix(lt, "/*") {
+		return true, "blocked rm: wildcard at root " + target
+	}
+
+	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
+	for _, p := range dangerousPrefixes {
+		if strings.HasPrefix(lt, p) {
+			return true, "blocked rm: targets critical path " + target
+		}
+	}
+	return false, ""
+}
+
+// detectDangerousRm blocks destructive rm invocations aimed at root / system paths
+func (h *SecurityHook) detectDangerousRm(tokens []string) (bool, string) {
+	flags, targets := h.parseRmCommand(tokens)
+	if flags == nil || targets == nil {
 		return false, ""
 	}
 
-	// Dangerous root/system targets (lowercase since we compare against lowercased targets)
-	dangerousPrefixes := []string{"/system", "/library", "/applications", "/users", "/private", "/usr", "/bin", "/sbin", "/etc", "/var", "/volumes"}
+	if !h.hasRecursiveFlag(flags) {
+		return false, ""
+	}
+
 	for _, tgt := range targets {
-		lt := strings.ToLower(tgt)
-		if lt == "/" {
-			return true, "blocked rm: targets filesystem root"
-		}
-		// Wildcards at root level (check before exact match for /*)
-		if strings.HasPrefix(lt, "/*") {
-			return true, "blocked rm: wildcard at root " + tgt
-		}
-		for _, p := range dangerousPrefixes {
-			if strings.HasPrefix(lt, p) {
-				return true, "blocked rm: targets critical path " + tgt
-			}
+		if dangerous, msg := h.isDangerousRmTarget(tgt); dangerous {
+			return true, msg
 		}
 	}
 	return false, ""
@@ -238,33 +260,40 @@ func (h *SecurityHook) detectVolumeWipe(tokens []string) (bool, string) {
 	return false, ""
 }
 
+// isOwnershipOrPermCommand checks if the command is chmod or chown
+func (h *SecurityHook) isOwnershipOrPermCommand(cmd string) bool {
+	return cmd == "chmod" || cmd == "chown"
+}
+
+// hasRecursiveFlag checks if tokens contain recursive flags
+func (h *SecurityHook) hasRecursiveFlagInTokens(tokens []string) bool {
+	for _, t := range tokens {
+		if strings.HasPrefix(t, "-") && strings.Contains(t, "R") {
+			return true
+		}
+	}
+	return false
+}
+
+// isDangerousRecursivePath checks if a path is dangerous for recursive operations
+func (h *SecurityHook) isDangerousRecursivePath(path string) bool {
+	lt := strings.ToLower(path)
+	return lt == "/" || strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/library")
+}
+
 // detectRecursiveOwnershipOrPerm blocks broad recursive chmod/chown at root/system
 func (h *SecurityHook) detectRecursiveOwnershipOrPerm(tokens []string) (bool, string) {
-	if len(tokens) < 2 {
-		return false, ""
-	}
-	if tokens[0] != "chmod" && tokens[0] != "chown" {
+	if len(tokens) < 2 || !h.isOwnershipOrPermCommand(tokens[0]) {
 		return false, ""
 	}
 
-	hasRecursive := false
-	for _, t := range tokens[1:] {
-		if strings.HasPrefix(t, "-") && strings.Contains(t, "R") {
-			hasRecursive = true
-			break
-		}
-	}
-	if !hasRecursive {
+	if !h.hasRecursiveFlagInTokens(tokens[1:]) {
 		return false, ""
 	}
 
 	// Check paths in tokens
 	for _, t := range tokens[1:] {
-		if strings.HasPrefix(t, "-") {
-			continue
-		}
-		lt := strings.ToLower(t)
-		if lt == "/" || strings.HasPrefix(lt, "/system") || strings.HasPrefix(lt, "/library") {
+		if !strings.HasPrefix(t, "-") && h.isDangerousRecursivePath(t) {
 			return true, "blocked recursive " + tokens[0] + " on critical path " + t
 		}
 	}
