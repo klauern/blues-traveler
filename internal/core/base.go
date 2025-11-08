@@ -105,6 +105,7 @@ type CommandExecutor interface {
 type RealCommandExecutor struct{}
 
 // ExecuteCommand executes a system command with the specified arguments and returns the combined output
+// #nosec G204 - Command name is controlled by hooks, not user input; args are hook-defined
 func (ce *RealCommandExecutor) ExecuteCommand(name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	return cmd.CombinedOutput()
