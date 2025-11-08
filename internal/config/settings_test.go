@@ -297,6 +297,7 @@ func TestRemoveHookTypeFromSettings(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,funlen // Comprehensive table-driven test with extensive test cases
 func TestSettingsPrecedence(t *testing.T) {
 	// Save original working directory
 	originalWd, err := os.Getwd()
