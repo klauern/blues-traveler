@@ -95,21 +95,62 @@ func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, setti
 	fmt.Println()
 }
 
+// resolveAndValidateEvent resolves event alias and validates it
+func resolveAndValidateEvent(event string, isValidEventType func(string) bool, validEventTypes func() []string) (string, error) {
+	resolvedEvent := core.ResolveEventAlias(event)
+	if resolvedEvent == "" {
+		resolvedEvent = event // Already canonical (or unknown)
+	}
+
+	if !isValidEventType(resolvedEvent) {
+		return "", fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", event, strings.Join(validEventTypes(), ", "))
+	}
+
+	return resolvedEvent, nil
+}
+
+// loadAndValidateSettings loads settings from the specified path
+func loadAndValidateSettings(settingsPath string, global bool) (*config.Settings, error) {
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
+	}
+	return settings, nil
+}
+
+// saveSettingsIfNeeded saves settings only if not a duplicate
+func saveSettingsIfNeeded(settingsPath string, settings *config.Settings, isDuplicateNoChange bool) error {
+	if !isDuplicateNoChange {
+		if err := config.SaveSettings(settingsPath, settings); err != nil {
+			return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
+		}
+	}
+	return nil
+}
+
+// performPostInstallActions runs post-install actions for specific hook types
+func performPostInstallActions(hookType string, global bool) {
+	if hookType == "fetch-blocker" {
+		createSampleBlockedUrlsFile(global)
+	}
+}
+
+// showInstallSuccessMessages shows success messages if not a duplicate
+func showInstallSuccessMessages(hookType string, scope string, flags installFlags, hookCommand string, settingsPath string, isDuplicateNoChange bool) {
+	if !isDuplicateNoChange {
+		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
+		fmt.Println("The hook will be active in new Claude Code sessions.")
+		fmt.Println("Use 'claude /hooks' to verify the configuration.")
+	}
+}
+
 // installHookAction performs the hook installation
 func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
-	// Resolve Cursor alias to canonical event name first (accept both canonical and Cursor aliases)
-	// This allows users to use Cursor event names like "beforeShellExecution"
-	// which will be resolved to "PreToolUse"
-	resolvedEvent := core.ResolveEventAlias(flags.event)
-	if resolvedEvent == "" {
-		resolvedEvent = flags.event // Already canonical (or unknown)
+	// Resolve and validate event
+	resolvedEvent, err := resolveAndValidateEvent(flags.event, isValidEventType, validEventTypes)
+	if err != nil {
+		return err
 	}
-
-	// Validate the resolved/canonical event name
-	if !isValidEventType(resolvedEvent) {
-		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
-	}
-
 	flags.event = resolvedEvent
 
 	// Build hook command
@@ -129,9 +170,9 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	}
 
 	// Load existing settings
-	settings, err := config.LoadSettings(settingsPath)
+	settings, err := loadAndValidateSettings(settingsPath, flags.global)
 	if err != nil {
-		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
+		return err
 	}
 
 	// Add hook to settings
@@ -145,10 +186,8 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	isDuplicateNoChange := handleDuplicateHookResult(result)
 
 	// Save settings (only if not a duplicate with no changes)
-	if !isDuplicateNoChange {
-		if err := config.SaveSettings(settingsPath, settings); err != nil {
-			return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
-		}
+	if err := saveSettingsIfNeeded(settingsPath, settings, isDuplicateNoChange); err != nil {
+		return err
 	}
 
 	scope := ScopeProject
@@ -156,21 +195,11 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 		scope = ScopeGlobal
 	}
 
-	// Only show installation success message if not a duplicate
-	if !isDuplicateNoChange {
-		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
-	}
+	// Show success messages
+	showInstallSuccessMessages(hookType, scope, flags, hookCommand, settingsPath, isDuplicateNoChange)
 
 	// Post-install actions for specific plugins (run even for duplicates)
-	if hookType == "fetch-blocker" {
-		createSampleBlockedUrlsFile(flags.global)
-	}
-
-	// Only show the activation message if not a duplicate
-	if !isDuplicateNoChange {
-		fmt.Println("The hook will be active in new Claude Code sessions.")
-		fmt.Println("Use 'claude /hooks' to verify the configuration.")
-	}
+	performPostInstallActions(hookType, flags.global)
 
 	return nil
 }
