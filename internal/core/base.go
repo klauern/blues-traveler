@@ -148,6 +148,7 @@ type HookContext struct {
 	LoggingEnabled  bool
 	LoggingDir      string
 	LoggingFormat   string
+	// Platform identifies the runtime environment (e.g., Claude, Cursor)
 	Platform        Platform
 }
 
