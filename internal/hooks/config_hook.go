@@ -209,6 +209,15 @@ func (h *ConfigHook) preHandler(ctx context.Context, ev *cchooks.PreToolUseEvent
 		// Rule 2: Partial JSON = proceed with available fields
 		if cursorResp != nil {
 			if resp, _ := translateCursorResponse(h.job.Name, core.PreToolUseEvent, h, cursorResp); resp != nil {
+				if cursorPermission, ok := resp.(core.CursorPermissionResponse); ok {
+					platform := core.PlatformUnknown
+					if ctx := h.Context(); ctx != nil {
+						platform = ctx.Platform.OrDefault()
+					}
+					if !platform.SupportsCursorAsk() {
+						return cursorPermission.ClaudeFallback()
+					}
+				}
 				return resp
 			}
 		}
@@ -423,6 +432,7 @@ func (h *ConfigHook) handleCursorResponsePost(resp *CursorHookResponse) cchooks.
 		return core.PostBlockWithMessages(userMsg, agentMsg)
 	}
 }
+
 // rawHandler handles unsupported events (e.g., UserPromptSubmit) by parsing the raw JSON
 // and executing the configured job when the event name matches this hook's event.
 func (h *ConfigHook) rawHandler() func(context.Context, string) *cchooks.RawResponse {
