@@ -1,3 +1,6 @@
+// Package cursor provides Cursor IDE integration, including JSON protocol types,
+// event models, and hook configuration management for transforming between
+// Cursor's stdin/stdout format and Claude Code's event model.
 package cursor
 
 // Event names for Cursor hooks
