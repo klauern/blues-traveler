@@ -97,9 +97,58 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 	}
 }
 
+// printEmptyProjectsMessage prints message when no projects are found
+func printEmptyProjectsMessage(pathsOnly bool) {
+	if !pathsOnly {
+		fmt.Println("No projects found in XDG configuration registry.")
+		fmt.Printf("Run 'blues-traveler config migrate' to migrate existing configurations.\n")
+	}
+}
+
+// printPathsOnly outputs just the project paths
+func printPathsOnly(projects []string) {
+	for _, project := range projects {
+		fmt.Println(project)
+	}
+}
+
+// printProjectSummary outputs the project summary header
+func printProjectSummary(projects []string) {
+	fmt.Printf("Found %d project(s) in XDG configuration registry:\n\n", len(projects))
+}
+
+// printProjectBasic outputs basic project information
+func printProjectBasic(project string) {
+	fmt.Printf("Project: %s\n", project)
+}
+
+// printProjectVerbose outputs detailed project information
+func printProjectVerbose(xdg *config.XDGConfig, project string) {
+	projectConfig, err := xdg.GetProjectConfig(project)
+	if err != nil {
+		fmt.Printf("  Error: %v\n", err)
+		return
+	}
+
+	configPath := filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
+	fmt.Printf("  Config File: %s\n", configPath)
+	fmt.Printf("  Format: %s\n", projectConfig.ConfigFormat)
+	fmt.Printf("  Last Modified: %s\n", projectConfig.LastModified)
+
+	// Check if config file exists
+	if _, err := os.Stat(configPath); err != nil {
+		fmt.Printf("  Status: Missing (config file not found)\n")
+	} else {
+		fmt.Printf("  Status: OK\n")
+	}
+}
+
+// printVerboseHint prints hint about using verbose flag
+func printVerboseHint() {
+	fmt.Printf("Use --verbose flag for detailed information.\n")
+}
+
 // NewConfigListCmd creates the config list subcommand
-//
-//nolint:gocognit // CLI command with rich user interaction and detailed output formatting
 func NewConfigListCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "list",
@@ -129,50 +178,29 @@ func NewConfigListCmd() *cli.Command {
 			}
 
 			if len(projects) == 0 {
-				if !pathsOnly {
-					fmt.Println("No projects found in XDG configuration registry.")
-					fmt.Printf("Run 'blues-traveler config migrate' to migrate existing configurations.\n")
-				}
+				printEmptyProjectsMessage(pathsOnly)
 				return nil
 			}
 
 			if pathsOnly {
-				for _, project := range projects {
-					fmt.Println(project)
-				}
+				printPathsOnly(projects)
 				return nil
 			}
 
-			fmt.Printf("Found %d project(s) in XDG configuration registry:\n\n", len(projects))
+			printProjectSummary(projects)
 
 			for _, project := range projects {
-				fmt.Printf("Project: %s\n", project)
+				printProjectBasic(project)
 
 				if verbose {
-					projectConfig, err := xdg.GetProjectConfig(project)
-					if err != nil {
-						fmt.Printf("  Error: %v\n", err)
-						continue
-					}
-
-					configPath := filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
-					fmt.Printf("  Config File: %s\n", configPath)
-					fmt.Printf("  Format: %s\n", projectConfig.ConfigFormat)
-					fmt.Printf("  Last Modified: %s\n", projectConfig.LastModified)
-
-					// Check if config file exists
-					if _, err := os.Stat(configPath); err != nil {
-						fmt.Printf("  Status: Missing (config file not found)\n")
-					} else {
-						fmt.Printf("  Status: OK\n")
-					}
+					printProjectVerbose(xdg, project)
 				}
 
 				fmt.Println()
 			}
 
 			if !verbose {
-				fmt.Printf("Use --verbose flag for detailed information.\n")
+				printVerboseHint()
 			}
 
 			return nil
@@ -342,9 +370,56 @@ func launchEditor(editor, configPath string) error {
 	return cmd.Run()
 }
 
+// findOrphanedProjects finds projects that no longer exist on filesystem
+func findOrphanedProjects(xdg *config.XDGConfig) ([]string, error) {
+	projects, err := xdg.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	var orphaned []string
+	for _, project := range projects {
+		if _, err := os.Stat(project); os.IsNotExist(err) {
+			orphaned = append(orphaned, project)
+		}
+	}
+	return orphaned, nil
+}
+
+// printOrphanedProjects prints the list of orphaned projects
+func printOrphanedProjects(orphaned []string) {
+	fmt.Printf("Found %d orphaned configuration(s):\n", len(orphaned))
+	for _, project := range orphaned {
+		fmt.Printf("  - %s\n", project)
+	}
+
+	if len(orphaned) > 0 {
+		fmt.Printf("\nTo remove these configurations, run: blues-traveler config clean\n")
+	} else {
+		fmt.Printf("No orphaned configurations found.\n")
+	}
+}
+
+// performCleanup performs the actual cleanup of orphaned configurations
+func performCleanup(xdg *config.XDGConfig) error {
+	orphaned, err := xdg.CleanupOrphanedConfigs()
+	if err != nil {
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
+
+	fmt.Printf("Cleaned up %d orphaned configuration(s):\n", len(orphaned))
+	for _, project := range orphaned {
+		fmt.Printf("  - %s\n", project)
+	}
+
+	if len(orphaned) == 0 {
+		fmt.Printf("No orphaned configurations found.\n")
+	}
+
+	return nil
+}
+
 // NewConfigCleanCmd creates the config clean subcommand
-//
-//nolint:gocognit // CLI command with interactive cleanup and detailed progress reporting
 func NewConfigCleanCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "clean",
@@ -360,56 +435,18 @@ func NewConfigCleanCmd() *cli.Command {
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
 			dryRun := cmd.Bool("dry-run")
-
 			xdg := config.NewXDGConfig()
 
 			if dryRun {
 				fmt.Println("Dry run: checking for orphaned configurations...")
+				orphaned, err := findOrphanedProjects(xdg)
+				if err != nil {
+					return err
+				}
+				printOrphanedProjects(orphaned)
 			} else {
 				fmt.Println("Cleaning up orphaned configurations...")
-			}
-
-			// For dry run, we'll check manually without actually removing
-			if dryRun {
-				projects, err := xdg.ListProjects()
-				if err != nil {
-					return fmt.Errorf("failed to list projects: %w", err)
-				}
-
-				var orphaned []string
-				for _, project := range projects {
-					if _, err := os.Stat(project); os.IsNotExist(err) {
-						orphaned = append(orphaned, project)
-					}
-				}
-
-				fmt.Printf("Found %d orphaned configuration(s):\n", len(orphaned))
-				for _, project := range orphaned {
-					fmt.Printf("  - %s\n", project)
-				}
-
-				if len(orphaned) > 0 {
-					fmt.Printf("\nTo remove these configurations, run: blues-traveler config clean\n")
-				} else {
-					fmt.Printf("No orphaned configurations found.\n")
-				}
-
-				return nil
-			}
-
-			// Perform actual cleanup
-			orphaned, err := xdg.CleanupOrphanedConfigs()
-			if err != nil {
-				return fmt.Errorf("cleanup failed: %w", err)
-			}
-
-			fmt.Printf("Cleaned up %d orphaned configuration(s):\n", len(orphaned))
-			for _, project := range orphaned {
-				fmt.Printf("  - %s\n", project)
-			}
-
-			if len(orphaned) == 0 {
-				fmt.Printf("No orphaned configurations found.\n")
+				return performCleanup(xdg)
 			}
 
 			return nil

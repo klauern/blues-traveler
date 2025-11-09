@@ -143,56 +143,6 @@ func newTestConfigHookWithPlatform(t *testing.T, platform core.Platform) *Config
 	return cfgHook
 }
 
-func TestHandleCursorResponsePreAskCursorPlatform(t *testing.T) {
-	hook := newTestConfigHookWithPlatform(t, core.PlatformCursor)
-
-	result := hook.handleCursorResponsePre(&CursorHookResponse{
-		Permission:   "ask",
-		UserMessage:  "Confirm action?",
-		AgentMessage: "Agent details",
-	})
-
-	askResp, ok := result.(*core.AskPreToolResponse)
-	if !ok {
-		t.Fatalf("Expected *core.AskPreToolResponse, got %T", result)
-	}
-
-	if askResp.CursorPermission() != "ask" {
-		t.Errorf("Expected Cursor permission 'ask', got %q", askResp.CursorPermission())
-	}
-
-	if askResp.GetUserMessage() != "Confirm action?" {
-		t.Errorf("Unexpected user message: %q", askResp.GetUserMessage())
-	}
-
-	if askResp.GetAgentMessage() != "Agent details" {
-		t.Errorf("Unexpected agent message: %q", askResp.GetAgentMessage())
-	}
-}
-
-func TestHandleCursorResponsePreAskClaudeFallback(t *testing.T) {
-	hook := newTestConfigHookWithPlatform(t, core.PlatformClaude)
-
-	result := hook.handleCursorResponsePre(&CursorHookResponse{
-		Permission:   "ask",
-		UserMessage:  "Confirm action?",
-		AgentMessage: "Agent details",
-	})
-
-	dualResp, ok := result.(*core.DualMessagePreToolResponse)
-	if !ok {
-		t.Fatalf("Expected fallback *core.DualMessagePreToolResponse, got %T", result)
-	}
-
-	if dualResp.GetUserMessage() != "Confirm action?" {
-		t.Errorf("Unexpected user message: %q", dualResp.GetUserMessage())
-	}
-
-	if dualResp.GetAgentMessage() != "Agent details" {
-		t.Errorf("Unexpected agent message: %q", dualResp.GetAgentMessage())
-	}
-}
-
 // messageExpectation holds the expected user and agent messages for a response.
 type messageExpectation struct {
 	user  string

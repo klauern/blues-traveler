@@ -1,6 +1,6 @@
 module github.com/klauern/blues-traveler
 
-go 1.25.0
+go 1.25.4
 
 require (
 	github.com/brads3290/cchooks v0.7.0

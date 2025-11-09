@@ -1,8 +1,9 @@
 package core
 
 import (
-	"encoding/json"
 	"testing"
+
+	"github.com/brads3290/cchooks"
 )
 
 // TestBlockWithMessagesSingleParam tests BlockWithMessages with a single parameter.
@@ -184,90 +185,6 @@ func TestAllowWithMessagesDualParams(t *testing.T) {
 	}
 }
 
-// TestAskWithMessagesSingleParam tests AskWithMessages with a single parameter.
-func TestAskWithMessagesSingleParam(t *testing.T) {
-	msg := "This operation requires confirmation"
-	resp := AskWithMessages(msg)
-
-	askResp, ok := resp.(*AskPreToolResponse)
-	if !ok {
-		t.Fatal("AskWithMessages should return *AskPreToolResponse")
-	}
-
-	if askResp.GetUserMessage() != msg {
-		t.Errorf("Expected userMessage %q, got %q", msg, askResp.GetUserMessage())
-	}
-
-	if askResp.GetAgentMessage() != msg {
-		t.Errorf("Expected agentMessage %q, got %q", msg, askResp.GetAgentMessage())
-	}
-
-	fallback, ok := askResp.ClaudeFallback().(*DualMessagePreToolResponse)
-	if !ok {
-		t.Fatal("Claude fallback should be *DualMessagePreToolResponse")
-	}
-
-	if fallback.PreToolUseResponse == nil {
-		t.Error("Embedded PreToolUseResponse should not be nil")
-	}
-}
-
-// TestAskWithMessagesDualParams tests AskWithMessages with separate messages.
-func TestAskWithMessagesDualParams(t *testing.T) {
-	userMsg := "This operation requires your confirmation"
-	agentMsg := "Attempting to execute: sudo rm -rf /tmp/cache"
-
-	resp := AskWithMessages(userMsg, agentMsg)
-
-	askResp, ok := resp.(*AskPreToolResponse)
-	if !ok {
-		t.Fatal("AskWithMessages should return *AskPreToolResponse")
-	}
-
-	if askResp.GetUserMessage() != userMsg {
-		t.Errorf("Expected userMessage %q, got %q", userMsg, askResp.GetUserMessage())
-	}
-
-	if askResp.GetAgentMessage() != agentMsg {
-		t.Errorf("Expected agentMessage %q, got %q", agentMsg, askResp.GetAgentMessage())
-	}
-}
-
-// TestAskWithMessagesJSONSerialization ensures the ask response encodes Cursor-compatible JSON.
-func TestAskWithMessagesJSONSerialization(t *testing.T) {
-	userMsg := "Requires confirmation"
-	agentMsg := "Details for agent"
-
-	resp := AskWithMessages(userMsg, agentMsg)
-
-	askResp, ok := resp.(*AskPreToolResponse)
-	if !ok {
-		t.Fatal("AskWithMessages should return *AskPreToolResponse")
-	}
-
-	data, err := json.Marshal(askResp)
-	if err != nil {
-		t.Fatalf("json.Marshal failed: %v", err)
-	}
-
-	var payload map[string]string
-	if err := json.Unmarshal(data, &payload); err != nil {
-		t.Fatalf("json.Unmarshal failed: %v", err)
-	}
-
-	if payload["permission"] != "ask" {
-		t.Errorf("Expected permission 'ask', got %q", payload["permission"])
-	}
-
-	if payload["userMessage"] != userMsg {
-		t.Errorf("Expected userMessage %q, got %q", userMsg, payload["userMessage"])
-	}
-
-	if payload["agentMessage"] != agentMsg {
-		t.Errorf("Expected agentMessage %q, got %q", agentMsg, payload["agentMessage"])
-	}
-}
-
 // TestPreToolUseInterfaceCompliance verifies that DualMessagePreToolResponse
 // implements cchooks.PreToolUseResponseInterface.
 func TestPreToolUseInterfaceCompliance(t *testing.T) {
@@ -275,10 +192,6 @@ func TestPreToolUseInterfaceCompliance(t *testing.T) {
 	_ = BlockWithMessages("test")
 	_ = ApproveWithMessages("test")
 	_ = AskWithMessages("test")
-
-	if _, ok := AskWithMessages("test").(CursorPermissionResponse); !ok {
-		t.Fatal("AskWithMessages should implement CursorPermissionResponse")
-	}
 }
 
 // TestPostToolUseInterfaceCompliance verifies that DualMessagePostToolResponse
@@ -445,4 +358,148 @@ func BenchmarkPostBlockWithMessages(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = PostBlockWithMessages("test message", "agent message")
 	}
+}
+
+// TestAsk tests the Ask helper function creates correct PreToolUseResponse
+func TestAsk(t *testing.T) {
+	reason := "Confirmation required"
+	resp := Ask(reason)
+
+	if resp.Decision != PreToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PreToolUseAsk, resp.Decision)
+	}
+
+	if resp.Reason != reason {
+		t.Errorf("Expected reason %q, got %q", reason, resp.Reason)
+	}
+}
+
+// TestAskPost tests the AskPost helper function creates correct PostToolUseResponse
+func TestAskPost(t *testing.T) {
+	reason := "Review required"
+	resp := AskPost(reason)
+
+	if resp.Decision != PostToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PostToolUseAsk, resp.Decision)
+	}
+
+	if resp.Reason != reason {
+		t.Errorf("Expected reason %q, got %q", reason, resp.Reason)
+	}
+}
+
+// TestAskWithMessagesSingleParam tests AskWithMessages with a single parameter.
+// The same message should be sent to both user and agent.
+func TestAskWithMessagesSingleParam(t *testing.T) {
+	msg := "Do you want to proceed?"
+	resp := AskWithMessages(msg)
+
+	// Type assertion to access dual message fields
+	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	if !ok {
+		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != msg {
+		t.Errorf("Expected userMessage %q, got %q", msg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != msg {
+		t.Errorf("Expected agentMessage %q, got %q", msg, dualResp.GetAgentMessage())
+	}
+
+	// Verify embedded response has correct decision
+	if dualResp.PreToolUseResponse == nil {
+		t.Fatal("Embedded PreToolUseResponse should not be nil")
+	}
+
+	if dualResp.PreToolUseResponse.Decision != PreToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PreToolUseAsk, dualResp.PreToolUseResponse.Decision)
+	}
+}
+
+// TestAskWithMessagesDualParams tests AskWithMessages with separate user and agent messages.
+func TestAskWithMessagesDualParams(t *testing.T) {
+	userMsg := "Hook 'security-check' requests confirmation"
+	agentMsg := "Potentially sensitive operation detected: modifying .env file"
+
+	resp := AskWithMessages(userMsg, agentMsg)
+
+	dualResp, ok := resp.(*DualMessagePreToolResponse)
+	if !ok {
+		t.Fatal("AskWithMessages should return *DualMessagePreToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != userMsg {
+		t.Errorf("Expected userMessage %q, got %q", userMsg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != agentMsg {
+		t.Errorf("Expected agentMessage %q, got %q", agentMsg, dualResp.GetAgentMessage())
+	}
+
+	if dualResp.PreToolUseResponse.Decision != PreToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PreToolUseAsk, dualResp.PreToolUseResponse.Decision)
+	}
+}
+
+// TestAskPostWithMessagesSingleParam tests AskPostWithMessages with a single parameter.
+func TestAskPostWithMessagesSingleParam(t *testing.T) {
+	msg := "Confirm the result?"
+	resp := AskPostWithMessages(msg)
+
+	// Type assertion to access dual message fields
+	dualResp, ok := resp.(*DualMessagePostToolResponse)
+	if !ok {
+		t.Fatal("AskPostWithMessages should return *DualMessagePostToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != msg {
+		t.Errorf("Expected userMessage %q, got %q", msg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != msg {
+		t.Errorf("Expected agentMessage %q, got %q", msg, dualResp.GetAgentMessage())
+	}
+
+	// Verify embedded response has correct decision
+	if dualResp.PostToolUseResponse == nil {
+		t.Fatal("Embedded PostToolUseResponse should not be nil")
+	}
+
+	if dualResp.PostToolUseResponse.Decision != PostToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PostToolUseAsk, dualResp.PostToolUseResponse.Decision)
+	}
+}
+
+// TestAskPostWithMessagesDualParams tests AskPostWithMessages with separate user and agent messages.
+func TestAskPostWithMessagesDualParams(t *testing.T) {
+	userMsg := "Hook 'audit' requests review"
+	agentMsg := "Detected 5 changes to sensitive files - please review"
+
+	resp := AskPostWithMessages(userMsg, agentMsg)
+
+	dualResp, ok := resp.(*DualMessagePostToolResponse)
+	if !ok {
+		t.Fatal("AskPostWithMessages should return *DualMessagePostToolResponse")
+	}
+
+	if dualResp.GetUserMessage() != userMsg {
+		t.Errorf("Expected userMessage %q, got %q", userMsg, dualResp.GetUserMessage())
+	}
+
+	if dualResp.GetAgentMessage() != agentMsg {
+		t.Errorf("Expected agentMessage %q, got %q", agentMsg, dualResp.GetAgentMessage())
+	}
+
+	if dualResp.PostToolUseResponse.Decision != PostToolUseAsk {
+		t.Errorf("Expected decision %q, got %q", PostToolUseAsk, dualResp.PostToolUseResponse.Decision)
+	}
+}
+
+// TestAskInterfaceCompliance verifies that Ask responses implement the correct interfaces.
+func TestAskInterfaceCompliance(_ *testing.T) {
+	// These should compile - if they don't, we're not implementing the interfaces correctly
+	var _ cchooks.PreToolUseResponseInterface = AskWithMessages("test")
+	var _ cchooks.PostToolUseResponseInterface = AskPostWithMessages("test")
 }

@@ -119,7 +119,7 @@ task lint
 
 - `github.com/brads3290/cchooks`: Claude Code hooks library for event handling
 - `github.com/urfave/cli/v3`: CLI framework
-- Go 1.25.0+ required
+- Go 1.25.4+ required
 
 ## Settings Configuration
 

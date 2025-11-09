@@ -71,13 +71,13 @@ func TestTranslateCursorResponsePre(t *testing.T) {
 			AgentMessage: "Explain details",
 		})
 
-		// Check if it's an AskPreToolResponse (which embeds DualMessagePreToolResponse)
-		ask, ok := resp.(*core.AskPreToolResponse)
+		// Check if it's a DualMessagePreToolResponse (new ask implementation)
+		dual, ok := resp.(*core.DualMessagePreToolResponse)
 		if !ok {
-			t.Fatalf("expected AskPreToolResponse, got %T", resp)
+			t.Fatalf("expected DualMessagePreToolResponse, got %T", resp)
 		}
 
-		if got := ask.GetUserMessage(); got != "Need approval" {
+		if got := dual.GetUserMessage(); got != "Need approval" {
 			t.Errorf("user message = %q, want %q", got, "Need approval")
 		}
 
