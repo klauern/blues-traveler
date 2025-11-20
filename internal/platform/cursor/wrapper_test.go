@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -77,6 +78,22 @@ func TestWrapperScriptPath(t *testing.T) {
 		t.Fatalf("WrapperScriptPath failed: %v", err)
 	}
 
+	// Get the actual home directory for comparison
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get user home directory: %v", err)
+	}
+
+	// Verify path starts with actual home directory, not literal "~"
+	if !strings.HasPrefix(path, home) {
+		t.Errorf("Path should start with home directory %q, got: %s", home, path)
+	}
+
+	// Verify path does NOT contain literal "~"
+	if strings.Contains(path, "/~/") || strings.HasSuffix(filepath.Dir(path), "~") {
+		t.Errorf("Path should not contain literal tilde, got: %s", path)
+	}
+
 	path = filepath.ToSlash(path)
 
 	if !strings.Contains(path, ".cursor/hooks") {
@@ -89,5 +106,11 @@ func TestWrapperScriptPath(t *testing.T) {
 
 	if !strings.Contains(path, BeforeShellExecution) {
 		t.Errorf("Path should contain event name, got: %s", path)
+	}
+
+	// Verify the complete expected path structure
+	expectedSuffix := filepath.Join(".cursor", "hooks", "blues-traveler-security-"+BeforeShellExecution+".sh")
+	if !strings.HasSuffix(path, filepath.ToSlash(expectedSuffix)) {
+		t.Errorf("Path should end with %q, got: %s", expectedSuffix, path)
 	}
 }
