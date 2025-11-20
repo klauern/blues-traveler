@@ -25,14 +25,7 @@ func NewVetHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the vet hook.
 func (h *VetHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Vet plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(nil, h.postToolUseHandler, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(nil, h.postToolUseHandler)
 }
 
 func (h *VetHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {

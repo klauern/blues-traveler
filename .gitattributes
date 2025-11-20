@@ -17,3 +17,6 @@
 # Makefiles
 Makefile text eol=lf
 makefile text eol=lf
+
+# Beads issues file uses custom merge driver
+.beads/issues.jsonl merge=bd

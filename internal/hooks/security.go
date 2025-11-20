@@ -24,14 +24,7 @@ func NewSecurityHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the security hook.
 func (h *SecurityHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Security plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, nil, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(h.preToolUseHandler, nil)
 }
 
 // securityCheck represents a single security check
@@ -102,9 +95,7 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 	bash, err := event.AsBash()
 	if err != nil {
 		// Log the parse error but approve the request to avoid breaking flows on benign parsing issues
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("security_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
-		}
+		h.LogError("security_error", event.ToolName, err)
 		return cchooks.Approve()
 	}
 
@@ -121,12 +112,10 @@ func (h *SecurityHook) preToolUseHandler(_ context.Context, event *cchooks.PreTo
 		)
 	}
 
-	// Log approved commands if logging is enabled
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("security_approved", constants.ToolBash, map[string]interface{}{
-			"command": bash.Command,
-		}, nil)
-	}
+	// Log approved commands
+	h.LogApproval("security_approved", constants.ToolBash, map[string]interface{}{
+		"command": bash.Command,
+	})
 
 	return cchooks.Approve()
 }

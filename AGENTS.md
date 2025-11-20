@@ -184,7 +184,7 @@ func (h *MyHook) Run() error {
 
 ## Issue Tracking with bd (beads)
 
-**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
+**IMPORTANT**: This project uses **bd** (the CLI for the Beads system) for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
 
 ### Why bd?
 
@@ -239,12 +239,12 @@ bd close bd-42 --reason "Completed" --json
 
 ### Workflow for AI Agents
 
-1. **Check ready work**: `bd ready` shows unblocked issues
-2. **Claim your task**: `bd update <id> --status in_progress`
+1. **Check ready work**: `bd ready --json` shows unblocked issues. Select the highest priority item (lowest number).
+2. **Claim your task**: `bd update <id> --status in_progress --json`
 3. **Work on it**: Implement, test, document
 4. **Discover new work?** Create linked issue:
-   - `bd create "Found bug" -p 1 --deps discovered-from:<parent-id>`
-5. **Complete**: `bd close <id> --reason "Done"`
+   - `bd create "Found bug" -p 1 --deps discovered-from:<parent-id> --json`
+5. **Complete**: `bd close <id> --reason "Done" --json`
 
 ### Auto-Sync
 
@@ -280,7 +280,8 @@ Then use `mcp__beads__*` functions instead of CLI commands.
 - ✅ Use bd for ALL task tracking
 - ✅ Always use `--json` flag for programmatic use
 - ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `bd ready` before asking "what should I work on?"
+- ✅ Check `bd ready --json` before asking "what should I work on?"
+- ❌ Do NOT try to run `beads` command (use `bd`)
 - ❌ Do NOT create markdown TODO lists
 - ❌ Do NOT use external issue trackers
 - ❌ Do NOT duplicate tracking systems

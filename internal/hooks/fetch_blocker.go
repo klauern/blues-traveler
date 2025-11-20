@@ -27,14 +27,7 @@ func NewFetchBlockerHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the fetch blocker hook.
 func (h *FetchBlockerHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Fetch blocker plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, nil, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(h.preToolUseHandler, nil)
 }
 
 func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
@@ -47,7 +40,7 @@ func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.P
 
 	webFetch, err := event.AsWebFetch()
 	if err != nil {
-		h.logError(event.ToolName, err)
+		h.LogError("fetch_blocker_error", event.ToolName, err)
 		return cchooks.Block("failed to parse WebFetch command")
 	}
 
@@ -82,13 +75,6 @@ func (h *FetchBlockerHook) logEventDetails(event *cchooks.PreToolUseEvent) {
 	h.LogHookEvent("pre_tool_use_fetch_check", event.ToolName, rawData, details)
 }
 
-// logError logs a parsing error
-func (h *FetchBlockerHook) logError(toolName string, err error) {
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("fetch_blocker_error", toolName, map[string]interface{}{"error": err.Error()}, nil)
-	}
-}
-
 // logLoadError logs an error loading blocked prefixes
 func (h *FetchBlockerHook) logLoadError(toolName string, err error) {
 	if h.Context().LoggingEnabled {
@@ -113,20 +99,16 @@ func (h *FetchBlockerHook) checkAndBlockURL(url string, blockedPrefixes []Blocke
 	blocked, matchedPrefix, suggestion := h.isURLBlocked(url, blockedPrefixes)
 	if !blocked {
 		// Log approval and return
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("fetch_blocker_approved", "WebFetch", map[string]interface{}{"url": url}, nil)
-		}
+		h.LogApproval("fetch_blocker_approved", "WebFetch", map[string]interface{}{"url": url})
 		return cchooks.Approve()
 	}
 
 	// Log block event
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("fetch_blocker_block", "WebFetch", map[string]interface{}{
-			"url":            url,
-			"matched_prefix": matchedPrefix,
-			"suggestion":     suggestion,
-		}, nil)
-	}
+	h.LogBlock("fetch_blocker_block", "WebFetch", map[string]interface{}{
+		"url":            url,
+		"matched_prefix": matchedPrefix,
+		"suggestion":     suggestion,
+	})
 
 	// Build block messages
 	userMsg := "This URL requires authentication or an alternative access method."

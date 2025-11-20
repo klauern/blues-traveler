@@ -28,7 +28,6 @@ func NewDebugHook(ctx *core.HookContext) core.Hook {
 // Run executes the debug hook.
 func (h *DebugHook) Run() error {
 	if !h.IsEnabled() {
-		fmt.Println("Debug plugin disabled - skipping")
 		return nil
 	}
 	h.ensureLogger()
@@ -43,7 +42,6 @@ func (h *DebugHook) Run() error {
 		}
 	}()
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	fmt.Println("Debug hook started - logging to .claude/hooks/debug.log")
 	runner.Run()
 	return nil
 }
