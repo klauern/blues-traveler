@@ -7,34 +7,34 @@ import (
 
 func TestDetectPlatform(t *testing.T) {
 	tests := []struct {
-		name            string
-		envVar          string
-		cursorEnvs      map[string]string
+		name             string
+		envVar           string
+		cursorEnvs       map[string]string
 		expectedPlatform Platform
 	}{
 		{
-			name:            "explicit override to cursor",
-			envVar:          "cursor",
+			name:             "explicit override to cursor",
+			envVar:           "cursor",
 			expectedPlatform: PlatformCursor,
 		},
 		{
-			name:            "explicit override to claude",
-			envVar:          "claude",
+			name:             "explicit override to claude",
+			envVar:           "claude",
 			expectedPlatform: PlatformClaude,
 		},
 		{
-			name:            "explicit override with uppercase",
-			envVar:          "CURSOR",
+			name:             "explicit override with uppercase",
+			envVar:           "CURSOR",
 			expectedPlatform: PlatformCursor,
 		},
 		{
-			name:            "explicit override with mixed case",
-			envVar:          "Claude",
+			name:             "explicit override with mixed case",
+			envVar:           "Claude",
 			expectedPlatform: PlatformClaude,
 		},
 		{
-			name:            "invalid override falls back to detection",
-			envVar:          "invalid",
+			name:             "invalid override falls back to detection",
+			envVar:           "invalid",
 			expectedPlatform: PlatformClaude, // should default
 		},
 		{
@@ -87,7 +87,7 @@ func TestDetectPlatform(t *testing.T) {
 			expectedPlatform: PlatformClaude,
 		},
 		{
-			name:            "no env vars defaults to claude",
+			name:             "no env vars defaults to claude",
 			expectedPlatform: PlatformClaude,
 		},
 		{

@@ -59,7 +59,7 @@ func TestDefaultDetector_DetectType(t *testing.T) {
 			setupFunc: func(t *testing.T) func() {
 				tmpDir := t.TempDir()
 				cursorDir := filepath.Join(tmpDir, ".cursor")
-				if err := os.Mkdir(cursorDir, 0755); err != nil {
+				if err := os.Mkdir(cursorDir, 0o755); err != nil {
 					t.Fatalf("Failed to create .cursor dir: %v", err)
 				}
 				oldCwd, _ := os.Getwd()
@@ -73,7 +73,7 @@ func TestDefaultDetector_DetectType(t *testing.T) {
 			setupFunc: func(t *testing.T) func() {
 				tmpDir := t.TempDir()
 				claudeDir := filepath.Join(tmpDir, ".claude")
-				if err := os.Mkdir(claudeDir, 0755); err != nil {
+				if err := os.Mkdir(claudeDir, 0o755); err != nil {
 					t.Fatalf("Failed to create .claude dir: %v", err)
 				}
 				oldCwd, _ := os.Getwd()
@@ -88,10 +88,10 @@ func TestDefaultDetector_DetectType(t *testing.T) {
 				tmpDir := t.TempDir()
 				cursorDir := filepath.Join(tmpDir, ".cursor")
 				claudeDir := filepath.Join(tmpDir, ".claude")
-				if err := os.Mkdir(cursorDir, 0755); err != nil {
+				if err := os.Mkdir(cursorDir, 0o755); err != nil {
 					t.Fatalf("Failed to create .cursor dir: %v", err)
 				}
-				if err := os.Mkdir(claudeDir, 0755); err != nil {
+				if err := os.Mkdir(claudeDir, 0o755); err != nil {
 					t.Fatalf("Failed to create .claude dir: %v", err)
 				}
 				oldCwd, _ := os.Getwd()
@@ -131,70 +131,70 @@ func TestDefaultDetector_DetectType(t *testing.T) {
 
 func TestTypeFromString(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
+		name         string
+		input        string
 		expectedType Type
-		expectError bool
+		expectError  bool
 	}{
 		{
-			name:        "cursor lowercase",
-			input:       "cursor",
+			name:         "cursor lowercase",
+			input:        "cursor",
 			expectedType: Cursor,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "cursor uppercase",
-			input:       "CURSOR",
+			name:         "cursor uppercase",
+			input:        "CURSOR",
 			expectedType: Cursor,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "cursor mixed case",
-			input:       "CuRsOr",
+			name:         "cursor mixed case",
+			input:        "CuRsOr",
 			expectedType: Cursor,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "claudecode",
-			input:       "claudecode",
+			name:         "claudecode",
+			input:        "claudecode",
 			expectedType: ClaudeCode,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "claude",
-			input:       "claude",
+			name:         "claude",
+			input:        "claude",
 			expectedType: ClaudeCode,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "claude-code",
-			input:       "claude-code",
+			name:         "claude-code",
+			input:        "claude-code",
 			expectedType: ClaudeCode,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "CLAUDECODE uppercase",
-			input:       "CLAUDECODE",
+			name:         "CLAUDECODE uppercase",
+			input:        "CLAUDECODE",
 			expectedType: ClaudeCode,
-			expectError: false,
+			expectError:  false,
 		},
 		{
-			name:        "invalid platform",
-			input:       "vscode",
+			name:         "invalid platform",
+			input:        "vscode",
 			expectedType: "",
-			expectError: true,
+			expectError:  true,
 		},
 		{
-			name:        "empty string",
-			input:       "",
+			name:         "empty string",
+			input:        "",
 			expectedType: "",
-			expectError: true,
+			expectError:  true,
 		},
 		{
-			name:        "random string",
-			input:       "foobar",
+			name:         "random string",
+			input:        "foobar",
 			expectedType: "",
-			expectError: true,
+			expectError:  true,
 		},
 	}
 
