@@ -571,116 +571,117 @@ func NewConfigStatusCmd() *cli.Command {
 }
 
 // NewConfigLogCmd creates the config log subcommand
-//
-//nolint:gocognit // CLI command with multiple validation steps and comprehensive help output
 func NewConfigLogCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "log",
 		Usage:       "Configure log rotation settings",
 		Description: `Configure log rotation settings including maximum age, file size, and backup count.`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "global",
-				Aliases: []string{"g"},
-				Value:   false,
-				Usage:   "Configure global settings",
-			},
-			&cli.IntFlag{
-				Name:    "max-age",
-				Aliases: []string{"a"},
-				Value:   0,
-				Usage:   "Maximum age in days to retain log files (default: 30)",
-			},
-			&cli.IntFlag{
-				Name:    "max-size",
-				Aliases: []string{"s"},
-				Value:   0,
-				Usage:   "Maximum size in MB per log file before rotation (default: 10)",
-			},
-			&cli.IntFlag{
-				Name:    "max-backups",
-				Aliases: []string{"b"},
-				Value:   0,
-				Usage:   "Maximum number of backup files to retain (default: 5)",
-			},
-			&cli.BoolFlag{
-				Name:    "compress",
-				Aliases: []string{"c"},
-				Value:   false,
-				Usage:   "Compress rotated log files",
-			},
-			&cli.BoolFlag{
-				Name:  "show",
-				Value: false,
-				Usage: "Show current log rotation settings",
-			},
+		Flags:       logCmdFlags(),
+		Action:      logCmdAction,
+	}
+}
+
+// logCmdFlags returns the flags for the log command.
+func logCmdFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "global",
+			Aliases: []string{"g"},
+			Value:   false,
+			Usage:   "Configure global settings",
 		},
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			global := cmd.Bool("global")
-			maxAge := cmd.Int("max-age")
-			maxSize := cmd.Int("max-size")
-			maxBackups := cmd.Int("max-backups")
-			compress := cmd.Bool("compress")
-			show := cmd.Bool("show")
-
-			configPath, err := config.GetLogConfigPath(global)
-			if err != nil {
-				scope := constants.ScopeProject
-				if global {
-					scope = constants.ScopeGlobal
-				}
-				return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
-			}
-
-			logConfig, err := config.LoadLogConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
-			}
-
-			if show {
-				// Show current log rotation settings
-				scope := constants.ScopeProject
-				if global {
-					scope = constants.ScopeGlobal
-				}
-				fmt.Printf("Current log rotation settings (%s: %s):\n", scope, configPath)
-				fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
-				fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
-				fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
-				fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
-				return nil
-			}
-
-			// Only update non-zero values
-			if maxAge > 0 {
-				logConfig.LogRotation.MaxAge = maxAge
-			}
-			if maxSize > 0 {
-				logConfig.LogRotation.MaxSize = maxSize
-			}
-			if maxBackups > 0 {
-				logConfig.LogRotation.MaxBackups = maxBackups
-			}
-			// Respect explicit presence of the flag (true or false)
-			if cmd.IsSet("compress") {
-				logConfig.LogRotation.Compress = compress
-			}
-
-			if err := config.SaveLogConfig(configPath, logConfig); err != nil {
-				return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
-			}
-
-			scope := "project"
-			if global {
-				scope = "global"
-			}
-			fmt.Printf("Log rotation configuration updated in %s config (%s):\n", scope, configPath)
-			fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
-			fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
-			fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
-			fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
-			return nil
+		&cli.IntFlag{
+			Name:    "max-age",
+			Aliases: []string{"a"},
+			Value:   0,
+			Usage:   "Maximum age in days to retain log files (default: 30)",
 		},
+		&cli.IntFlag{
+			Name:    "max-size",
+			Aliases: []string{"s"},
+			Value:   0,
+			Usage:   "Maximum size in MB per log file before rotation (default: 10)",
+		},
+		&cli.IntFlag{
+			Name:    "max-backups",
+			Aliases: []string{"b"},
+			Value:   0,
+			Usage:   "Maximum number of backup files to retain (default: 5)",
+		},
+		&cli.BoolFlag{
+			Name:    "compress",
+			Aliases: []string{"c"},
+			Value:   false,
+			Usage:   "Compress rotated log files",
+		},
+		&cli.BoolFlag{
+			Name:  "show",
+			Value: false,
+			Usage: "Show current log rotation settings",
+		},
+	}
+}
+
+// logCmdAction handles the log command execution.
+func logCmdAction(_ context.Context, cmd *cli.Command) error {
+	global := cmd.Bool("global")
+	scope := getScopeString(global)
+
+	configPath, err := config.GetLogConfigPath(global)
+	if err != nil {
+		return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
+	}
+
+	logConfig, err := config.LoadLogConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
+	}
+
+	if cmd.Bool("show") {
+		printLogRotationSettings("Current", scope, configPath, logConfig)
+		return nil
+	}
+
+	applyLogRotationUpdates(cmd, logConfig)
+
+	if err := config.SaveLogConfig(configPath, logConfig); err != nil {
+		return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
+	}
+
+	printLogRotationSettings("Log rotation configuration updated in", scope, configPath, logConfig)
+	return nil
+}
+
+// getScopeString returns the scope string based on the global flag.
+func getScopeString(global bool) string {
+	if global {
+		return constants.ScopeGlobal
+	}
+	return constants.ScopeProject
+}
+
+// printLogRotationSettings displays the log rotation settings.
+func printLogRotationSettings(prefix, scope, configPath string, logConfig *config.LogConfig) {
+	fmt.Printf("%s log rotation settings (%s: %s):\n", prefix, scope, configPath)
+	fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
+	fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
+	fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
+	fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
+}
+
+// applyLogRotationUpdates applies non-zero values from command flags to the config.
+func applyLogRotationUpdates(cmd *cli.Command, logConfig *config.LogConfig) {
+	if maxAge := cmd.Int("max-age"); maxAge > 0 {
+		logConfig.LogRotation.MaxAge = maxAge
+	}
+	if maxSize := cmd.Int("max-size"); maxSize > 0 {
+		logConfig.LogRotation.MaxSize = maxSize
+	}
+	if maxBackups := cmd.Int("max-backups"); maxBackups > 0 {
+		logConfig.LogRotation.MaxBackups = maxBackups
+	}
+	if cmd.IsSet("compress") {
+		logConfig.LogRotation.Compress = cmd.Bool("compress")
 	}
 }
 
