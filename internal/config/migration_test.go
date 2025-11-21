@@ -8,490 +8,309 @@ import (
 )
 
 func TestLegacyConfigDiscovery(t *testing.T) {
-	// Create temporary directory structure for testing
-	tempDir, err := os.MkdirTemp("", "migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	// Create XDG config with custom base directory
-	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
 
-	// Create mock project structure with legacy config
-	project1 := filepath.Join(tempDir, "project1")
-	project2 := filepath.Join(tempDir, "project2")
-	project3 := filepath.Join(tempDir, "project3", "subproject") // Nested project
+	projects := []string{
+		filepath.Join(tempDir, "project1"),
+		filepath.Join(tempDir, "project2"),
+		filepath.Join(tempDir, "project3", "subproject"),
+	}
 
-	projects := []string{project1, project2, project3}
-
-	// Create legacy config files
 	for i, project := range projects {
-		legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-		err := os.MkdirAll(legacyConfigDir, 0o755)
-		if err != nil {
-			t.Fatalf("Failed to create legacy config dir: %v", err)
-		}
-
-		configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
-		configData := map[string]interface{}{
-			"logRotation": map[string]interface{}{
-				"maxAge":     30,
-				"maxSize":    10,
-				"maxBackups": 5,
-			},
-			"testProject": i + 1,
-		}
-
-		data, err := json.MarshalIndent(configData, "", "  ")
-		if err != nil {
-			t.Fatalf("Failed to marshal config data: %v", err)
-		}
-
-		err = os.WriteFile(configPath, data, 0o600)
-		if err != nil {
-			t.Fatalf("Failed to write config file: %v", err)
-		}
+		createTestLegacyConfig(t, project, i+1)
 	}
 
-	// Test discovery within the temp directory
-	discoveredConfigs := make(map[string]string)
+	t.Run("discovers all configs", func(t *testing.T) {
+		discoveredConfigs := make(map[string]string)
+		err := discovery.walkProjectDirectories(tempDir, discoveredConfigs)
+		requireNoError(t, err, "discover configs")
 
-	// Manually call walkProjectDirectories for our test directory
-	err = discovery.walkProjectDirectories(tempDir, discoveredConfigs)
-	if err != nil {
-		t.Fatalf("Failed to discover configs: %v", err)
-	}
-
-	// Verify all configs were discovered
-	if len(discoveredConfigs) != len(projects) {
-		t.Errorf("Expected %d configs, found %d", len(projects), len(discoveredConfigs))
-	}
-
-	for _, project := range projects {
-		if _, exists := discoveredConfigs[project]; !exists {
-			t.Errorf("Config for project %s not discovered", project)
+		if len(discoveredConfigs) != len(projects) {
+			t.Errorf("Expected %d configs, found %d", len(projects), len(discoveredConfigs))
 		}
+
+		for _, project := range projects {
+			if _, exists := discoveredConfigs[project]; !exists {
+				t.Errorf("Config for project %s not discovered", project)
+			}
+		}
+	})
+}
+
+// createTestLegacyConfig creates a test legacy config with a project number.
+func createTestLegacyConfig(t *testing.T, project string, projectNum int) {
+	t.Helper()
+	configData := map[string]interface{}{
+		"logRotation": map[string]interface{}{"maxAge": 30, "maxSize": 10, "maxBackups": 5},
+		"testProject": projectNum,
 	}
+	writeLegacyConfigFile(t, project, configData)
 }
 
 func TestMigrationDryRun(t *testing.T) {
-	// Create temporary directory structure
-	tempDir, err := os.MkdirTemp("", "migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	// Create XDG config with custom base directory
-	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
-	discovery := NewLegacyConfigDiscovery(xdg)
-
-	// Create a project with legacy config
 	project := filepath.Join(tempDir, "test-project")
-	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to create legacy config dir: %v", err)
-	}
 
-	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
 	configData := map[string]interface{}{
-		"logRotation": map[string]interface{}{
-			"maxAge": 30,
-		},
-		"testData": "test-value",
+		"logRotation": map[string]interface{}{"maxAge": 30},
+		"testData":    "test-value",
 	}
+	writeLegacyConfigFile(t, project, configData)
 
-	data, err := json.MarshalIndent(configData, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal config data: %v", err)
-	}
+	// Simulate dry run migration logic
+	result := simulateDryRunMigration(xdg, project)
 
-	err = os.WriteFile(configPath, data, 0o600)
-	if err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
+	t.Run("counts are correct", func(t *testing.T) {
+		assertDryRunCounts(t, result, 1, 1, 0)
+	})
 
-	// Override discovery to use our test directory
-	discovery.xdg = xdg
-
-	// Mock the DiscoverLegacyConfigs method for testing
-	testConfigs := map[string]string{
-		project: configPath,
-	}
-
-	// Create a custom discovery instance that uses our test configs
-	customDiscovery := &LegacyConfigDiscovery{xdg: xdg}
-
-	// Test dry run migration
-	result := &MigrationResult{
-		TotalFound:      len(testConfigs),
-		MigratedPaths:   []string{},
-		SkippedPaths:    []string{},
-		ErrorPaths:      []MigrationError{},
-		BackupLocations: []string{},
-	}
-
-	// Simulate dry run migration
-	for projectPath := range testConfigs {
-		// Check if project already exists in XDG registry (it shouldn't)
-		if _, err := customDiscovery.xdg.GetProjectConfig(projectPath); err == nil {
-			result.TotalSkipped++
-			result.SkippedPaths = append(result.SkippedPaths, projectPath)
-		} else {
-			result.TotalMigrated++
-			result.MigratedPaths = append(result.MigratedPaths, projectPath)
+	t.Run("no backups created", func(t *testing.T) {
+		if len(result.BackupLocations) != 0 {
+			t.Errorf("Expected 0 backup locations in dry run, got %d", len(result.BackupLocations))
 		}
-	}
+	})
+}
 
-	// Verify dry run results
-	if result.TotalFound != 1 {
-		t.Errorf("Expected 1 config found, got %d", result.TotalFound)
+// simulateDryRunMigration simulates a dry run migration for testing.
+func simulateDryRunMigration(xdg *XDGConfig, projectPath string) *MigrationResult {
+	result := &MigrationResult{TotalFound: 1}
+	if _, err := xdg.GetProjectConfig(projectPath); err == nil {
+		result.TotalSkipped++
+		result.SkippedPaths = append(result.SkippedPaths, projectPath)
+	} else {
+		result.TotalMigrated++
+		result.MigratedPaths = append(result.MigratedPaths, projectPath)
 	}
-	if result.TotalMigrated != 1 {
-		t.Errorf("Expected 1 config to be migrated, got %d", result.TotalMigrated)
+	return result
+}
+
+// assertDryRunCounts checks the dry run result counts.
+func assertDryRunCounts(t *testing.T, result *MigrationResult, found, migrated, skipped int) {
+	t.Helper()
+	if result.TotalFound != found {
+		t.Errorf("Expected %d config found, got %d", found, result.TotalFound)
 	}
-	if result.TotalSkipped != 0 {
-		t.Errorf("Expected 0 configs to be skipped, got %d", result.TotalSkipped)
+	if result.TotalMigrated != migrated {
+		t.Errorf("Expected %d config to be migrated, got %d", migrated, result.TotalMigrated)
 	}
-	if len(result.BackupLocations) != 0 {
-		t.Errorf("Expected 0 backup locations in dry run, got %d", len(result.BackupLocations))
+	if result.TotalSkipped != skipped {
+		t.Errorf("Expected %d configs to be skipped, got %d", skipped, result.TotalSkipped)
 	}
 }
 
-//nolint:gocyclo,cyclop // End-to-end migration test with multiple validation steps
 func TestActualMigration(t *testing.T) {
-	// Create temporary directory structure
-	tempDir, err := os.MkdirTemp("", "migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	// Create XDG config with custom base directory
-	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
 
-	// Create a project with legacy config
 	project := filepath.Join(tempDir, "test-project")
+	configPath := setupMigrationTestConfig(t, project)
+
+	t.Run("migration succeeds", func(t *testing.T) {
+		err := discovery.migrateConfig(project, configPath, false, &MigrationResult{})
+		requireNoError(t, err, "perform migration")
+	})
+
+	t.Run("project is registered", func(t *testing.T) {
+		projectConfig, err := xdg.GetProjectConfig(project)
+		requireNoError(t, err, "get project config")
+
+		if projectConfig.ConfigFormat != "json" {
+			t.Errorf("Expected format json, got %s", projectConfig.ConfigFormat)
+		}
+	})
+
+	t.Run("data is migrated correctly", func(t *testing.T) {
+		migratedData, err := xdg.LoadProjectConfig(project)
+		requireNoError(t, err, "load migrated config")
+		assertMigratedConfigData(t, migratedData)
+	})
+
+	t.Run("backup is created", func(t *testing.T) {
+		matches, err := filepath.Glob(configPath + ".backup.*")
+		requireNoError(t, err, "check for backup files")
+		if len(matches) != 1 {
+			t.Errorf("Expected 1 backup file, found %d", len(matches))
+		}
+	})
+}
+
+// setupMigrationTestConfig creates a legacy config for migration testing.
+func setupMigrationTestConfig(t *testing.T, project string) string {
+	t.Helper()
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to create legacy config dir: %v", err)
-	}
+	err := os.MkdirAll(legacyConfigDir, 0o755)
+	requireNoError(t, err, "create legacy config dir")
 
 	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
-	originalConfigData := map[string]interface{}{
+	data, err := json.MarshalIndent(testMigrationConfigData(), "", "  ")
+	requireNoError(t, err, "marshal config data")
+
+	err = os.WriteFile(configPath, data, 0o600)
+	requireNoError(t, err, "write config file")
+	return configPath
+}
+
+// testMigrationConfigData returns test data for migration tests.
+func testMigrationConfigData() map[string]interface{} {
+	return map[string]interface{}{
 		"logRotation": map[string]interface{}{
-			"maxAge":     30,
-			"maxSize":    10,
-			"maxBackups": 5,
+			"maxAge": 30, "maxSize": 10, "maxBackups": 5,
 		},
 		"testData": "migration-test",
 		"customHooks": map[string]interface{}{
 			"test-group": map[string]interface{}{
 				"PreToolUse": map[string]interface{}{
 					"jobs": []interface{}{
-						map[string]interface{}{
-							"name": "test-job",
-							"run":  "echo 'test'",
-						},
+						map[string]interface{}{"name": "test-job", "run": "echo 'test'"},
 					},
 				},
 			},
 		},
 	}
+}
 
-	data, err := json.MarshalIndent(originalConfigData, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal config data: %v", err)
-	}
-
-	err = os.WriteFile(configPath, data, 0o600)
-	if err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Perform actual migration
-	err = discovery.migrateConfig(project, configPath, false, &MigrationResult{
-		MigratedPaths:   []string{},
-		SkippedPaths:    []string{},
-		ErrorPaths:      []MigrationError{},
-		BackupLocations: []string{},
-	})
-	if err != nil {
-		t.Fatalf("Migration failed: %v", err)
-	}
-
-	// Verify project is registered in XDG registry
-	projectConfig, err := xdg.GetProjectConfig(project)
-	if err != nil {
-		t.Fatalf("Project not registered after migration: %v", err)
-	}
-
-	if projectConfig.ConfigFormat != "json" {
-		t.Errorf("Expected format json, got %s", projectConfig.ConfigFormat)
-	}
-
-	// Verify config data was migrated correctly
-	migratedData, err := xdg.LoadProjectConfig(project)
-	if err != nil {
-		t.Fatalf("Failed to load migrated config: %v", err)
-	}
-
-	// Check specific values
+// assertMigratedConfigData checks the migrated config has correct values.
+func assertMigratedConfigData(t *testing.T, migratedData map[string]interface{}) {
+	t.Helper()
 	if migratedData["testData"] != "migration-test" {
 		t.Errorf("Expected testData=migration-test, got %v", migratedData["testData"])
 	}
 
-	// Check nested structure
 	logRotation, ok := migratedData["logRotation"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("logRotation not found or not a map")
 	}
-
-	if logRotation["maxAge"] != float64(30) { // JSON numbers are float64
+	if logRotation["maxAge"] != float64(30) {
 		t.Errorf("Expected maxAge=30, got %v", logRotation["maxAge"])
-	}
-
-	// Verify backup was created
-	backupPattern := configPath + ".backup.*"
-	matches, err := filepath.Glob(backupPattern)
-	if err != nil {
-		t.Fatalf("Failed to check for backup files: %v", err)
-	}
-	if len(matches) != 1 {
-		t.Errorf("Expected 1 backup file, found %d", len(matches))
 	}
 }
 
 func TestMigrationSkipExisting(t *testing.T) {
-	// Create temporary directory structure
-	tempDir, err := os.MkdirTemp("", "migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	// Create XDG config with custom base directory
-	xdgTempDir, err := os.MkdirTemp("", "xdg-migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
+	xdgTempDir := t.TempDir()
 
 	xdg := &XDGConfig{BaseDir: xdgTempDir}
 	discovery := NewLegacyConfigDiscovery(xdg)
-
 	project := filepath.Join(tempDir, "test-project")
 
-	// First, register the project in XDG system
-	existingData := map[string]interface{}{
-		"alreadyMigrated": true,
-	}
-	err = xdg.SaveProjectConfig(project, existingData, "json")
-	if err != nil {
-		t.Fatalf("Failed to save existing config: %v", err)
-	}
+	// Setup: existing XDG config and legacy config
+	existingData := map[string]interface{}{"alreadyMigrated": true}
+	err := xdg.SaveProjectConfig(project, existingData, "json")
+	requireNoError(t, err, "save existing config")
 
-	// Create legacy config
-	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to create legacy config dir: %v", err)
-	}
+	configPath := writeLegacyConfigFile(t, project, map[string]interface{}{"shouldNotMigrate": true})
 
-	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
-	legacyData := map[string]interface{}{
-		"shouldNotMigrate": true,
-	}
+	t.Run("migration is skipped", func(t *testing.T) {
+		result := &MigrationResult{}
+		err := discovery.migrateConfig(project, configPath, false, result)
+		requireNoError(t, err, "attempt migration")
 
-	data, err := json.MarshalIndent(legacyData, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal config data: %v", err)
-	}
-
-	err = os.WriteFile(configPath, data, 0o600)
-	if err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
-	}
-
-	// Attempt migration
-	result := &MigrationResult{
-		MigratedPaths:   []string{},
-		SkippedPaths:    []string{},
-		ErrorPaths:      []MigrationError{},
-		BackupLocations: []string{},
-	}
-
-	err = discovery.migrateConfig(project, configPath, false, result)
-	if err != nil {
-		t.Fatalf("Migration should not fail for existing config: %v", err)
-	}
-
-	// Verify migration was skipped
-	if len(result.SkippedPaths) != 1 {
-		t.Errorf("Expected 1 skipped path, got %d", len(result.SkippedPaths))
-	}
-
-	if result.SkippedPaths[0] != project {
-		t.Errorf("Expected skipped path %s, got %s", project, result.SkippedPaths[0])
-	}
-
-	// Verify existing config wasn't overwritten
-	currentData, err := xdg.LoadProjectConfig(project)
-	if err != nil {
-		t.Fatalf("Failed to load current config: %v", err)
-	}
-
-	if currentData["alreadyMigrated"] != true {
-		t.Error("Existing config was overwritten")
-	}
-
-	if currentData["shouldNotMigrate"] != nil {
-		t.Error("Legacy config data was incorrectly merged")
-	}
-}
-
-//nolint:gocyclo,cyclop // Comprehensive status validation across multiple scenarios
-func TestGetMigrationStatus(t *testing.T) {
-	// Create temporary directory structure
-	tempDir, err := os.MkdirTemp("", "migration-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
+		if len(result.SkippedPaths) != 1 || result.SkippedPaths[0] != project {
+			t.Errorf("Expected skipped path %s, got %v", project, result.SkippedPaths)
 		}
 	})
 
-	project := filepath.Join(tempDir, "test-project")
+	t.Run("existing config preserved", func(t *testing.T) {
+		currentData, err := xdg.LoadProjectConfig(project)
+		requireNoError(t, err, "load current config")
 
-	// Test status with no configs
-	status, err := GetMigrationStatus(project)
-	if err != nil {
-		t.Fatalf("Failed to get migration status: %v", err)
-	}
+		if currentData["alreadyMigrated"] != true {
+			t.Error("Existing config was overwritten")
+		}
+		if currentData["shouldNotMigrate"] != nil {
+			t.Error("Legacy config data was incorrectly merged")
+		}
+	})
+}
 
-	if status.HasLegacyConfig {
-		t.Error("Should not have legacy config")
-	}
-	if status.HasXDGConfig {
-		t.Error("Should not have XDG config")
-	}
-	if status.NeedsMigration {
-		t.Error("Should not need migration when no configs exist")
-	}
-
-	// Create legacy config
+// writeLegacyConfigFile creates a legacy config file with the given data.
+func writeLegacyConfigFile(t *testing.T, project string, configData map[string]interface{}) string {
+	t.Helper()
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
-	if err != nil {
-		t.Fatalf("Failed to create legacy config dir: %v", err)
-	}
+	err := os.MkdirAll(legacyConfigDir, 0o755)
+	requireNoError(t, err, "create legacy config dir")
 
 	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
-	configData := map[string]interface{}{"test": "data"}
 	data, err := json.MarshalIndent(configData, "", "  ")
-	if err != nil {
-		t.Fatalf("Failed to marshal config data: %v", err)
-	}
+	requireNoError(t, err, "marshal config data")
 
 	err = os.WriteFile(configPath, data, 0o600)
+	requireNoError(t, err, "write config file")
+	return configPath
+}
+
+func TestGetMigrationStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	project := filepath.Join(tempDir, "test-project")
+
+	t.Run("no configs exist", func(t *testing.T) {
+		status, err := GetMigrationStatus(project)
+		requireNoError(t, err, "get migration status")
+		assertMigrationStatus(t, status, false, false, false)
+	})
+
+	t.Run("legacy config only", func(t *testing.T) {
+		createLegacyConfig(t, project)
+		status, err := GetMigrationStatus(project)
+		requireNoError(t, err, "get migration status")
+		assertMigrationStatus(t, status, true, false, true)
+	})
+
+	t.Run("both configs exist", func(t *testing.T) {
+		xdg := NewXDGConfig()
+		err := xdg.SaveProjectConfig(project, map[string]interface{}{"test": "data"}, "json")
+		requireNoError(t, err, "save XDG config")
+
+		status, err := GetMigrationStatus(project)
+		requireNoError(t, err, "get migration status")
+		assertMigrationStatus(t, status, true, true, false)
+	})
+}
+
+// createLegacyConfig creates a legacy config file in the project directory.
+func createLegacyConfig(t *testing.T, project string) {
+	t.Helper()
+	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
+	err := os.MkdirAll(legacyConfigDir, 0o755)
+	requireNoError(t, err, "create legacy config dir")
+
+	configPath := filepath.Join(legacyConfigDir, "blues-traveler-config.json")
+	data, err := json.MarshalIndent(map[string]interface{}{"test": "data"}, "", "  ")
+	requireNoError(t, err, "marshal config data")
+
+	err = os.WriteFile(configPath, data, 0o600)
+	requireNoError(t, err, "write config file")
+}
+
+// requireNoError fails the test if err is not nil.
+func requireNoError(t *testing.T, err error, context string) {
+	t.Helper()
 	if err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf("Failed to %s: %v", context, err)
 	}
+}
 
-	// Test status with legacy config only
-	status, err = GetMigrationStatus(project)
-	if err != nil {
-		t.Fatalf("Failed to get migration status: %v", err)
+// assertMigrationStatus checks the migration status fields.
+func assertMigrationStatus(t *testing.T, status *MigrationStatus, hasLegacy, hasXDG, needsMigration bool) {
+	t.Helper()
+	if status.HasLegacyConfig != hasLegacy {
+		t.Errorf("HasLegacyConfig: got %v, want %v", status.HasLegacyConfig, hasLegacy)
 	}
-
-	if !status.HasLegacyConfig {
-		t.Error("Should have legacy config")
+	if status.HasXDGConfig != hasXDG {
+		t.Errorf("HasXDGConfig: got %v, want %v", status.HasXDGConfig, hasXDG)
 	}
-	if status.HasXDGConfig {
-		t.Error("Should not have XDG config yet")
-	}
-	if !status.NeedsMigration {
-		t.Error("Should need migration")
-	}
-
-	// Create XDG config
-	xdg := NewXDGConfig()
-	err = xdg.SaveProjectConfig(project, configData, "json")
-	if err != nil {
-		t.Fatalf("Failed to save XDG config: %v", err)
-	}
-
-	// Test status with both configs
-	status, err = GetMigrationStatus(project)
-	if err != nil {
-		t.Fatalf("Failed to get migration status: %v", err)
-	}
-
-	if !status.HasLegacyConfig {
-		t.Error("Should still have legacy config")
-	}
-	if !status.HasXDGConfig {
-		t.Error("Should have XDG config")
-	}
-	if status.NeedsMigration {
-		t.Error("Should not need migration when XDG config exists")
+	if status.NeedsMigration != needsMigration {
+		t.Errorf("NeedsMigration: got %v, want %v", status.NeedsMigration, needsMigration)
 	}
 }
 
