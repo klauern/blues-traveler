@@ -86,11 +86,29 @@ group-name:
 
 ### Expression Language
 
-#### Operators
-- `==`, `!=` - Equality
-- `&&`, `||`, `!` - Logical
-- `regex` - Regex match: `${VAR} regex "pattern"`
-- `matches` - Glob match: `${VAR} matches "*.go"`
+Expressions used by `only`/`skip` are evaluated by [`core.EvalExpression`](../../internal/core/expressions.go),
+which performs a tiny parser tailored for hook filters:
+
+1. **Variable expansion** – `${NAME}` tokens are replaced with values from the job's environment map.
+2. **Boolean grouping** – the parser splits on `||` first, then `&&`, so `&&` binds tighter than `||`.
+3. **Unary negation** – any leading `!` operators flip the truthiness of the remaining expression.
+4. **Operator evaluation** – the remaining clause is evaluated using the operators below or treated as a literal.
+
+#### Supported operators
+
+| Operator | Behavior |
+|----------|----------|
+| `==`, `!=` | String equality/inequality after variable expansion |
+| `matches` | Uses Go `filepath.Match` against each whitespace-separated token on the left side |
+| `regex` | Uses Go regular expressions (`regexp.Compile`) against each token on the left side |
+| `&&`, `||`, `!` | Boolean operators with `!` unary negation |
+
+Quoted strings are preserved while splitting, so `${FILES_CHANGED} regex "^src/.*\\.go$"` stays intact. Lists of values
+(for example `FILES_CHANGED`) are tokenized on whitespace, letting a single `matches` or `regex` clause check every path.
+Literals fall back to truthy/falsy evaluation (`true`, `false`, non-empty strings).
+
+For reference, see the evaluator tests in [`internal/core/expressions_test.go`](../../internal/core/expressions_test.go) and
+[`internal/core/expressions_regex_test.go`](../../internal/core/expressions_regex_test.go).
 
 #### Examples
 ```yaml
@@ -174,6 +192,21 @@ testing:
         skip: ${FILES_CHANGED} regex "_test\\.go$"
         timeout: 120
 ```
+
+### End-to-End `only` Example
+
+```yaml
+security:
+  PreToolUse:
+    jobs:
+      - name: allow-shell-audits
+        run: ./scripts/audit.sh "${TOOL_ARGS}"
+        only: ${TOOL_NAME} == "Bash"
+```
+
+1. During hook execution, blues-traveler populates the job environment with `TOOL_NAME`, `TOOL_ARGS`, and other context.
+2. `core.EvalExpression` expands `${TOOL_NAME}` and evaluates the boolean expression.
+3. If the expression resolves to `true` (the active tool is Bash), the job runs; otherwise it is skipped without invoking the script.
 
 ## Migration Commands
 

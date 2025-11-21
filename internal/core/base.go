@@ -148,6 +148,8 @@ type HookContext struct {
 	LoggingEnabled  bool
 	LoggingDir      string
 	LoggingFormat   string
+	// Platform identifies the runtime environment (e.g., Claude, Cursor)
+	Platform Platform
 }
 
 // DefaultHookContext returns a context with real implementations
@@ -160,6 +162,7 @@ func DefaultHookContext() *HookContext {
 		LoggingEnabled:  false,
 		LoggingDir:      ".claude/hooks",
 		LoggingFormat:   config.LoggingFormatJSONL,
+		Platform:        DetectPlatform(),
 	}
 }
 
@@ -210,4 +213,51 @@ func (h *BaseHook) CreateRawHandler() func(context.Context, string) *cchooks.Raw
 		// Return nil to continue with normal processing
 		return nil
 	}
+}
+
+// StandardRun executes the hook with the provided handlers.
+// Concrete hooks should call this in their Run() method.
+func (h *BaseHook) StandardRun(
+	preHandler func(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface,
+	postHandler func(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface,
+) error {
+	if !h.IsEnabled() {
+		// fmt.Printf("%s plugin disabled - skipping\n", h.Name()) // Optional: print to stdout
+		return nil
+	}
+
+	runner := h.Context().RunnerFactory(preHandler, postHandler, h.CreateRawHandler())
+	runner.Run()
+	return nil
+}
+
+// LogError logs a standard error event
+func (h *BaseHook) LogError(eventType, toolName string, err error) {
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent(eventType, toolName, map[string]interface{}{"error": err.Error()}, nil)
+	}
+}
+
+// LogApproval logs a standard approval event
+func (h *BaseHook) LogApproval(eventType, toolName string, details map[string]interface{}) {
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent(eventType, toolName, details, nil)
+	}
+}
+
+// LogBlock logs a standard block event
+func (h *BaseHook) LogBlock(eventType, toolName string, details map[string]interface{}) {
+	if h.Context().LoggingEnabled {
+		h.LogHookEvent(eventType, toolName, details, nil)
+	}
+}
+
+// PreToolUseHandler interface for hooks that handle pre-tool-use events
+type PreToolUseHandler interface {
+	PreToolUse(context.Context, *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface
+}
+
+// PostToolUseHandler interface for hooks that handle post-tool-use events
+type PostToolUseHandler interface {
+	PostToolUse(context.Context, *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface
 }

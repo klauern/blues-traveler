@@ -11,6 +11,7 @@ func TestVetHook(t *testing.T) {
 		CommandExecutor: &core.MockCommandExecutor{},
 		RunnerFactory:   core.MockRunnerFactory,
 		LoggingEnabled:  false,
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewVetHook(ctx)

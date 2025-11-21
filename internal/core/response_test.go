@@ -187,10 +187,11 @@ func TestAllowWithMessagesDualParams(t *testing.T) {
 
 // TestPreToolUseInterfaceCompliance verifies that DualMessagePreToolResponse
 // implements cchooks.PreToolUseResponseInterface.
-func TestPreToolUseInterfaceCompliance(_ *testing.T) {
+func TestPreToolUseInterfaceCompliance(t *testing.T) {
 	// This should compile - if it doesn't, we're not implementing the interface correctly
 	_ = BlockWithMessages("test")
 	_ = ApproveWithMessages("test")
+	_ = AskWithMessages("test")
 }
 
 // TestPostToolUseInterfaceCompliance verifies that DualMessagePostToolResponse

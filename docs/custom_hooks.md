@@ -62,7 +62,7 @@ blues-traveler hooks custom install my-project --event PostToolUse
 
 - `TOOL_NAME`: Tool (Bash, Edit, Write, etc.)
 - `TOOL_OUTPUT_FILE`: File path for Edit/Write
-- `FILES_CHANGED`: Comma-separated list of changed files
+- `FILES_CHANGED`: Space-separated list of changed files
 - `USER_PROMPT`: User’s prompt text
 - `EVENT_NAME`: Current event name
 - `TOOL_ARGS`: Raw tool arguments where applicable

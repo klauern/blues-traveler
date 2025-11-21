@@ -23,18 +23,11 @@ func NewFindBlockerHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the find blocker hook.
 func (h *FindBlockerHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Find blocker plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, nil, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(h.preToolUseHandler, nil)
 }
 
 func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
-	// Log detailed event data if logging is enabled
+	// Log detailed event data
 	if h.Context().LoggingEnabled {
 		details := make(map[string]interface{})
 		rawData := make(map[string]interface{})
@@ -57,20 +50,16 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 
 	bash, err := event.AsBash()
 	if err != nil {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("find_blocker_error", event.ToolName, map[string]interface{}{"error": err.Error()}, nil)
-		}
+		h.LogError("find_blocker_error", event.ToolName, err)
 		return cchooks.Block("failed to parse bash command")
 	}
 
 	// Check if this is a find command
 	if blocked, suggestion := h.isFindCommand(bash.Command); blocked {
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("find_blocker_block", constants.ToolBash, map[string]interface{}{
-				"command":    bash.Command,
-				"suggestion": suggestion,
-			}, nil)
-		}
+		h.LogBlock("find_blocker_block", constants.ToolBash, map[string]interface{}{
+			"command":    bash.Command,
+			"suggestion": suggestion,
+		})
 		// User-friendly message + detailed fd suggestions for agent
 		return core.BlockWithMessages(
 			"The 'find' command was blocked. Please use 'fd' instead for better performance.",
@@ -78,12 +67,10 @@ func (h *FindBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 		)
 	}
 
-	// Log approved commands if logging is enabled
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("find_blocker_approved", constants.ToolBash, map[string]interface{}{
-			"command": bash.Command,
-		}, nil)
-	}
+	// Log approved commands
+	h.LogApproval("find_blocker_approved", constants.ToolBash, map[string]interface{}{
+		"command": bash.Command,
+	})
 
 	return cchooks.Approve()
 }
@@ -126,30 +113,13 @@ func (h *FindBlockerHook) containsFindInPipeline(command string) bool {
 	for _, pattern := range patterns {
 		if strings.Contains(command, pattern) {
 			// Additional check: make sure it's not in a quoted string
-			if !h.isInQuotedString(command, pattern) {
+			if !core.IsInQuotedString(command, pattern) {
 				return true
 			}
 		}
 	}
 
 	return false
-}
-
-// isInQuotedString performs a simple check if the pattern is within quotes
-// This is a basic implementation - a full parser would be more accurate
-func (h *FindBlockerHook) isInQuotedString(command, pattern string) bool {
-	index := strings.Index(command, pattern)
-	if index == -1 {
-		return false
-	}
-
-	// Count quotes before the pattern
-	beforePattern := command[:index]
-	singleQuotes := strings.Count(beforePattern, "'")
-	doubleQuotes := strings.Count(beforePattern, "\"")
-
-	// If we have an odd number of quotes before the pattern, we're likely inside quotes
-	return singleQuotes%2 == 1 || doubleQuotes%2 == 1
 }
 
 // generateFdSuggestion creates helpful fd command suggestions based on common find patterns

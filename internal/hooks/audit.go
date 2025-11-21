@@ -34,14 +34,7 @@ func NewAuditHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the audit hook.
 func (h *AuditHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Audit plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(h.preToolUseHandler, h.postToolUseHandler)
 }
 
 // addToolSpecificDetails adds tool-specific details to the audit entry

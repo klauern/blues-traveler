@@ -235,6 +235,7 @@ func TestHookContext(settingsChecker func(string) bool) *HookContext {
 		CommandExecutor: NewMockCommandExecutor(),
 		RunnerFactory:   MockRunnerFactory,
 		SettingsChecker: settingsChecker,
+		Platform:        PlatformClaude,
 	}
 }
 

@@ -7,9 +7,9 @@ This guide shows how to write hooks that work seamlessly in both Cursor IDE and 
 Blues-traveler supports the [Cursor hooks specification](https://cursor.com/docs/agent/hooks), enabling you to write hooks once and run them in both environments. This compatibility layer includes:
 
 - **Event name aliases**: Use Cursor event names that auto-translate to Claude Code events
-- **JSON response format**: Standard response structure for both systems
-- **Dual-message support**: Separate messages for users vs AI agents
-- **Permission model**: allow/deny/ask permissions (ask mode pending cchooks support)
+- **JSON response format**: Standard response structure for both systems ✅ **Implemented**
+- **Dual-message support**: Separate messages for users vs AI agents ✅ **Implemented**
+- **Permission model**: allow/deny/ask permissions ✅ **Full** (ask degrades to allow with messages when running under Claude)
 
 ## Event Name Mapping
 
@@ -51,9 +51,12 @@ Hooks can output JSON to control execution and provide messages. Both systems su
 ### Field Descriptions
 
 - **`permission`** (string, optional): Control execution flow
-  - `"allow"` - Continue execution (default if omitted)
-  - `"deny"` - Block execution
-  - `"ask"` - Prompt user for manual approval (pending cchooks support)
+  - `"allow"` - Continue execution (default if omitted) ✅
+  - `"deny"` - Block execution ✅
+  - `"ask"` - Prompt user for manual approval
+    - ✅ **Works in Cursor IDE** when Blues-traveler detects the Cursor platform (auto-detected env vars or `BT_HOOK_PLATFORM=cursor`)
+    - ✅ **Graceful fallback in Claude Code** - Approves with contextual messages when ask isn't supported
+    - Logged for audit visibility
 
 - **`userMessage`** (string, optional): User-friendly message displayed in the UI
   - Keep concise and actionable
@@ -225,11 +228,14 @@ Both systems provide hook scripts with contextual environment variables:
 | Variable | Available In | Description |
 |----------|-------------|-------------|
 | `HOOK_EVENT_NAME` | Both | Event that triggered the hook |
-| `TOOL_NAME` | Both | Name of tool being used (Bash, Edit, Write, etc.) |
+| `TOOL_NAME` | Both | Bash |
 | `TOOL_INPUT` | Both | Input/arguments to the tool |
-| `FILES_CHANGED` | Both | List of files modified |
+| `FILES_CHANGED` | Both | Space-separated list of files modified |
 | `USER_PROMPT` | Both (UserPromptSubmit only) | User's prompt text |
 | `CWD` | Both | Current working directory |
+| `BT_HOOK_PLATFORM` | Both | Override platform detection (`cursor` or `claude`) |
+
+> ℹ️ Blues-traveler automatically detects Cursor by checking common `CURSOR_*` environment variables. Set `BT_HOOK_PLATFORM=cursor` to force Cursor semantics (including permission prompts) when testing locally.
 
 ## Migration Guide
 
@@ -358,6 +364,55 @@ echo "✅ All compatibility tests passed"
 - Always include `userMessage` when `permission: deny`
 - Provide actionable guidance for the user
 - Example: `"userMessage": "Code formatting required. Run: npm run format"`
+
+## Implementation Status
+
+Blues-traveler's Cursor compatibility features have been implemented in phases:
+
+### ✅ Fully Implemented
+
+1. **JSON Response Parsing** (Issue #59)
+   - Parses Cursor-style JSON responses from hook scripts
+   - Supports both permission-based and flow-control formats
+   - Handles partial JSON gracefully
+   - Comprehensive error handling and validation
+
+2. **Dual-Message Responses** (Issue #55)
+   - Separate `userMessage` and `agentMessage` fields
+   - Wrapper functions: `BlockWithMessages()`, `ApproveWithMessages()`, `PostBlockWithMessages()`, `AllowWithMessages()`
+   - Single-parameter support (same message to both audiences)
+   - Backward compatible with existing code
+
+3. **Response Format Support**
+   - `permission: "allow"` - ✅ Working
+   - `permission: "deny"` - ✅ Working
+   - `continue: true/false` - ✅ Working
+   - `userMessage` / `agentMessage` routing - ✅ Working
+
+### ✅ Platform-Specific Features
+
+1. **Ask Permission Mode** (Issue #54)
+   - **Status**: Works in Cursor IDE, graceful fallback in Claude Code
+   - **Cursor IDE**: Native "ask" support - prompts user for approval
+   - **Claude Code**: Falls back to `Approve()` with contextual messages (Claude Code doesn't support ask mode natively)
+   - **Logging**: All "ask" events are logged for audit visibility
+   - **Function Available**: `AskWithMessages()` provides consistent API across both platforms
+
+### 📋 Usage Recommendations
+
+**For Cursor IDE users:**
+- Use `permission: "ask"` when you want user confirmation for non-critical operations
+- User will see a prompt and can approve/deny
+- Great for operations that might be disruptive but not dangerous
+
+**For Claude Code users:**
+- `permission: "ask"` will allow execution with messages (logged for audit)
+- Use `permission: "deny"` for security-critical blocks
+- Use `permission: "allow"` for informational messages
+
+**Cross-platform hooks:**
+- Safe to use `permission: "ask"` - works optimally in Cursor, degrades gracefully in Claude Code
+- Check logs to see when "ask" events occur
 
 ## Additional Resources
 
