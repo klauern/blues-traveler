@@ -279,73 +279,42 @@ func TestTOMLSupport(t *testing.T) {
 }
 
 func TestCleanupOrphanedConfigs(t *testing.T) {
-	// Create temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
+	tempDir := t.TempDir()
+	xdg := &XDGConfig{BaseDir: tempDir}
+
+	// Setup: register a real project and a non-existent project
+	projectDir := t.TempDir()
+	nonExistentProject := "/non/existent/project"
+
+	requireNoErrorTest(t, xdg.RegisterProject(projectDir, FormatJSON), "register project")
+	requireNoErrorTest(t, xdg.RegisterProject(nonExistentProject, FormatJSON), "register non-existent project")
+
+	t.Run("projects registered", func(t *testing.T) {
+		projects, err := xdg.ListProjects()
+		requireNoErrorTest(t, err, "list projects")
+		if len(projects) != 2 {
+			t.Errorf("Expected 2 projects, got %d", len(projects))
 		}
 	})
 
-	// Create XDG config with custom base directory
-	xdg := &XDGConfig{BaseDir: tempDir}
+	// Remove the project directory to make it orphaned
+	requireNoErrorTest(t, os.RemoveAll(projectDir), "remove project dir")
 
-	// Create a temporary project directory
-	projectDir, err := os.MkdirTemp("", "project-*")
-	if err != nil {
-		t.Fatalf("Failed to create project dir: %v", err)
-	}
+	t.Run("cleanup removes orphaned", func(t *testing.T) {
+		orphaned, err := xdg.CleanupOrphanedConfigs()
+		requireNoErrorTest(t, err, "cleanup orphaned configs")
+		if len(orphaned) != 2 {
+			t.Errorf("Expected 2 orphaned configs, got %d", len(orphaned))
+		}
+	})
 
-	// Register the project
-	err = xdg.RegisterProject(projectDir, FormatJSON)
-	if err != nil {
-		t.Fatalf("Failed to register project: %v", err)
-	}
-
-	// Create a config for a non-existent project
-	nonExistentProject := "/non/existent/project"
-	err = xdg.RegisterProject(nonExistentProject, FormatJSON)
-	if err != nil {
-		t.Fatalf("Failed to register non-existent project: %v", err)
-	}
-
-	// Verify both projects are registered
-	projects, err := xdg.ListProjects()
-	if err != nil {
-		t.Fatalf("Failed to list projects: %v", err)
-	}
-	if len(projects) != 2 {
-		t.Errorf("Expected 2 projects, got %d", len(projects))
-	}
-
-	// Remove the project directory
-	if err := os.RemoveAll(projectDir); err != nil {
-		t.Fatalf("Failed to remove project dir: %v", err)
-	}
-
-	// Run cleanup
-	orphaned, err := xdg.CleanupOrphanedConfigs()
-	if err != nil {
-		t.Fatalf("Failed to cleanup orphaned configs: %v", err)
-	}
-
-	// Verify that both orphaned projects were cleaned up
-	expectedOrphaned := 2 // Both the removed project and the non-existent project
-	if len(orphaned) != expectedOrphaned {
-		t.Errorf("Expected %d orphaned configs, got %d", expectedOrphaned, len(orphaned))
-	}
-
-	// Verify registry is empty now
-	projects, err = xdg.ListProjects()
-	if err != nil {
-		t.Fatalf("Failed to list projects after cleanup: %v", err)
-	}
-	if len(projects) != 0 {
-		t.Errorf("Expected 0 projects after cleanup, got %d", len(projects))
-	}
+	t.Run("registry empty after cleanup", func(t *testing.T) {
+		projects, err := xdg.ListProjects()
+		requireNoErrorTest(t, err, "list projects after cleanup")
+		if len(projects) != 0 {
+			t.Errorf("Expected 0 projects after cleanup, got %d", len(projects))
+		}
+	})
 }
 
 func TestErrorHandling(t *testing.T) {
