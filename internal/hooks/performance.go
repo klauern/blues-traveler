@@ -38,12 +38,16 @@ func NewPerformanceHook(ctx *core.HookContext) core.Hook {
 // Run executes the performance hook.
 func (h *PerformanceHook) Run() error {
 	if !h.IsEnabled() {
-		fmt.Println("Performance plugin disabled - skipping")
+		if h.Context().LoggingEnabled {
+			fmt.Println("Performance plugin disabled - skipping")
+		}
 		return nil
 	}
 
+	if h.Context().LoggingEnabled {
+		fmt.Println("Performance monitoring started")
+	}
 	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	fmt.Println("Performance monitoring started")
 	runner.Run()
 	return nil
 }
@@ -113,6 +117,10 @@ func (h *PerformanceHook) postToolUseHandler(_ context.Context, event *cchooks.P
 }
 
 func (h *PerformanceHook) logPerformanceEntry(entry PerformanceEntry) {
+	if !h.Context().LoggingEnabled {
+		return
+	}
+
 	jsonData, err := json.Marshal(entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to marshal performance entry: %v\n", err)

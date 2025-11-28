@@ -315,10 +315,10 @@ func TestSettingsPrecedence(t *testing.T) {
 	globalDir := filepath.Join(tempDir, "global")
 	projectDir := filepath.Join(tempDir, "project")
 
-	if err := os.MkdirAll(filepath.Join(globalDir, ".claude"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(globalDir, ".claude"), 0o755); err != nil {
 		t.Fatalf("Failed to create global .claude dir: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0o755); err != nil {
 		t.Fatalf("Failed to create project .claude dir: %v", err)
 	}
 
@@ -329,7 +329,7 @@ func TestSettingsPrecedence(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(path, data, 0644)
+		return os.WriteFile(path, data, 0o644)
 	}
 
 	// Helper to create bool pointer
