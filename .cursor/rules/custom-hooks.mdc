@@ -1,0 +1,17 @@
+---
+description: Custom hook environment variable semantics and documentation clarifications
+---
+
+# Custom Hook Environment Notes
+
+## `FILES_CHANGED` formatting
+
+- Treat the `FILES_CHANGED` environment variable as **space-separated tokens** when
+  matching or expanding values in custom hook jobs.
+- This mirrors the runtime behavior in
+  [`internal/core/environment.go`](mdc:internal/core/environment.go), where the
+  environment builder calls `strings.Join(changedFiles, " ")` to populate the
+  variable.
+- Prefer glob or regex matchers that handle space-separated input (for example,
+  `${FILES_CHANGED} regex ".*\\.rb$"`) rather than assuming comma-delimited
+  values.

@@ -38,6 +38,7 @@ func TestFormatHookGoFile(t *testing.T) {
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewFormatHook(ctx).(*FormatHook)
@@ -61,6 +62,7 @@ func TestFormatHookJavaScriptFile(t *testing.T) {
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewFormatHook(ctx).(*FormatHook)
@@ -87,6 +89,7 @@ func TestFormatHookPythonFile(t *testing.T) {
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewFormatHook(ctx).(*FormatHook)
@@ -107,6 +110,7 @@ func TestFormatHookYAMLFile(t *testing.T) {
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewFormatHook(ctx).(*FormatHook)
@@ -133,6 +137,7 @@ func TestFormatHookUnsupportedFile(t *testing.T) {
 		CommandExecutor: mockCmd,
 		RunnerFactory:   core.MockRunnerFactory,
 		SettingsChecker: func(string) bool { return true },
+		Platform:        core.PlatformClaude,
 	}
 
 	hook := NewFormatHook(ctx).(*FormatHook)

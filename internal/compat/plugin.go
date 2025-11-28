@@ -46,5 +46,6 @@ func init() {
 		CommandExecutor: &core.RealCommandExecutor{},
 		RunnerFactory:   core.DefaultRunnerFactory,
 		SettingsChecker: config.IsPluginEnabled,
+		Platform:        core.DetectPlatform(),
 	})
 }

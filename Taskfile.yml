@@ -57,14 +57,13 @@ tasks:
       - go mod tidy
 
   lint:
-    desc: Run linter
+    desc: Run linter (using go vet due to Go 1.25 golangci-lint issue)
     cmds:
+      - go vet ./...
       - |
         if command -v golangci-lint >/dev/null 2>&1; then
-          golangci-lint run
-        else
-          echo "golangci-lint not found, running go vet instead"
-          go vet ./...
+          echo "Note: golangci-lint has a known issue with Go 1.25's printf analyzer"
+          echo "Using go vet instead. See .golangci.yml for details."
         fi
 
   test:

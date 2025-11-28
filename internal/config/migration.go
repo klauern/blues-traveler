@@ -54,70 +54,81 @@ func (d *LegacyConfigDiscovery) DiscoverLegacyConfigs() (map[string]string, erro
 // DiscoverLegacyConfigsWithScope searches for configs with optional global scope
 func (d *LegacyConfigDiscovery) DiscoverLegacyConfigsWithScope(globalSearch bool) (map[string]string, error) {
 	configs := make(map[string]string)
-
-	var searchPaths []string
-
-	if globalSearch {
-		// Global search: look in common project locations
-		searchPaths = []string{
-			// Current directory and parent directories
-			".",
-			"..",
-			"../..",
-		}
-
-		// Add user's home directory common project locations
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			searchPaths = append(searchPaths,
-				filepath.Join(homeDir, "dev"),
-				filepath.Join(homeDir, "projects"),
-				filepath.Join(homeDir, "work"),
-				filepath.Join(homeDir, "src"),
-			)
-		}
-	} else {
-		// Local search: only check current directory
-		searchPaths = []string{"."}
-	}
-
-	var bar *progressbar.ProgressBar
-	if !d.verbose {
-		bar = progressbar.NewOptions(len(searchPaths),
-			progressbar.OptionSetDescription("Searching for configs..."),
-			progressbar.OptionSetWidth(40),
-			progressbar.OptionShowCount(),
-			progressbar.OptionShowIts(),
-			progressbar.OptionSetRenderBlankState(true),
-		)
-	}
+	searchPaths := d.getSearchPaths(globalSearch)
+	bar := d.createSearchProgressBar(len(searchPaths))
 
 	for i, searchPath := range searchPaths {
-		if d.verbose {
-			fmt.Printf("Searching in: %s\n", searchPath)
-		} else {
-			_ = bar.Set(i)
-		}
-
-		if err := d.walkProjectDirectories(searchPath, configs); err != nil {
-			if d.verbose {
-				fmt.Printf("  Warning: could not search %s: %v\n", searchPath, err)
-			}
-			// Continue searching other paths on error
-			continue
-		}
-
-		if d.verbose && len(configs) > 0 {
-			fmt.Printf("  Found %d configuration(s) so far\n", len(configs))
-		}
+		d.updateSearchProgress(bar, i, searchPath)
+		d.searchPathForConfigs(searchPath, configs)
 	}
 
-	if !d.verbose {
-		_ = bar.Finish()
-		fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
-	}
-
+	d.finishSearchProgress(bar, len(configs))
 	return configs, nil
+}
+
+// getSearchPaths returns the paths to search based on the global flag.
+func (d *LegacyConfigDiscovery) getSearchPaths(globalSearch bool) []string {
+	if !globalSearch {
+		return []string{"."}
+	}
+
+	// Global search: look in common project locations
+	paths := []string{".", "..", "../.."}
+
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		paths = append(paths,
+			filepath.Join(homeDir, "dev"),
+			filepath.Join(homeDir, "projects"),
+			filepath.Join(homeDir, "work"),
+			filepath.Join(homeDir, "src"),
+		)
+	}
+	return paths
+}
+
+// createSearchProgressBar creates a progress bar if not in verbose mode.
+func (d *LegacyConfigDiscovery) createSearchProgressBar(total int) *progressbar.ProgressBar {
+	if d.verbose {
+		return nil
+	}
+	return progressbar.NewOptions(total,
+		progressbar.OptionSetDescription("Searching for configs..."),
+		progressbar.OptionSetWidth(40),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowIts(),
+		progressbar.OptionSetRenderBlankState(true),
+	)
+}
+
+// updateSearchProgress updates progress display for the current search path.
+func (d *LegacyConfigDiscovery) updateSearchProgress(bar *progressbar.ProgressBar, index int, searchPath string) {
+	if d.verbose {
+		fmt.Printf("Searching in: %s\n", searchPath)
+	} else if bar != nil {
+		_ = bar.Set(index)
+	}
+}
+
+// searchPathForConfigs searches a single path and adds found configs to the map.
+func (d *LegacyConfigDiscovery) searchPathForConfigs(searchPath string, configs map[string]string) {
+	if err := d.walkProjectDirectories(searchPath, configs); err != nil && d.verbose {
+		fmt.Printf("  Warning: could not search %s: %v\n", searchPath, err)
+	}
+	if d.verbose && len(configs) > 0 {
+		fmt.Printf("  Found %d configuration(s) so far\n", len(configs))
+	}
+}
+
+// finishSearchProgress completes the progress display.
+func (d *LegacyConfigDiscovery) finishSearchProgress(bar *progressbar.ProgressBar, configCount int) {
+	if d.verbose {
+		return
+	}
+	if bar != nil {
+		_ = bar.Finish()
+	}
+	fmt.Printf("Found %d legacy configuration file(s)\n", configCount)
 }
 
 // walkProjectDirectories recursively searches for .claude/hooks/blues-traveler-config.json files
@@ -347,44 +358,59 @@ func GetMigrationStatus(projectPath string) (*MigrationStatus, error) {
 func FormatMigrationResult(result *MigrationResult, dryRun bool) string {
 	var sb strings.Builder
 
+	formatMigrationHeader(&sb, dryRun)
+	formatMigrationSummary(&sb, result)
+	formatMigrationPaths(&sb, result, dryRun)
+
+	return sb.String()
+}
+
+// formatMigrationHeader writes the migration result header.
+func formatMigrationHeader(sb *strings.Builder, dryRun bool) {
 	if dryRun {
 		sb.WriteString("Migration Dry Run Results:\n")
 	} else {
 		sb.WriteString("Migration Results:\n")
 	}
+}
 
+// formatMigrationSummary writes the migration counts summary.
+func formatMigrationSummary(sb *strings.Builder, result *MigrationResult) {
 	sb.WriteString(fmt.Sprintf("  Found: %d legacy configurations\n", result.TotalFound))
 	sb.WriteString(fmt.Sprintf("  Migrated: %d\n", result.TotalMigrated))
 	sb.WriteString(fmt.Sprintf("  Skipped: %d (already migrated)\n", result.TotalSkipped))
 	sb.WriteString(fmt.Sprintf("  Errors: %d\n", result.TotalErrors))
+}
 
-	if len(result.MigratedPaths) > 0 {
-		sb.WriteString("\nMigrated Projects:\n")
-		for _, path := range result.MigratedPaths {
-			sb.WriteString(fmt.Sprintf("  - %s\n", path))
-		}
+// formatMigrationPaths writes the detailed path lists.
+func formatMigrationPaths(sb *strings.Builder, result *MigrationResult, dryRun bool) {
+	formatPathList(sb, "\nMigrated Projects:\n", result.MigratedPaths)
+	formatPathList(sb, "\nSkipped Projects (already migrated):\n", result.SkippedPaths)
+	formatErrorPaths(sb, result.ErrorPaths)
+
+	if !dryRun {
+		formatPathList(sb, "\nBackup Files Created:\n", result.BackupLocations)
 	}
+}
 
-	if len(result.SkippedPaths) > 0 {
-		sb.WriteString("\nSkipped Projects (already migrated):\n")
-		for _, path := range result.SkippedPaths {
-			sb.WriteString(fmt.Sprintf("  - %s\n", path))
-		}
+// formatPathList writes a labeled list of paths if non-empty.
+func formatPathList(sb *strings.Builder, header string, paths []string) {
+	if len(paths) == 0 {
+		return
 	}
-
-	if len(result.ErrorPaths) > 0 {
-		sb.WriteString("\nErrors:\n")
-		for _, errPath := range result.ErrorPaths {
-			sb.WriteString(fmt.Sprintf("  - %s: %s\n", errPath.Path, errPath.Error))
-		}
+	sb.WriteString(header)
+	for _, path := range paths {
+		sb.WriteString(fmt.Sprintf("  - %s\n", path))
 	}
+}
 
-	if !dryRun && len(result.BackupLocations) > 0 {
-		sb.WriteString("\nBackup Files Created:\n")
-		for _, backup := range result.BackupLocations {
-			sb.WriteString(fmt.Sprintf("  - %s\n", backup))
-		}
+// formatErrorPaths writes the error paths list if non-empty.
+func formatErrorPaths(sb *strings.Builder, errorPaths []MigrationError) {
+	if len(errorPaths) == 0 {
+		return
 	}
-
-	return sb.String()
+	sb.WriteString("\nErrors:\n")
+	for _, errPath := range errorPaths {
+		sb.WriteString(fmt.Sprintf("  - %s: %s\n", errPath.Path, errPath.Error))
+	}
 }

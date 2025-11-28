@@ -1,6 +1,6 @@
 # Blues Traveler
 
-[![Go Version](https://img.shields.io/badge/go-1.25.0+-blue.svg)](https://golang.org/doc/go1.25)
+[![Go Version](https://img.shields.io/badge/go-1.25.4+-blue.svg)](https://golang.org/doc/go1.25)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/klauern/blues-traveler)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -700,8 +700,8 @@ For detailed documentation, see:
 | Format not working | Ensure formatters installed: `gofmt`, `prettier`, `black` |
 | Logs not appearing | Use `--log` flag and check `~/.config/blues-traveler/` directory |
 | Permission denied | Ensure binary has execute permissions: `chmod +x blues-traveler` |
-| Config sync issues | Use `--dry-run` to preview changes, check config with `hooks custom validate` |
-| Stale hook entries | Run `hooks custom sync` - it automatically cleans up removed groups |
+| Config sync issues | Use `--dry-run` to preview changes, check config with `blues-traveler hooks custom validate` |
+| Stale hook entries | Run `blues-traveler hooks custom sync` - it automatically cleans up removed groups |
 
 ## 🤝 Contributing
 

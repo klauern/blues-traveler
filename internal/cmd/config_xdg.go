@@ -30,6 +30,39 @@ func NewConfigCmd() *cli.Command {
 	}
 }
 
+// executeMigrateCommand executes the config migrate command
+func executeMigrateCommand(dryRun, verbose, all bool) error {
+	xdg := config.NewXDGConfig()
+	discovery := config.NewLegacyConfigDiscovery(xdg)
+	discovery.SetVerbose(verbose)
+
+	printMigrateSearchInfo(xdg, verbose, all)
+
+	// Discover and migrate
+	configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
+	if err != nil {
+		return fmt.Errorf("discovery failed: %w", err)
+	}
+
+	if len(configs) == 0 {
+		printNoConfigsFound(all)
+		return nil
+	}
+
+	printFoundConfigs(configs, verbose)
+
+	result, err := discovery.MigrateConfigs(configs, dryRun)
+	if err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	// Display results
+	fmt.Print(config.FormatMigrationResult(result, dryRun))
+	printMigrationSummary(result, dryRun, xdg.GetConfigDir())
+
+	return nil
+}
+
 // NewConfigMigrateCmd creates the config migrate subcommand
 func NewConfigMigrateCmd() *cli.Command {
 	return &cli.Command{
@@ -60,46 +93,113 @@ Use --all to search across common project directories (~/dev, ~/projects, etc.).
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			dryRun := cmd.Bool("dry-run")
-			verbose := cmd.Bool("verbose")
-			all := cmd.Bool("all")
-
-			xdg := config.NewXDGConfig()
-			discovery := config.NewLegacyConfigDiscovery(xdg)
-			discovery.SetVerbose(verbose)
-
-			printMigrateSearchInfo(xdg, verbose, all)
-
-			// Discover and migrate
-			configs, err := discovery.DiscoverLegacyConfigsWithScope(all)
-			if err != nil {
-				return fmt.Errorf("discovery failed: %w", err)
-			}
-
-			if len(configs) == 0 {
-				printNoConfigsFound(all)
-				return nil
-			}
-
-			printFoundConfigs(configs, verbose)
-
-			result, err := discovery.MigrateConfigs(configs, dryRun)
-			if err != nil {
-				return fmt.Errorf("migration failed: %w", err)
-			}
-
-			// Display results
-			fmt.Print(config.FormatMigrationResult(result, dryRun))
-			printMigrationSummary(result, dryRun, xdg.GetConfigDir())
-
-			return nil
+			return executeMigrateCommand(
+				cmd.Bool("dry-run"),
+				cmd.Bool("verbose"),
+				cmd.Bool("all"),
+			)
 		},
 	}
 }
 
+// printEmptyProjectsMessage prints message when no projects are found.
+func printEmptyProjectsMessage(pathsOnly bool) {
+	if !pathsOnly {
+		fmt.Println("No projects found in XDG configuration registry.")
+		fmt.Printf("Run 'blues-traveler config migrate' to migrate existing configurations.\n")
+	}
+}
+
+// printPathsOnly outputs just the project paths.
+func printPathsOnly(projects []string) {
+	for _, project := range projects {
+		fmt.Println(project)
+	}
+}
+
+// printProjectSummary outputs the project summary header.
+func printProjectSummary(projects []string) {
+	fmt.Printf("Found %d project(s) in XDG configuration registry:\n\n", len(projects))
+}
+
+// printProjectBasic outputs basic project information.
+func printProjectBasic(project string) {
+	fmt.Printf("Project: %s\n", project)
+}
+
+// printProjectVerbose outputs detailed project information.
+func printProjectVerbose(xdg *config.XDGConfig, project string) {
+	projectConfig, err := xdg.GetProjectConfig(project)
+	if err != nil {
+		fmt.Printf("  Error: %v\n", err)
+		return
+	}
+
+	configPath := filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
+	fmt.Printf("  Config File: %s\n", configPath)
+	fmt.Printf("  Format: %s\n", projectConfig.ConfigFormat)
+	fmt.Printf("  Last Modified: %s\n", projectConfig.LastModified)
+
+	// Check if config file exists
+	if _, err := os.Stat(configPath); err != nil {
+		fmt.Printf("  Status: Missing (config file not found)\n")
+	} else {
+		fmt.Printf("  Status: OK\n")
+	}
+}
+
+// printVerboseHint prints hint about using verbose flag.
+func printVerboseHint() {
+	fmt.Printf("Use --verbose flag for detailed information.\n")
+}
+
+// executeListPathsOnly displays only project paths.
+func executeListPathsOnly(projects []string) {
+	printPathsOnly(projects)
+}
+
+// executeListVerbose displays projects with optional verbose output.
+func executeListVerbose(xdg *config.XDGConfig, projects []string, verbose bool) {
+	printProjectSummary(projects)
+
+	for _, project := range projects {
+		printProjectBasic(project)
+
+		if verbose {
+			printProjectVerbose(xdg, project)
+		}
+
+		fmt.Println()
+	}
+
+	if !verbose {
+		printVerboseHint()
+	}
+}
+
+// executeListCommand executes the config list command.
+func executeListCommand(verbose, pathsOnly bool) error {
+	xdg := config.NewXDGConfig()
+	projects, err := xdg.ListProjects()
+	if err != nil {
+		return fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	if len(projects) == 0 {
+		printEmptyProjectsMessage(pathsOnly)
+		return nil
+	}
+
+	if pathsOnly {
+		executeListPathsOnly(projects)
+		return nil
+	}
+
+	executeListVerbose(xdg, projects, verbose)
+	return nil
+}
+
 // NewConfigListCmd creates the config list subcommand
-//
-//nolint:gocognit // CLI command with rich user interaction and detailed output formatting
 func NewConfigListCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "list",
@@ -119,63 +219,10 @@ func NewConfigListCmd() *cli.Command {
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			verbose := cmd.Bool("verbose")
-			pathsOnly := cmd.Bool("paths-only")
-
-			xdg := config.NewXDGConfig()
-			projects, err := xdg.ListProjects()
-			if err != nil {
-				return fmt.Errorf("failed to list projects: %w", err)
-			}
-
-			if len(projects) == 0 {
-				if !pathsOnly {
-					fmt.Println("No projects found in XDG configuration registry.")
-					fmt.Printf("Run 'blues-traveler config migrate' to migrate existing configurations.\n")
-				}
-				return nil
-			}
-
-			if pathsOnly {
-				for _, project := range projects {
-					fmt.Println(project)
-				}
-				return nil
-			}
-
-			fmt.Printf("Found %d project(s) in XDG configuration registry:\n\n", len(projects))
-
-			for _, project := range projects {
-				fmt.Printf("Project: %s\n", project)
-
-				if verbose {
-					projectConfig, err := xdg.GetProjectConfig(project)
-					if err != nil {
-						fmt.Printf("  Error: %v\n", err)
-						continue
-					}
-
-					configPath := filepath.Join(xdg.GetConfigDir(), projectConfig.ConfigFile)
-					fmt.Printf("  Config File: %s\n", configPath)
-					fmt.Printf("  Format: %s\n", projectConfig.ConfigFormat)
-					fmt.Printf("  Last Modified: %s\n", projectConfig.LastModified)
-
-					// Check if config file exists
-					if _, err := os.Stat(configPath); err != nil {
-						fmt.Printf("  Status: Missing (config file not found)\n")
-					} else {
-						fmt.Printf("  Status: OK\n")
-					}
-				}
-
-				fmt.Println()
-			}
-
-			if !verbose {
-				fmt.Printf("Use --verbose flag for detailed information.\n")
-			}
-
-			return nil
+			return executeListCommand(
+				cmd.Bool("verbose"),
+				cmd.Bool("paths-only"),
+			)
 		},
 	}
 }
@@ -342,9 +389,79 @@ func launchEditor(editor, configPath string) error {
 	return cmd.Run()
 }
 
+// findOrphanedProjects finds projects that no longer exist on filesystem
+func findOrphanedProjects(xdg *config.XDGConfig) ([]string, error) {
+	projects, err := xdg.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	var orphaned []string
+	for _, project := range projects {
+		if _, err := os.Stat(project); os.IsNotExist(err) {
+			orphaned = append(orphaned, project)
+		}
+	}
+	return orphaned, nil
+}
+
+// printOrphanedProjects prints the list of orphaned projects
+func printOrphanedProjects(orphaned []string) {
+	fmt.Printf("Found %d orphaned configuration(s):\n", len(orphaned))
+	for _, project := range orphaned {
+		fmt.Printf("  - %s\n", project)
+	}
+
+	if len(orphaned) > 0 {
+		fmt.Printf("\nTo remove these configurations, run: blues-traveler config clean\n")
+	} else {
+		fmt.Printf("No orphaned configurations found.\n")
+	}
+}
+
+// performCleanup performs the actual cleanup of orphaned configurations
+func performCleanup(xdg *config.XDGConfig) error {
+	orphaned, err := xdg.CleanupOrphanedConfigs()
+	if err != nil {
+		return fmt.Errorf("cleanup failed: %w", err)
+	}
+
+	fmt.Printf("Cleaned up %d orphaned configuration(s):\n", len(orphaned))
+	for _, project := range orphaned {
+		fmt.Printf("  - %s\n", project)
+	}
+
+	if len(orphaned) == 0 {
+		fmt.Printf("No orphaned configurations found.\n")
+	}
+
+	return nil
+}
+
+// executeCleanDryRun executes a dry-run cleanup check.
+func executeCleanDryRun(xdg *config.XDGConfig) error {
+	fmt.Println("Dry run: checking for orphaned configurations...")
+	orphaned, err := findOrphanedProjects(xdg)
+	if err != nil {
+		return err
+	}
+	printOrphanedProjects(orphaned)
+	return nil
+}
+
+// executeCleanCommand executes the config clean command.
+func executeCleanCommand(dryRun bool) error {
+	xdg := config.NewXDGConfig()
+
+	if dryRun {
+		return executeCleanDryRun(xdg)
+	}
+
+	fmt.Println("Cleaning up orphaned configurations...")
+	return performCleanup(xdg)
+}
+
 // NewConfigCleanCmd creates the config clean subcommand
-//
-//nolint:gocognit // CLI command with interactive cleanup and detailed progress reporting
 func NewConfigCleanCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "clean",
@@ -359,61 +476,55 @@ func NewConfigCleanCmd() *cli.Command {
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			dryRun := cmd.Bool("dry-run")
-
-			xdg := config.NewXDGConfig()
-
-			if dryRun {
-				fmt.Println("Dry run: checking for orphaned configurations...")
-			} else {
-				fmt.Println("Cleaning up orphaned configurations...")
-			}
-
-			// For dry run, we'll check manually without actually removing
-			if dryRun {
-				projects, err := xdg.ListProjects()
-				if err != nil {
-					return fmt.Errorf("failed to list projects: %w", err)
-				}
-
-				var orphaned []string
-				for _, project := range projects {
-					if _, err := os.Stat(project); os.IsNotExist(err) {
-						orphaned = append(orphaned, project)
-					}
-				}
-
-				fmt.Printf("Found %d orphaned configuration(s):\n", len(orphaned))
-				for _, project := range orphaned {
-					fmt.Printf("  - %s\n", project)
-				}
-
-				if len(orphaned) > 0 {
-					fmt.Printf("\nTo remove these configurations, run: blues-traveler config clean\n")
-				} else {
-					fmt.Printf("No orphaned configurations found.\n")
-				}
-
-				return nil
-			}
-
-			// Perform actual cleanup
-			orphaned, err := xdg.CleanupOrphanedConfigs()
-			if err != nil {
-				return fmt.Errorf("cleanup failed: %w", err)
-			}
-
-			fmt.Printf("Cleaned up %d orphaned configuration(s):\n", len(orphaned))
-			for _, project := range orphaned {
-				fmt.Printf("  - %s\n", project)
-			}
-
-			if len(orphaned) == 0 {
-				fmt.Printf("No orphaned configurations found.\n")
-			}
-
-			return nil
+			return executeCleanCommand(cmd.Bool("dry-run"))
 		},
+	}
+}
+
+// displayLegacyConfigStatus displays legacy configuration status.
+func displayLegacyConfigStatus(status *config.MigrationStatus) {
+	fmt.Printf("Legacy Configuration (.claude/hooks/):\n")
+	if status.HasLegacyConfig {
+		fmt.Printf("  ✓ Found: %s\n", status.LegacyConfigPath)
+	} else {
+		fmt.Printf("  ✗ Not found: %s\n", status.LegacyConfigPath)
+	}
+}
+
+// displayXDGConfigStatus displays XDG configuration status.
+func displayXDGConfigStatus(status *config.MigrationStatus) {
+	fmt.Printf("\nXDG Configuration (~/.config/blues-traveler/):\n")
+	if status.HasXDGConfig {
+		fmt.Printf("  ✓ Found: %s\n", status.XDGConfigPath)
+	} else {
+		fmt.Printf("  ✗ Not found\n")
+	}
+}
+
+// displayMigrationStatus displays migration status.
+func displayMigrationStatus(status *config.MigrationStatus) {
+	fmt.Printf("\nMigration Status:\n")
+	switch {
+	case status.NeedsMigration:
+		fmt.Printf("  ⚠ Migration needed\n")
+		fmt.Printf("  Run: blues-traveler config migrate\n")
+	case status.HasXDGConfig:
+		fmt.Printf("  ✓ Already migrated to XDG\n")
+	case !status.HasLegacyConfig:
+		fmt.Printf("  ✓ No configuration found (will use defaults)\n")
+	}
+}
+
+// displayStatusRecommendations displays recommendations based on status.
+func displayStatusRecommendations(status *config.MigrationStatus) {
+	fmt.Printf("\nRecommendations:\n")
+	switch {
+	case status.NeedsMigration:
+		fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
+	case status.HasXDGConfig:
+		fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
+	default:
+		fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
 	}
 }
 
@@ -449,45 +560,10 @@ func NewConfigStatusCmd() *cli.Command {
 			}
 
 			fmt.Printf("Configuration Status for: %s\n\n", status.ProjectPath)
-
-			// Legacy configuration
-			fmt.Printf("Legacy Configuration (.claude/hooks/):\n")
-			if status.HasLegacyConfig {
-				fmt.Printf("  ✓ Found: %s\n", status.LegacyConfigPath)
-			} else {
-				fmt.Printf("  ✗ Not found: %s\n", status.LegacyConfigPath)
-			}
-
-			// XDG configuration
-			fmt.Printf("\nXDG Configuration (~/.config/blues-traveler/):\n")
-			if status.HasXDGConfig {
-				fmt.Printf("  ✓ Found: %s\n", status.XDGConfigPath)
-			} else {
-				fmt.Printf("  ✗ Not found\n")
-			}
-
-			// Migration status
-			fmt.Printf("\nMigration Status:\n")
-			switch {
-			case status.NeedsMigration:
-				fmt.Printf("  ⚠ Migration needed\n")
-				fmt.Printf("  Run: blues-traveler config migrate\n")
-			case status.HasXDGConfig:
-				fmt.Printf("  ✓ Already migrated to XDG\n")
-			case !status.HasLegacyConfig:
-				fmt.Printf("  ✓ No configuration found (will use defaults)\n")
-			}
-
-			// Recommendations
-			fmt.Printf("\nRecommendations:\n")
-			switch {
-			case status.NeedsMigration:
-				fmt.Printf("  • Run 'blues-traveler config migrate' to migrate to XDG structure\n")
-			case status.HasXDGConfig:
-				fmt.Printf("  • Use 'blues-traveler config edit' to modify configuration\n")
-			default:
-				fmt.Printf("  • Use 'blues-traveler config edit' to create a new configuration\n")
-			}
+			displayLegacyConfigStatus(status)
+			displayXDGConfigStatus(status)
+			displayMigrationStatus(status)
+			displayStatusRecommendations(status)
 
 			return nil
 		},
@@ -495,122 +571,123 @@ func NewConfigStatusCmd() *cli.Command {
 }
 
 // NewConfigLogCmd creates the config log subcommand
-//
-//nolint:gocognit // CLI command with multiple validation steps and comprehensive help output
 func NewConfigLogCmd() *cli.Command {
 	return &cli.Command{
 		Name:        "log",
 		Usage:       "Configure log rotation settings",
 		Description: `Configure log rotation settings including maximum age, file size, and backup count.`,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "global",
-				Aliases: []string{"g"},
-				Value:   false,
-				Usage:   "Configure global settings",
-			},
-			&cli.IntFlag{
-				Name:    "max-age",
-				Aliases: []string{"a"},
-				Value:   0,
-				Usage:   "Maximum age in days to retain log files (default: 30)",
-			},
-			&cli.IntFlag{
-				Name:    "max-size",
-				Aliases: []string{"s"},
-				Value:   0,
-				Usage:   "Maximum size in MB per log file before rotation (default: 10)",
-			},
-			&cli.IntFlag{
-				Name:    "max-backups",
-				Aliases: []string{"b"},
-				Value:   0,
-				Usage:   "Maximum number of backup files to retain (default: 5)",
-			},
-			&cli.BoolFlag{
-				Name:    "compress",
-				Aliases: []string{"c"},
-				Value:   false,
-				Usage:   "Compress rotated log files",
-			},
-			&cli.BoolFlag{
-				Name:  "show",
-				Value: false,
-				Usage: "Show current log rotation settings",
-			},
+		Flags:       logCmdFlags(),
+		Action:      logCmdAction,
+	}
+}
+
+// logCmdFlags returns the flags for the log command.
+func logCmdFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "global",
+			Aliases: []string{"g"},
+			Value:   false,
+			Usage:   "Configure global settings",
 		},
-		Action: func(_ context.Context, cmd *cli.Command) error {
-			global := cmd.Bool("global")
-			maxAge := cmd.Int("max-age")
-			maxSize := cmd.Int("max-size")
-			maxBackups := cmd.Int("max-backups")
-			compress := cmd.Bool("compress")
-			show := cmd.Bool("show")
-
-			configPath, err := config.GetLogConfigPath(global)
-			if err != nil {
-				scope := constants.ScopeProject
-				if global {
-					scope = constants.ScopeGlobal
-				}
-				return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
-			}
-
-			logConfig, err := config.LoadLogConfig(configPath)
-			if err != nil {
-				return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
-			}
-
-			if show {
-				// Show current log rotation settings
-				scope := constants.ScopeProject
-				if global {
-					scope = constants.ScopeGlobal
-				}
-				fmt.Printf("Current log rotation settings (%s: %s):\n", scope, configPath)
-				fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
-				fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
-				fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
-				fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
-				return nil
-			}
-
-			// Only update non-zero values
-			if maxAge > 0 {
-				logConfig.LogRotation.MaxAge = maxAge
-			}
-			if maxSize > 0 {
-				logConfig.LogRotation.MaxSize = maxSize
-			}
-			if maxBackups > 0 {
-				logConfig.LogRotation.MaxBackups = maxBackups
-			}
-			// Respect explicit presence of the flag (true or false)
-			if cmd.IsSet("compress") {
-				logConfig.LogRotation.Compress = compress
-			}
-
-			if err := config.SaveLogConfig(configPath, logConfig); err != nil {
-				return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
-			}
-
-			scope := "project"
-			if global {
-				scope = "global"
-			}
-			fmt.Printf("Log rotation configuration updated in %s config (%s):\n", scope, configPath)
-			fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
-			fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
-			fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
-			fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
-			return nil
+		&cli.IntFlag{
+			Name:    "max-age",
+			Aliases: []string{"a"},
+			Value:   0,
+			Usage:   "Maximum age in days to retain log files (default: 30)",
 		},
+		&cli.IntFlag{
+			Name:    "max-size",
+			Aliases: []string{"s"},
+			Value:   0,
+			Usage:   "Maximum size in MB per log file before rotation (default: 10)",
+		},
+		&cli.IntFlag{
+			Name:    "max-backups",
+			Aliases: []string{"b"},
+			Value:   0,
+			Usage:   "Maximum number of backup files to retain (default: 5)",
+		},
+		&cli.BoolFlag{
+			Name:    "compress",
+			Aliases: []string{"c"},
+			Value:   false,
+			Usage:   "Compress rotated log files",
+		},
+		&cli.BoolFlag{
+			Name:  "show",
+			Value: false,
+			Usage: "Show current log rotation settings",
+		},
+	}
+}
+
+// logCmdAction handles the log command execution.
+func logCmdAction(_ context.Context, cmd *cli.Command) error {
+	global := cmd.Bool("global")
+	scope := getScopeString(global)
+
+	configPath, err := config.GetLogConfigPath(global)
+	if err != nil {
+		return fmt.Errorf("failed to locate %s config path: %w\n  Suggestion: Ensure your project is properly initialized with 'blues-traveler hooks init'", scope, err)
+	}
+
+	logConfig, err := config.LoadLogConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config from %s: %w\n  Suggestion: Check if the config file is valid JSON format", configPath, err)
+	}
+
+	if cmd.Bool("show") {
+		printLogRotationSettings("Current", scope, configPath, logConfig)
+		return nil
+	}
+
+	applyLogRotationUpdates(cmd, logConfig)
+
+	if err := config.SaveLogConfig(configPath, logConfig); err != nil {
+		return fmt.Errorf("failed to save config to %s: %w\n  Suggestion: Check file permissions and ensure the directory is writable", configPath, err)
+	}
+
+	printLogRotationSettings("Log rotation configuration updated in", scope, configPath, logConfig)
+	return nil
+}
+
+// getScopeString returns the scope string based on the global flag.
+func getScopeString(global bool) string {
+	if global {
+		return constants.ScopeGlobal
+	}
+	return constants.ScopeProject
+}
+
+// printLogRotationSettings displays the log rotation settings.
+func printLogRotationSettings(prefix, scope, configPath string, logConfig *config.LogConfig) {
+	fmt.Printf("%s log rotation settings (%s: %s):\n", prefix, scope, configPath)
+	fmt.Printf("  Max Age: %d days\n", logConfig.LogRotation.MaxAge)
+	fmt.Printf("  Max Size: %d MB\n", logConfig.LogRotation.MaxSize)
+	fmt.Printf("  Max Backups: %d files\n", logConfig.LogRotation.MaxBackups)
+	fmt.Printf("  Compress: %t\n", logConfig.LogRotation.Compress)
+}
+
+// applyLogRotationUpdates applies non-zero values from command flags to the config.
+func applyLogRotationUpdates(cmd *cli.Command, logConfig *config.LogConfig) {
+	if maxAge := cmd.Int("max-age"); maxAge > 0 {
+		logConfig.LogRotation.MaxAge = maxAge
+	}
+	if maxSize := cmd.Int("max-size"); maxSize > 0 {
+		logConfig.LogRotation.MaxSize = maxSize
+	}
+	if maxBackups := cmd.Int("max-backups"); maxBackups > 0 {
+		logConfig.LogRotation.MaxBackups = maxBackups
+	}
+	if cmd.IsSet("compress") {
+		logConfig.LogRotation.Compress = cmd.Bool("compress")
 	}
 }
 
 // Helper functions for migrate command
 
-// printMigrateSearchInfo displays information about the migration search scope
+// printMigrateSearchInfo displays information about the migration search scope.
 func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
 	if !verbose {
 		return
@@ -623,7 +700,7 @@ func printMigrateSearchInfo(xdg *config.XDGConfig, verbose, all bool) {
 	}
 }
 
-// printNoConfigsFound displays message when no legacy configs are found
+// printNoConfigsFound displays message when no legacy configs are found.
 func printNoConfigsFound(all bool) {
 	if all {
 		fmt.Printf("No legacy configurations found to migrate.\n")
@@ -633,7 +710,7 @@ func printNoConfigsFound(all bool) {
 	}
 }
 
-// printFoundConfigs displays discovered configuration files
+// printFoundConfigs displays discovered configuration files.
 func printFoundConfigs(configs map[string]string, verbose bool) {
 	fmt.Printf("Found %d legacy configuration file(s)\n", len(configs))
 
@@ -646,7 +723,7 @@ func printFoundConfigs(configs map[string]string, verbose bool) {
 	}
 }
 
-// printMigrationSummary displays summary after migration
+// printMigrationSummary displays summary after migration.
 func printMigrationSummary(result *config.MigrationResult, dryRun bool, configDir string) {
 	if !dryRun && result.TotalMigrated > 0 {
 		fmt.Printf("\nMigration completed successfully!\n")

@@ -34,14 +34,65 @@ func NewAuditHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the audit hook.
 func (h *AuditHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Audit plugin disabled - skipping")
-		return nil
-	}
+	return h.StandardRun(h.preToolUseHandler, h.postToolUseHandler)
+}
 
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, h.postToolUseHandler, h.CreateRawHandler())
-	runner.Run()
-	return nil
+// addToolSpecificDetails adds tool-specific details to the audit entry
+func (h *AuditHook) addToolSpecificDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	switch event.ToolName {
+	case constants.ToolBash:
+		h.addBashDetails(entry, event)
+	case constants.ToolEdit:
+		h.addEditDetails(entry, event)
+	case constants.ToolWrite:
+		h.addWriteDetails(entry, event)
+	case constants.ToolRead:
+		h.addReadDetails(entry, event)
+	case constants.ToolGlob:
+		h.addGlobDetails(entry, event)
+	case constants.ToolGrep:
+		h.addGrepDetails(entry, event)
+	}
+}
+
+func (h *AuditHook) addBashDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if bash, err := event.AsBash(); err == nil {
+		entry.Details["command"] = bash.Command
+		entry.Details["description"] = bash.Description
+	}
+}
+
+func (h *AuditHook) addEditDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if edit, err := event.AsEdit(); err == nil {
+		entry.Details["file_path"] = edit.FilePath
+		entry.Details["old_string_length"] = len(edit.OldString)
+		entry.Details["new_string_length"] = len(edit.NewString)
+	}
+}
+
+func (h *AuditHook) addWriteDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if write, err := event.AsWrite(); err == nil {
+		entry.Details["file_path"] = write.FilePath
+		entry.Details["content_length"] = len(write.Content)
+	}
+}
+
+func (h *AuditHook) addReadDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if read, err := event.AsRead(); err == nil {
+		entry.Details["file_path"] = read.FilePath
+	}
+}
+
+func (h *AuditHook) addGlobDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if glob, err := event.AsGlob(); err == nil {
+		entry.Details["pattern"] = glob.Pattern
+	}
+}
+
+func (h *AuditHook) addGrepDetails(entry *AuditEntry, event *cchooks.PreToolUseEvent) {
+	if grep, err := event.AsGrep(); err == nil {
+		entry.Details["pattern"] = grep.Pattern
+	}
 }
 
 func (h *AuditHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
@@ -51,38 +102,7 @@ func (h *AuditHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolU
 		Details:  make(map[string]interface{}),
 	}
 
-	// Add tool-specific details
-	switch event.ToolName {
-	case constants.ToolBash:
-		if bash, err := event.AsBash(); err == nil {
-			entry.Details["command"] = bash.Command
-			entry.Details["description"] = bash.Description
-		}
-	case constants.ToolEdit:
-		if edit, err := event.AsEdit(); err == nil {
-			entry.Details["file_path"] = edit.FilePath
-			entry.Details["old_string_length"] = len(edit.OldString)
-			entry.Details["new_string_length"] = len(edit.NewString)
-		}
-	case constants.ToolWrite:
-		if write, err := event.AsWrite(); err == nil {
-			entry.Details["file_path"] = write.FilePath
-			entry.Details["content_length"] = len(write.Content)
-		}
-	case constants.ToolRead:
-		if read, err := event.AsRead(); err == nil {
-			entry.Details["file_path"] = read.FilePath
-		}
-	case constants.ToolGlob:
-		if glob, err := event.AsGlob(); err == nil {
-			entry.Details["pattern"] = glob.Pattern
-		}
-	case constants.ToolGrep:
-		if grep, err := event.AsGrep(); err == nil {
-			entry.Details["pattern"] = grep.Pattern
-		}
-	}
-
+	h.addToolSpecificDetails(&entry, event)
 	h.logAuditEntry(entry)
 
 	// Also use the new detailed logging if enabled

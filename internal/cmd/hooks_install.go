@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// installFlags holds the parsed command flags
+// installFlags holds the parsed command flags.
 type installFlags struct {
 	global     bool
 	event      string
@@ -23,7 +23,7 @@ type installFlags struct {
 	logFormat  string
 }
 
-// parseInstallFlags extracts and validates flags from the command
+// parseInstallFlags extracts and validates flags from the command.
 func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
 	flags := installFlags{
 		global:     cmd.Bool("global"),
@@ -45,7 +45,7 @@ func parseInstallFlags(cmd *cli.Command) (installFlags, error) {
 	return flags, nil
 }
 
-// buildInstallHookCommand constructs the hook command string for install
+// buildInstallHookCommand constructs the hook command string for install.
 func buildInstallHookCommand(hookType string, flags installFlags) (string, error) {
 	execPath, err := os.Executable()
 	if err != nil {
@@ -69,7 +69,7 @@ func buildInstallHookCommand(hookType string, flags installFlags) (string, error
 	return hookCommand, nil
 }
 
-// handleDuplicateHookResult processes duplicate detection results
+// handleDuplicateHookResult processes duplicate detection results.
 func handleDuplicateHookResult(result config.MergeResult) bool {
 	if !result.WasDuplicate {
 		return false
@@ -85,7 +85,7 @@ func handleDuplicateHookResult(result config.MergeResult) bool {
 	return true
 }
 
-// printHookInstallSuccess displays success message
+// printHookInstallSuccess displays success message.
 func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, settingsPath string) {
 	fmt.Printf("✅ Successfully installed %s hook in %s settings\n", hookType, scope)
 	fmt.Printf("   Event: %s\n", event)
@@ -95,21 +95,62 @@ func printHookInstallSuccess(hookType, scope, event, matcher, hookCommand, setti
 	fmt.Println()
 }
 
-// installHookAction performs the hook installation
-func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
-	// Resolve Cursor alias to canonical event name first (accept both canonical and Cursor aliases)
-	// This allows users to use Cursor event names like "beforeShellExecution"
-	// which will be resolved to "PreToolUse"
-	resolvedEvent := core.ResolveEventAlias(flags.event)
+// resolveAndValidateEvent resolves event alias and validates it.
+func resolveAndValidateEvent(event string, isValidEventType func(string) bool, validEventTypes func() []string) (string, error) {
+	resolvedEvent := core.ResolveEventAlias(event)
 	if resolvedEvent == "" {
-		resolvedEvent = flags.event // Already canonical (or unknown)
+		resolvedEvent = event // Already canonical (or unknown)
 	}
 
-	// Validate the resolved/canonical event name
 	if !isValidEventType(resolvedEvent) {
-		return fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", flags.event, strings.Join(validEventTypes(), ", "))
+		return "", fmt.Errorf("invalid event '%s'.\nValid events: %s\nUse 'hooks list --events' to see all available events with descriptions", event, strings.Join(validEventTypes(), ", "))
 	}
 
+	return resolvedEvent, nil
+}
+
+// loadAndValidateSettings loads settings from the specified path.
+func loadAndValidateSettings(settingsPath string) (*config.Settings, error) {
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
+	}
+	return settings, nil
+}
+
+// saveSettingsIfNeeded saves settings only if not a duplicate.
+func saveSettingsIfNeeded(settingsPath string, settings *config.Settings, isDuplicateNoChange bool) error {
+	if !isDuplicateNoChange {
+		if err := config.SaveSettings(settingsPath, settings); err != nil {
+			return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
+		}
+	}
+	return nil
+}
+
+// performPostInstallActions runs post-install actions for specific hook types.
+func performPostInstallActions(hookType string, global bool) {
+	if hookType == "fetch-blocker" {
+		createSampleBlockedUrlsFile(global)
+	}
+}
+
+// showInstallSuccessMessages shows success messages if not a duplicate.
+func showInstallSuccessMessages(hookType string, scope string, flags installFlags, hookCommand string, settingsPath string, isDuplicateNoChange bool) {
+	if !isDuplicateNoChange {
+		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
+		fmt.Println("The hook will be active in new Claude Code sessions.")
+		fmt.Println("Use 'claude /hooks' to verify the configuration.")
+	}
+}
+
+// installHookAction performs the hook installation.
+func installHookAction(hookType string, flags installFlags, isValidEventType func(string) bool, validEventTypes func() []string) error {
+	// Resolve and validate event
+	resolvedEvent, err := resolveAndValidateEvent(flags.event, isValidEventType, validEventTypes)
+	if err != nil {
+		return err
+	}
 	flags.event = resolvedEvent
 
 	// Build hook command
@@ -129,9 +170,9 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	}
 
 	// Load existing settings
-	settings, err := config.LoadSettings(settingsPath)
+	settings, err := loadAndValidateSettings(settingsPath)
 	if err != nil {
-		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
+		return err
 	}
 
 	// Add hook to settings
@@ -145,10 +186,8 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 	isDuplicateNoChange := handleDuplicateHookResult(result)
 
 	// Save settings (only if not a duplicate with no changes)
-	if !isDuplicateNoChange {
-		if err := config.SaveSettings(settingsPath, settings); err != nil {
-			return fmt.Errorf("failed to save settings to %s: %w\n  Suggestion: Check file permissions and disk space", settingsPath, err)
-		}
+	if err := saveSettingsIfNeeded(settingsPath, settings, isDuplicateNoChange); err != nil {
+		return err
 	}
 
 	scope := ScopeProject
@@ -156,26 +195,30 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 		scope = ScopeGlobal
 	}
 
-	// Only show installation success message if not a duplicate
-	if !isDuplicateNoChange {
-		printHookInstallSuccess(hookType, scope, flags.event, flags.matcher, hookCommand, settingsPath)
-	}
+	// Show success messages
+	showInstallSuccessMessages(hookType, scope, flags, hookCommand, settingsPath, isDuplicateNoChange)
 
 	// Post-install actions for specific plugins (run even for duplicates)
-	if hookType == "fetch-blocker" {
-		createSampleBlockedUrlsFile(flags.global)
-	}
-
-	// Only show the activation message if not a duplicate
-	if !isDuplicateNoChange {
-		fmt.Println("The hook will be active in new Claude Code sessions.")
-		fmt.Println("Use 'claude /hooks' to verify the configuration.")
-	}
+	performPostInstallActions(hookType, flags.global)
 
 	return nil
 }
 
-// newHooksInstallCommand creates the install command
+// executeInstallCommand executes the hooks install command.
+func executeInstallCommand(hookType string, flags installFlags, getPlugin func(string) (interface {
+	Run() error
+	Description() string
+}, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
+) error {
+	// Validate plugin exists
+	if _, exists := getPlugin(hookType); !exists {
+		return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", hookType, strings.Join(pluginKeys(), ", "))
+	}
+
+	return installHookAction(hookType, flags, isValidEventType, validEventTypes)
+}
+
+// newHooksInstallCommand creates the install command.
 func newHooksInstallCommand(getPlugin func(string) (interface {
 	Run() error
 	Description() string
@@ -231,23 +274,69 @@ This will automatically configure the hook to run for the specified events.`,
 			}
 			hookType := args[0]
 
-			// Validate plugin exists
-			if _, exists := getPlugin(hookType); !exists {
-				return fmt.Errorf("plugin '%s' not found.\nAvailable plugins: %s", hookType, strings.Join(pluginKeys(), ", "))
-			}
-
 			// Parse and validate flags
 			flags, err := parseInstallFlags(cmd)
 			if err != nil {
 				return err
 			}
 
-			return installHookAction(hookType, flags, isValidEventType, validEventTypes)
+			return executeInstallCommand(hookType, flags, getPlugin, pluginKeys, isValidEventType, validEventTypes)
 		},
 	}
 }
 
-// newHooksUninstallCommand creates the uninstall command
+// executeUninstallSpecificHook uninstalls a specific hook type.
+func executeUninstallSpecificHook(hookType string, global bool) error {
+	// Get settings path
+	settingsPath, err := config.GetSettingsPath(global)
+	if err != nil {
+		scope := ScopeProject
+		if global {
+			scope = ScopeGlobal
+		}
+		return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
+	}
+
+	// Load existing settings
+	settings, err := config.LoadSettings(settingsPath)
+	if err != nil {
+		return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
+	}
+
+	// Remove hook from settings using pattern matching
+	// This handles hooks installed with flags (--log, --format) or different executable paths
+	removed := config.RemoveHookTypeFromSettings(settings, hookType)
+
+	if !removed {
+		return fmt.Errorf("hook type '%s' was not found in settings", hookType)
+	}
+
+	// Save settings
+	if err := config.SaveSettings(settingsPath, settings); err != nil {
+		return fmt.Errorf("error saving settings: %w", err)
+	}
+
+	scope := constants.ScopeProject
+	if global {
+		scope = constants.ScopeGlobal
+	}
+
+	fmt.Printf("✅ Successfully removed all '%s' hooks from %s settings\n", hookType, scope)
+	fmt.Printf("   Settings: %s\n", settingsPath)
+	return nil
+}
+
+// executeUninstallCommand executes the hooks uninstall command.
+func executeUninstallCommand(hookType string, global, skipConfirmation bool) error {
+	// Handle 'all' case
+	if hookType == "all" {
+		return uninstallAllKlauerHooks(global, skipConfirmation)
+	}
+
+	return executeUninstallSpecificHook(hookType, global)
+}
+
+// newHooksUninstallCommand creates the uninstall command.
 func newHooksUninstallCommand() *cli.Command {
 	return &cli.Command{
 		Name:        "uninstall",
@@ -274,94 +363,19 @@ func newHooksUninstallCommand() *cli.Command {
 				return fmt.Errorf("exactly one argument required: [hook-type|all]")
 			}
 			hookType := args[0]
-			global := cmd.Bool("global")
 
-			// Handle 'all' case
-			if hookType == "all" {
-				return uninstallAllKlauerHooks(global, cmd.Bool("yes"))
-			}
-
-			// Get settings path
-			settingsPath, err := config.GetSettingsPath(global)
-			if err != nil {
-				scope := ScopeProject
-				if global {
-					scope = ScopeGlobal
-				}
-				return fmt.Errorf("failed to locate %s settings path: %w\n  Suggestion: Run 'blues-traveler hooks init' to initialize the project", scope, err)
-			}
-
-			// Load existing settings
-			settings, err := config.LoadSettings(settingsPath)
-			if err != nil {
-				return fmt.Errorf("failed to load settings from %s: %w\n  Suggestion: Verify the settings file format is valid JSON", settingsPath, err)
-			}
-
-			// Remove hook from settings using pattern matching
-			// This handles hooks installed with flags (--log, --format) or different executable paths
-			removed := config.RemoveHookTypeFromSettings(settings, hookType)
-
-			if !removed {
-				return fmt.Errorf("hook type '%s' was not found in settings", hookType)
-			}
-
-			// Save settings
-			if err := config.SaveSettings(settingsPath, settings); err != nil {
-				return fmt.Errorf("error saving settings: %w", err)
-			}
-
-			scope := constants.ScopeProject
-			if global {
-				scope = constants.ScopeGlobal
-			}
-
-			fmt.Printf("✅ Successfully removed all '%s' hooks from %s settings\n", hookType, scope)
-			fmt.Printf("   Settings: %s\n", settingsPath)
-			return nil
+			return executeUninstallCommand(
+				hookType,
+				cmd.Bool("global"),
+				cmd.Bool("yes"),
+			)
 		},
 	}
 }
 
-// createSampleBlockedUrlsFile creates a sample blocked-urls.txt file for the fetch-blocker hook
-func createSampleBlockedUrlsFile(global bool) {
-	// Determine the target directory
-	var targetDir string
-	var scope string
-
-	if global {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
-			return
-		}
-		targetDir = filepath.Join(homeDir, ".claude")
-		scope = constants.ScopeGlobal
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
-			return
-		}
-		targetDir = filepath.Join(cwd, ".claude")
-		scope = constants.ScopeProject
-	}
-
-	blockedUrlsPath := filepath.Join(targetDir, "blocked-urls.txt")
-
-	// Check if file already exists
-	if _, err := os.Stat(blockedUrlsPath); err == nil {
-		fmt.Printf("📄 Sample blocked-urls.txt already exists: %s\n", blockedUrlsPath)
-		return
-	}
-
-	// Ensure the .claude directory exists
-	if err := os.MkdirAll(targetDir, 0o750); err != nil {
-		fmt.Printf("⚠️  Could not create .claude directory: %v\n", err)
-		return
-	}
-
-	// Create the sample file content
-	sampleContent := `# Blocked URL prefixes for fetch-blocker hook
+// getBlockedUrlsSampleContent returns the sample content for blocked-urls.txt.
+func getBlockedUrlsSampleContent() string {
+	return `# Blocked URL prefixes for fetch-blocker hook
 # Format: prefix|suggestion (suggestion is optional)
 # Lines starting with # are comments
 
@@ -385,8 +399,55 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 # https://example.com/*|Wildcard blocks all paths under domain
 # *.internal.company.com/*|Wildcard subdomain pattern
 `
+}
+
+// determineBlockedUrlsDir determines the target directory for blocked-urls.txt.
+func determineBlockedUrlsDir(global bool) (string, string, error) {
+	if global {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", "", err
+		}
+		return filepath.Join(homeDir, ".claude"), constants.ScopeGlobal, nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(cwd, ".claude"), constants.ScopeProject, nil
+}
+
+// ensureBlockedUrlsDir ensures the directory exists.
+func ensureBlockedUrlsDir(targetDir string) error {
+	return os.MkdirAll(targetDir, 0o750)
+}
+
+// createSampleBlockedUrlsFile creates a sample blocked-urls.txt file for the fetch-blocker hook.
+func createSampleBlockedUrlsFile(global bool) {
+	// Determine the target directory
+	targetDir, scope, err := determineBlockedUrlsDir(global)
+	if err != nil {
+		fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
+		return
+	}
+
+	blockedUrlsPath := filepath.Join(targetDir, "blocked-urls.txt")
+
+	// Check if file already exists
+	if _, err := os.Stat(blockedUrlsPath); err == nil {
+		fmt.Printf("📄 Sample blocked-urls.txt already exists: %s\n", blockedUrlsPath)
+		return
+	}
+
+	// Ensure the .claude directory exists
+	if err := ensureBlockedUrlsDir(targetDir); err != nil {
+		fmt.Printf("⚠️  Could not create .claude directory: %v\n", err)
+		return
+	}
 
 	// Write the sample file
+	sampleContent := getBlockedUrlsSampleContent()
 	if err := os.WriteFile(blockedUrlsPath, []byte(sampleContent), 0o600); err != nil {
 		fmt.Printf("⚠️  Could not create sample blocked-urls.txt: %v\n", err)
 		return
@@ -394,6 +455,22 @@ https://api.github.com/repos/*/*/contents/*|Use 'gh api' for authenticated GitHu
 
 	fmt.Printf("📄 Created sample blocked-urls.txt (%s): %s\n", scope, blockedUrlsPath)
 	fmt.Printf("   Edit this file to add your own blocked URL prefixes.\n")
+}
+
+// promptUninstallAllConfirmation prompts user for confirmation to uninstall all hooks.
+func promptUninstallAllConfirmation(scope string) bool {
+	fmt.Printf("Continue? (y/N): ")
+	var response string
+	_, _ = fmt.Scanln(&response)
+	return response == "y" || response == "Y" || response == "yes"
+}
+
+// displayUninstallAllSummary displays what will be removed before confirmation
+func displayUninstallAllSummary(totalHooks int, scope string, settings *config.Settings) {
+	fmt.Printf("Found %d blues-traveler hooks in %s settings:\n\n", totalHooks, scope)
+	config.PrintBluesTravelerToRemove(settings)
+	fmt.Printf("\nThis will remove ALL blues-traveler hooks from %s settings.\n", scope)
+	fmt.Printf("Other hooks (not from blues-traveler) will be preserved.\n")
 }
 
 // uninstallAllKlauerHooks removes all blues-traveler hooks from settings
@@ -424,21 +501,12 @@ func uninstallAllKlauerHooks(global bool, skipConfirmation bool) error {
 	}
 
 	// Show what will be removed
-	fmt.Printf("Found %d blues-traveler hooks in %s settings:\n\n", totalHooksBefore, scope)
-	config.PrintBluesTravelerToRemove(settings)
+	displayUninstallAllSummary(totalHooksBefore, scope, settings)
 
 	// Confirmation prompt
-	fmt.Printf("\nThis will remove ALL blues-traveler hooks from %s settings.\n", scope)
-	fmt.Printf("Other hooks (not from blues-traveler) will be preserved.\n")
-
-	if !skipConfirmation {
-		fmt.Printf("Continue? (y/N): ")
-		var response string
-		_, _ = fmt.Scanln(&response)
-		if response != "y" && response != "Y" && response != "yes" {
-			fmt.Println("Operation cancelled.")
-			return nil
-		}
+	if !skipConfirmation && !promptUninstallAllConfirmation(scope) {
+		fmt.Println("Operation cancelled.")
+		return nil
 	}
 
 	// Remove all blues-traveler hooks

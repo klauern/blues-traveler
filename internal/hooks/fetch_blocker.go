@@ -27,14 +27,7 @@ func NewFetchBlockerHook(ctx *core.HookContext) core.Hook {
 
 // Run executes the fetch blocker hook.
 func (h *FetchBlockerHook) Run() error {
-	if !h.IsEnabled() {
-		fmt.Println("Fetch blocker plugin disabled - skipping")
-		return nil
-	}
-
-	runner := h.Context().RunnerFactory(h.preToolUseHandler, nil, h.CreateRawHandler())
-	runner.Run()
-	return nil
+	return h.StandardRun(h.preToolUseHandler, nil)
 }
 
 func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
@@ -47,7 +40,7 @@ func (h *FetchBlockerHook) preToolUseHandler(_ context.Context, event *cchooks.P
 
 	webFetch, err := event.AsWebFetch()
 	if err != nil {
-		h.logError(event.ToolName, err)
+		h.LogError("fetch_blocker_error", event.ToolName, err)
 		return cchooks.Block("failed to parse WebFetch command")
 	}
 
@@ -82,13 +75,6 @@ func (h *FetchBlockerHook) logEventDetails(event *cchooks.PreToolUseEvent) {
 	h.LogHookEvent("pre_tool_use_fetch_check", event.ToolName, rawData, details)
 }
 
-// logError logs a parsing error
-func (h *FetchBlockerHook) logError(toolName string, err error) {
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("fetch_blocker_error", toolName, map[string]interface{}{"error": err.Error()}, nil)
-	}
-}
-
 // logLoadError logs an error loading blocked prefixes
 func (h *FetchBlockerHook) logLoadError(toolName string, err error) {
 	if h.Context().LoggingEnabled {
@@ -113,20 +99,16 @@ func (h *FetchBlockerHook) checkAndBlockURL(url string, blockedPrefixes []Blocke
 	blocked, matchedPrefix, suggestion := h.isURLBlocked(url, blockedPrefixes)
 	if !blocked {
 		// Log approval and return
-		if h.Context().LoggingEnabled {
-			h.LogHookEvent("fetch_blocker_approved", "WebFetch", map[string]interface{}{"url": url}, nil)
-		}
+		h.LogApproval("fetch_blocker_approved", "WebFetch", map[string]interface{}{"url": url})
 		return cchooks.Approve()
 	}
 
 	// Log block event
-	if h.Context().LoggingEnabled {
-		h.LogHookEvent("fetch_blocker_block", "WebFetch", map[string]interface{}{
-			"url":            url,
-			"matched_prefix": matchedPrefix,
-			"suggestion":     suggestion,
-		}, nil)
-	}
+	h.LogBlock("fetch_blocker_block", "WebFetch", map[string]interface{}{
+		"url":            url,
+		"matched_prefix": matchedPrefix,
+		"suggestion":     suggestion,
+	})
 
 	// Build block messages
 	userMsg := "This URL requires authentication or an alternative access method."
@@ -137,12 +119,8 @@ func (h *FetchBlockerHook) checkAndBlockURL(url string, blockedPrefixes []Blocke
 	return core.BlockWithMessages(userMsg, agentMsg)
 }
 
-// loadBlockedPrefixes loads URL prefixes from the blocked URLs file
-func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
-	// Look for blocked URLs file in multiple locations:
-	// 1. Project-local: ./.claude/blocked-urls.txt
-	// 2. Global: ~/.claude/blocked-urls.txt
-
+// getBlockedURLsFilePaths returns the list of possible blocked URLs file locations
+func (h *FetchBlockerHook) getBlockedURLsFilePaths() []string {
 	var filePaths []string
 
 	// Project-local file
@@ -155,47 +133,81 @@ func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
 		filePaths = append(filePaths, filepath.Join(homeDir, ".claude", "blocked-urls.txt"))
 	}
 
+	return filePaths
+}
+
+// loadPrefixesFromFile attempts to load blocked prefixes from a specific file
+func (h *FetchBlockerHook) loadPrefixesFromFile(filePath string) ([]BlockedPrefix, error) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil, nil // File doesn't exist, not an error
+	}
+
+	file, err := os.Open(filePath) // #nosec G304 - paths constructed from os.Getwd()/os.UserHomeDir() + fixed ".claude/blocked-urls.txt" suffix
+	if err != nil {
+		return nil, nil // File can't be opened, not an error
+	}
+	defer func() {
+		_ = file.Close() // Ignore close error in defer
+	}()
+
+	return h.parseBlockedURLsFile(file)
+}
+
+// parseBlockedURLsFile parses the content of a blocked URLs file
+func (h *FetchBlockerHook) parseBlockedURLsFile(file *os.File) ([]BlockedPrefix, error) {
 	var prefixes []BlockedPrefix
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if h.shouldSkipLine(line) {
+			continue
+		}
+
+		if blocked, err := h.parseBlockedURLLine(line); err != nil {
+			return nil, err
+		} else if blocked != nil {
+			prefixes = append(prefixes, *blocked)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+
+	return prefixes, nil
+}
+
+// shouldSkipLine determines if a line should be skipped during parsing
+func (h *FetchBlockerHook) shouldSkipLine(line string) bool {
+	return line == "" || strings.HasPrefix(line, "#")
+}
+
+// parseBlockedURLLine parses a single line from the blocked URLs file
+func (h *FetchBlockerHook) parseBlockedURLLine(line string) (*BlockedPrefix, error) {
+	// Parse line format: "prefix|suggestion" or just "prefix"
+	parts := strings.SplitN(line, "|", 2)
+	blocked := &BlockedPrefix{
+		Prefix: parts[0],
+	}
+	if len(parts) > 1 {
+		blocked.Suggestion = parts[1]
+	}
+	return blocked, nil
+}
+
+// loadBlockedPrefixes loads URL prefixes from the blocked URLs file
+func (h *FetchBlockerHook) loadBlockedPrefixes() ([]BlockedPrefix, error) {
+	filePaths := h.getBlockedURLsFilePaths()
 
 	// Try each file location
 	for _, filePath := range filePaths {
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			continue
-		}
-
-		file, err := os.Open(filePath) // #nosec G304 - controlled config file paths
-		if err != nil {
-			continue
-		}
-		defer func() {
-			_ = file.Close() // Ignore close error in defer
-		}()
-
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			// Skip empty lines and comments
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-
-			// Parse line format: "prefix|suggestion" or just "prefix"
-			parts := strings.SplitN(line, "|", 2)
-			blocked := BlockedPrefix{
-				Prefix: parts[0],
-			}
-			if len(parts) > 1 {
-				blocked.Suggestion = parts[1]
-			}
-			prefixes = append(prefixes, blocked)
-		}
-
-		if err := scanner.Err(); err != nil {
+		if prefixes, err := h.loadPrefixesFromFile(filePath); err != nil {
 			return nil, fmt.Errorf("error reading file %s: %w", filePath, err)
+		} else if prefixes != nil {
+			// If we successfully loaded from this file, return the prefixes
+			return prefixes, nil
 		}
-
-		// If we successfully loaded from this file, return the prefixes
-		return prefixes, nil
 	}
 
 	// No file found, return empty list (allow all)
