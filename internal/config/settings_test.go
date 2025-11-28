@@ -468,8 +468,10 @@ func TestSettingsPrecedence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set HOME to global directory
+			// Set HOME to global directory (Unix-like systems)
 			t.Setenv("HOME", globalDir)
+			// Set USERPROFILE for Windows compatibility
+			t.Setenv("USERPROFILE", globalDir)
 
 			// Write global settings
 			if err := writeSettings(globalDir, tt.globalSettings); err != nil {
