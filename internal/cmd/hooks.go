@@ -23,31 +23,49 @@ type ClaudeCodeEvent struct {
 // EventType represents a Claude Code hook event
 type EventType string
 
-// NewHooksCommand creates the main hooks command with all subcommands
-func NewHooksCommand(getPlugin func(string) (interface {
+// PluginProvider defines the interface for plugin operations
+type PluginProvider interface {
 	Run() error
 	Description() string
-}, bool), isPluginEnabled func(string) bool, pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string, allEvents func() []ClaudeCodeEvent,
-) *cli.Command {
+}
+
+// HooksCommandConfig encapsulates all dependencies for hooks command construction
+type HooksCommandConfig struct {
+	// GetPlugin retrieves a plugin by its key
+	GetPlugin func(string) (PluginProvider, bool)
+	// IsPluginEnabled checks if a plugin is enabled in settings
+	IsPluginEnabled func(string) bool
+	// PluginKeys returns all available plugin keys
+	PluginKeys func() []string
+	// IsValidEventType validates an event type string
+	IsValidEventType func(string) bool
+	// ValidEventTypes returns all valid event type strings
+	ValidEventTypes func() []string
+	// AllEvents returns all available Claude Code events
+	AllEvents func() []ClaudeCodeEvent
+}
+
+// NewHooksCommand creates the main hooks command with all subcommands
+func NewHooksCommand(cfg *HooksCommandConfig) *cli.Command {
 	return &cli.Command{
 		Name:        "hooks",
 		Usage:       "Manage and run hook plugins",
 		Description: `Manage hook plugins including listing, running, installing, and uninstalling hooks.`,
 		Commands: []*cli.Command{
-			newHooksListCommand(getPlugin, pluginKeys, allEvents),
-			newHooksRunCommand(getPlugin, isPluginEnabled, pluginKeys),
-			newHooksInstallCommand(getPlugin, pluginKeys, isValidEventType, validEventTypes),
+			newHooksListCommand(cfg.GetPlugin, cfg.PluginKeys, cfg.AllEvents),
+			newHooksRunCommand(cfg.GetPlugin, cfg.IsPluginEnabled, cfg.PluginKeys),
+			newHooksInstallCommand(cfg.GetPlugin, cfg.PluginKeys, cfg.IsValidEventType, cfg.ValidEventTypes),
 			newHooksUninstallCommand(),
-			newHooksCustomCommand(isValidEventType, validEventTypes),
+			newHooksCustomCommand(cfg.IsValidEventType, cfg.ValidEventTypes),
 		},
 	}
 }
 
 // newHooksListCommand creates the consolidated list command
-func newHooksListCommand(getPlugin func(string) (interface {
-	Run() error
-	Description() string
-}, bool), pluginKeys func() []string, allEvents func() []ClaudeCodeEvent,
+func newHooksListCommand(
+	getPlugin func(string) (PluginProvider, bool),
+	pluginKeys func() []string,
+	allEvents func() []ClaudeCodeEvent,
 ) *cli.Command {
 	return &cli.Command{
 		Name:        "list",
@@ -93,10 +111,10 @@ func newHooksListCommand(getPlugin func(string) (interface {
 }
 
 // newHooksRunCommand creates the run command
-func newHooksRunCommand(getPlugin func(string) (interface {
-	Run() error
-	Description() string
-}, bool), isPluginEnabled func(string) bool, pluginKeys func() []string,
+func newHooksRunCommand(
+	getPlugin func(string) (PluginProvider, bool),
+	isPluginEnabled func(string) bool,
+	pluginKeys func() []string,
 ) *cli.Command {
 	return &cli.Command{
 		Name:        "run",

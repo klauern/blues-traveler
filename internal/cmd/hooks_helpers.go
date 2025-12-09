@@ -16,10 +16,9 @@ const (
 )
 
 // listAvailableHooks lists all available hook plugins
-func listAvailableHooks(getPlugin func(string) (interface {
-	Run() error
-	Description() string
-}, bool), pluginKeys func() []string,
+func listAvailableHooks(
+	getPlugin func(string) (PluginProvider, bool),
+	pluginKeys func() []string,
 ) error {
 	keys := pluginKeys()
 	var builtin, custom []string

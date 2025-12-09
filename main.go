@@ -23,11 +23,7 @@ var (
 
 func main() {
 	// Create wrapper functions for compatibility
-	getPluginWrapper := func(key string) (interface {
-		Run() error
-		Description() string
-	}, bool,
-	) {
+	getPluginWrapper := func(key string) (cmd.PluginProvider, bool) {
 		p, exists := compat.GetPlugin(key)
 		if !exists {
 			return nil, false
@@ -49,6 +45,16 @@ func main() {
 		return result
 	}
 
+	// Create hooks command configuration
+	hooksConfig := &cmd.HooksCommandConfig{
+		GetPlugin:        getPluginWrapper,
+		IsPluginEnabled:  compat.IsPluginEnabled,
+		PluginKeys:       compat.PluginKeys,
+		IsValidEventType: core.IsValidEventType,
+		ValidEventTypes:  core.ValidEventTypes,
+		AllEvents:        eventsWrapper,
+	}
+
 	// Create version info
 	versionInfo := cmd.VersionInfo{
 		Version: version,
@@ -64,7 +70,7 @@ func main() {
 		Description: `A CLI tool that runs Claude Code hooks directly and manages hook installations.
 Like the classic Blues Traveler song, our hooks will bring you back to clean, secure, and well-formatted code.`,
 		Commands: []*cli.Command{
-			cmd.NewHooksCommand(getPluginWrapper, compat.IsPluginEnabled, compat.PluginKeys, core.IsValidEventType, core.ValidEventTypes, eventsWrapper),
+			cmd.NewHooksCommand(hooksConfig),
 			cmd.NewDoctorCommand(),
 			cmd.NewConfigCmd(),
 			cmd.NewGenerateCmd(),

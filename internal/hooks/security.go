@@ -182,8 +182,12 @@ func (h *SecurityHook) parseRmCommand(tokens []string) ([]string, []string) {
 
 // hasRecursiveFlag checks if the flags contain recursive options
 func (h *SecurityHook) hasRecursiveFlag(flags []string) bool {
-	flagStr := strings.Join(flags, " ")
-	return strings.Contains(flagStr, "r") || strings.Contains(flagStr, "R")
+	for _, flag := range flags {
+		if strings.HasPrefix(flag, "-") && strings.ContainsAny(flag, "rR") {
+			return true
+		}
+	}
+	return false
 }
 
 // isDangerousRmTarget checks if a target is dangerous for rm operations
@@ -254,16 +258,6 @@ func (h *SecurityHook) isOwnershipOrPermCommand(cmd string) bool {
 	return cmd == "chmod" || cmd == "chown"
 }
 
-// hasRecursiveFlag checks if tokens contain recursive flags
-func (h *SecurityHook) hasRecursiveFlagInTokens(tokens []string) bool {
-	for _, t := range tokens {
-		if strings.HasPrefix(t, "-") && strings.Contains(t, "R") {
-			return true
-		}
-	}
-	return false
-}
-
 // isDangerousRecursivePath checks if a path is dangerous for recursive operations
 func (h *SecurityHook) isDangerousRecursivePath(path string) bool {
 	lt := strings.ToLower(path)
@@ -276,14 +270,26 @@ func (h *SecurityHook) detectRecursiveOwnershipOrPerm(tokens []string) (bool, st
 		return false, ""
 	}
 
-	if !h.hasRecursiveFlagInTokens(tokens[1:]) {
+	// Extract flags and paths from tokens
+	var flags []string
+	var paths []string
+	for _, t := range tokens[1:] {
+		if strings.HasPrefix(t, "-") {
+			flags = append(flags, t)
+		} else {
+			paths = append(paths, t)
+		}
+	}
+
+	// Check if recursive flag is present
+	if !h.hasRecursiveFlag(flags) {
 		return false, ""
 	}
 
-	// Check paths in tokens
-	for _, t := range tokens[1:] {
-		if !strings.HasPrefix(t, "-") && h.isDangerousRecursivePath(t) {
-			return true, "blocked recursive " + tokens[0] + " on critical path " + t
+	// Check paths for dangerous locations
+	for _, path := range paths {
+		if h.isDangerousRecursivePath(path) {
+			return true, "blocked recursive " + tokens[0] + " on critical path " + path
 		}
 	}
 	return false, ""

@@ -205,10 +205,13 @@ func installHookAction(hookType string, flags installFlags, isValidEventType fun
 }
 
 // executeInstallCommand executes the hooks install command.
-func executeInstallCommand(hookType string, flags installFlags, getPlugin func(string) (interface {
-	Run() error
-	Description() string
-}, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
+func executeInstallCommand(
+	hookType string,
+	flags installFlags,
+	getPlugin func(string) (PluginProvider, bool),
+	pluginKeys func() []string,
+	isValidEventType func(string) bool,
+	validEventTypes func() []string,
 ) error {
 	// Validate plugin exists
 	if _, exists := getPlugin(hookType); !exists {
@@ -219,10 +222,11 @@ func executeInstallCommand(hookType string, flags installFlags, getPlugin func(s
 }
 
 // newHooksInstallCommand creates the install command.
-func newHooksInstallCommand(getPlugin func(string) (interface {
-	Run() error
-	Description() string
-}, bool), pluginKeys func() []string, isValidEventType func(string) bool, validEventTypes func() []string,
+func newHooksInstallCommand(
+	getPlugin func(string) (PluginProvider, bool),
+	pluginKeys func() []string,
+	isValidEventType func(string) bool,
+	validEventTypes func() []string,
 ) *cli.Command {
 	return &cli.Command{
 		Name:      "install",
