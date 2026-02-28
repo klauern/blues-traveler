@@ -109,6 +109,7 @@ tasks:
       - task: format
       - task: lint
       - task: test
+      - task: docs-validate
       - task: build
 
   release:
@@ -134,6 +135,12 @@ tasks:
       - task: format
       - task: lint
       - task: test
+      - task: docs-validate
+
+  docs-validate:
+    desc: Validate hooks corpus links and doc portability
+    cmds:
+      - ./scripts/validate-docs.sh
 
   setup-dev:
     desc: Setup development environment
@@ -234,4 +241,3 @@ tasks:
         go install golang.org/x/tools/cmd/deadcode@latest
     status:
       - command -v deadcode >/dev/null 2>&1
-

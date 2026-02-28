@@ -7,7 +7,7 @@ This project uses [beads](https://github.com/beads-marketplace/beads) for issue 
 - **Structured data**: Issues stored in a database with proper relationships
 - **Dependencies**: Track blocking relationships between issues
 - **Status tracking**: Open, in progress, blocked, closed
-- **Priorities**: Numeric priority levels (1=low, 2=medium, 3=high)
+- **Priorities**: Numeric priority levels (0=critical, 1=high, 2=medium, 3=low, 4=backlog)
 - **Types**: bug, feature, task, epic, chore
 - **CLI-first**: Fast command-line interface for developers and AI assistants
 
@@ -57,9 +57,11 @@ bd stats
 
 ## Priority Levels
 
-- **3**: High priority (critical features, security issues)
-- **2**: Medium priority (important improvements)
-- **1**: Low priority (nice-to-haves, minor improvements)
+- **0**: Critical (security issues, broken builds, data loss)
+- **1**: High priority (important fixes and merge blockers)
+- **2**: Medium priority (default)
+- **3**: Low priority (polish, minor improvements)
+- **4**: Backlog (future ideas)
 
 ## Issue Workflow
 
@@ -258,6 +260,16 @@ The beads database is SQLite in `.beads/blues-traveler.db`. You can query it dir
 ```bash
 sqlite3 .beads/blues-traveler.db "SELECT id, title, priority FROM issues WHERE status='open' ORDER BY priority DESC"
 ```
+
+## Committing Beads Files
+
+The repository intentionally tracks `.beads/issues.jsonl` because it is the shareable project backlog.
+
+- Commit `.beads/issues.jsonl` when issue content changed in a way that other contributors should see.
+- Commit `.beads/.local_version` only when it changed as part of the same intentional tracker update.
+- Do not treat `.beads/.local_version` churn by itself as meaningful project work.
+- Keep machine-local files out of commits; `.beads/last-touched`, databases, locks, and WAL files should remain ignored.
+- Before opening a review, skim the staged `.beads/issues.jsonl` diff and make sure it reflects actual task state transitions rather than incidental local activity.
 
 ### Bulk Operations
 

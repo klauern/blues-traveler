@@ -41,10 +41,12 @@ coverage.html
 
 # Build artifacts
 dist/
+.gocache/
 
 # bd (beads) issue tracker
 # Track .beads/issues.jsonl for version control
 # Ignore database and temporary files
+.beads/last-touched
 .beads/*.db
 .beads/*.db.backup
 .beads/*.db-shm
