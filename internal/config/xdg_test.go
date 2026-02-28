@@ -10,17 +10,8 @@ import (
 
 func TestNewXDGConfig(t *testing.T) {
 	// Test with XDG_CONFIG_HOME set
-	originalXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	t.Cleanup(func() {
-		if err := os.Setenv("XDG_CONFIG_HOME", originalXDGConfigHome); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
 	testConfigHome := "/tmp/test-xdg-config"
-	if err := os.Setenv("XDG_CONFIG_HOME", testConfigHome); err != nil {
-		t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
-	}
+	t.Setenv("XDG_CONFIG_HOME", testConfigHome)
 
 	xdg := NewXDGConfig()
 	expectedBaseDir := filepath.Join(testConfigHome, "blues-traveler")
@@ -29,9 +20,7 @@ func TestNewXDGConfig(t *testing.T) {
 	}
 
 	// Test without XDG_CONFIG_HOME
-	if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
-		t.Fatalf("Failed to unset XDG_CONFIG_HOME: %v", err)
-	}
+	t.Setenv("XDG_CONFIG_HOME", "")
 	xdg = NewXDGConfig()
 	homeDir, _ := os.UserHomeDir()
 	expectedBaseDir = filepath.Join(homeDir, ".config", "blues-traveler")
@@ -168,16 +157,7 @@ func assertProjectInRegistry(t *testing.T, registry *ProjectRegistry, projectPat
 }
 
 func TestConfigDataOperations(t *testing.T) {
-	// Create temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -192,7 +172,7 @@ func TestConfigDataOperations(t *testing.T) {
 	}
 
 	// Test saving project config
-	err = xdg.SaveProjectConfig(projectPath, testData, FormatJSON)
+	err := xdg.SaveProjectConfig(projectPath, testData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save project config: %v", err)
 	}
@@ -229,16 +209,7 @@ func TestConfigDataOperations(t *testing.T) {
 }
 
 func TestTOMLSupport(t *testing.T) {
-	// Create temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
 
 	// Create XDG config with custom base directory
 	xdg := &XDGConfig{BaseDir: tempDir}
@@ -253,7 +224,7 @@ func TestTOMLSupport(t *testing.T) {
 	}
 
 	// Test saving project config as TOML
-	err = xdg.SaveProjectConfig(projectPath, testData, "toml")
+	err := xdg.SaveProjectConfig(projectPath, testData, "toml")
 	if err != nil {
 		t.Fatalf("Failed to save TOML project config: %v", err)
 	}
@@ -319,9 +290,10 @@ func TestCleanupOrphanedConfigs(t *testing.T) {
 
 func TestErrorHandling(t *testing.T) {
 	xdg := NewXDGConfig()
+	var err error
 
 	// Test getting non-existent project config
-	_, err := xdg.GetProjectConfig("/non/existent/project")
+	_, err = xdg.GetProjectConfig("/non/existent/project")
 	if err == nil {
 		t.Error("Expected error for non-existent project")
 	}
@@ -333,15 +305,7 @@ func TestErrorHandling(t *testing.T) {
 	}
 
 	// Test invalid format
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	tempDir := t.TempDir()
 
 	xdg = &XDGConfig{BaseDir: tempDir}
 	testData := map[string]interface{}{"key": "value"}
@@ -353,16 +317,7 @@ func TestErrorHandling(t *testing.T) {
 }
 
 func TestRegistryVersioning(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
+	tempDir := t.TempDir()
 	xdg := &XDGConfig{BaseDir: tempDir}
 
 	// Create registry manually with different version
@@ -371,7 +326,7 @@ func TestRegistryVersioning(t *testing.T) {
 		Projects: make(map[string]ProjectConfig),
 	}
 
-	err = xdg.SaveRegistry(registry)
+	err := xdg.SaveRegistry(registry)
 	if err != nil {
 		t.Fatalf("Failed to save registry: %v", err)
 	}
@@ -388,16 +343,7 @@ func TestRegistryVersioning(t *testing.T) {
 }
 
 func TestConcurrentAccess(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "xdg-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
+	tempDir := t.TempDir()
 	xdg := &XDGConfig{BaseDir: tempDir}
 
 	// Test sequential project registration first to establish baseline

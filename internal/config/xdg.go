@@ -12,6 +12,8 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+var hyphenRE = regexp.MustCompile(`-+`)
+
 // Config format constants
 const (
 	FormatJSON = "json"
@@ -88,8 +90,7 @@ func (x *XDGConfig) SanitizeProjectPath(projectPath string) string {
 	sanitized = strings.ReplaceAll(sanitized, "~", "home")
 
 	// Replace multiple consecutive hyphens with single hyphen
-	re := regexp.MustCompile(`-+`)
-	sanitized = re.ReplaceAllString(sanitized, "-")
+	sanitized = hyphenRE.ReplaceAllString(sanitized, "-")
 
 	// Remove leading/trailing hyphens
 	sanitized = strings.Trim(sanitized, "-")

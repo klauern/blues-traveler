@@ -1,8 +1,81 @@
 package config
 
 import (
+	"os"
 	"testing"
 )
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func TestIsPluginEnabledPrecedence(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalWD); err != nil {
+			t.Fatalf("failed to restore working directory: %v", err)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to change working directory: %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+
+	globalPath, err := GetSettingsPath(true)
+	if err != nil {
+		t.Fatalf("failed to get global settings path: %v", err)
+	}
+	projectPath, err := GetSettingsPath(false)
+	if err != nil {
+		t.Fatalf("failed to get project settings path: %v", err)
+	}
+
+	if err := SaveSettings(globalPath, &Settings{
+		Plugins: map[string]PluginConfig{
+			"security": {Enabled: boolPtr(false)},
+			"format":   {Enabled: boolPtr(true)},
+			"debug":    {Enabled: boolPtr(false)},
+		},
+	}); err != nil {
+		t.Fatalf("failed to save global settings: %v", err)
+	}
+
+	if err := SaveSettings(projectPath, &Settings{
+		Plugins: map[string]PluginConfig{
+			"security": {Enabled: boolPtr(true)},
+			"format":   {Enabled: boolPtr(false)},
+			"audit":    {},
+		},
+	}); err != nil {
+		t.Fatalf("failed to save project settings: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		plugin string
+		want   bool
+	}{
+		{"project enabled overrides global disabled", "security", true},
+		{"project disabled overrides global enabled", "format", false},
+		{"project nil falls back to global enabled", "audit", true},
+		{"project missing falls back to global disabled", "debug", false},
+		{"missing everywhere defaults enabled", "vet", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsPluginEnabled(tt.plugin); got != tt.want {
+				t.Errorf("IsPluginEnabled(%q) = %v, want %v", tt.plugin, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestMatchesHookType(t *testing.T) {
 	tests := []struct {

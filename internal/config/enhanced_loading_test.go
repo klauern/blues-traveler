@@ -195,26 +195,7 @@ func setupLegacyConfig(t *testing.T, project string) string {
 }
 
 func TestLoadGlobalConfigWithFallback(t *testing.T) {
-	// Create temporary directories
-	xdgTempDir, err := os.MkdirTemp("", "xdg-global-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	legacyTempDir, err := os.MkdirTemp("", "legacy-global-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create legacy temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(legacyTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	xdgTempDir := t.TempDir()
 
 	// Test LoadXDGOnly strategy
 	loader := NewEnhancedConfigLoader(LoadXDGOnly)
@@ -227,7 +208,7 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 		},
 		"globalSource": constants.XDGSource,
 	}
-	err = loader.xdg.SaveGlobalConfig(globalXDGData, FormatJSON)
+	err := loader.xdg.SaveGlobalConfig(globalXDGData, FormatJSON)
 	if err != nil {
 		t.Fatalf("Failed to save XDG global config: %v", err)
 	}
@@ -248,26 +229,8 @@ func TestLoadGlobalConfigWithFallback(t *testing.T) {
 }
 
 func TestSaveConfigWithXDG(t *testing.T) {
-	// Create temporary directory
-	xdgTempDir, err := os.MkdirTemp("", "xdg-save-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	tempDir, err := os.MkdirTemp("", "save-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	xdgTempDir := t.TempDir()
+	tempDir := t.TempDir()
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -287,7 +250,7 @@ func TestSaveConfigWithXDG(t *testing.T) {
 	}
 
 	// Test saving project config
-	err = loader.SaveConfigWithXDG(project, testConfig, "json")
+	err := loader.SaveConfigWithXDG(project, testConfig, "json")
 	if err != nil {
 		t.Fatalf("Failed to save config with XDG: %v", err)
 	}
@@ -328,26 +291,8 @@ func TestSaveConfigWithXDG(t *testing.T) {
 }
 
 func TestGetConfigPath(t *testing.T) {
-	// Create temporary directories
-	xdgTempDir, err := os.MkdirTemp("", "xdg-path-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	tempDir, err := os.MkdirTemp("", "path-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	xdgTempDir := t.TempDir()
+	tempDir := t.TempDir()
 
 	project := filepath.Join(tempDir, "test-project")
 
@@ -408,26 +353,8 @@ func TestGetConfigPath(t *testing.T) {
 }
 
 func TestIsProjectRegistered(t *testing.T) {
-	// Create temporary directories
-	xdgTempDir, err := os.MkdirTemp("", "xdg-registered-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create XDG temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(xdgTempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
-	tempDir, err := os.MkdirTemp("", "registered-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
+	xdgTempDir := t.TempDir()
+	tempDir := t.TempDir()
 
 	loader := NewEnhancedConfigLoader(LoadXDGFirst)
 	loader.xdg = &XDGConfig{BaseDir: xdgTempDir}
@@ -441,7 +368,7 @@ func TestIsProjectRegistered(t *testing.T) {
 
 	// Register project
 	testData := map[string]interface{}{"test": "data"}
-	err = loader.xdg.SaveProjectConfig(project, testData, "json")
+	err := loader.xdg.SaveProjectConfig(project, testData, "json")
 	if err != nil {
 		t.Fatalf("Failed to save XDG config: %v", err)
 	}

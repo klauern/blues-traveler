@@ -368,17 +368,7 @@ func TestFormatMigrationResult(t *testing.T) {
 }
 
 func TestHasLegacyConfig(t *testing.T) {
-	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "legacy-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Logf("cleanup failed: %v", err)
-		}
-	})
-
+	tempDir := t.TempDir()
 	project := filepath.Join(tempDir, "test-project")
 
 	// Test with no config
@@ -388,7 +378,7 @@ func TestHasLegacyConfig(t *testing.T) {
 
 	// Create legacy config
 	legacyConfigDir := filepath.Join(project, ".claude", "hooks")
-	err = os.MkdirAll(legacyConfigDir, 0o755)
+	err := os.MkdirAll(legacyConfigDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create legacy config dir: %v", err)
 	}
