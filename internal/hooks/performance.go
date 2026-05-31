@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/brads3290/cchooks"
@@ -14,6 +15,7 @@ import (
 // PerformanceHook implements performance monitoring and timing
 type PerformanceHook struct {
 	*core.BaseHook
+	mu         sync.Mutex
 	startTimes map[string]time.Time
 }
 
@@ -53,11 +55,15 @@ func (h *PerformanceHook) Run() error {
 }
 
 func (h *PerformanceHook) preToolUseHandler(_ context.Context, event *cchooks.PreToolUseEvent) cchooks.PreToolUseResponseInterface {
+	now := time.Now()
+
 	// Record start time for this tool invocation
-	h.startTimes[event.ToolName] = time.Now()
+	h.mu.Lock()
+	h.startTimes[event.ToolName] = now
+	h.mu.Unlock()
 
 	entry := PerformanceEntry{
-		Timestamp:   time.Now().Format(time.RFC3339),
+		Timestamp:   now.Format(time.RFC3339),
 		Event:       "tool_start",
 		ToolName:    event.ToolName,
 		Description: "Tool execution started",
@@ -81,16 +87,20 @@ func (h *PerformanceHook) preToolUseHandler(_ context.Context, event *cchooks.Pr
 }
 
 func (h *PerformanceHook) postToolUseHandler(_ context.Context, event *cchooks.PostToolUseEvent) cchooks.PostToolUseResponseInterface {
+	now := time.Now()
+
 	// Calculate duration if we have a start time
 	var durationMS float64
+	h.mu.Lock()
 	if startTime, ok := h.startTimes[event.ToolName]; ok {
-		duration := time.Since(startTime)
+		duration := now.Sub(startTime)
 		durationMS = float64(duration.Milliseconds())
 		delete(h.startTimes, event.ToolName) // Clean up
 	}
+	h.mu.Unlock()
 
 	entry := PerformanceEntry{
-		Timestamp:   time.Now().Format(time.RFC3339),
+		Timestamp:   now.Format(time.RFC3339),
 		Event:       "tool_complete",
 		ToolName:    event.ToolName,
 		DurationMS:  durationMS,

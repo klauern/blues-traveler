@@ -77,7 +77,8 @@ func (d *LegacyConfigDiscovery) getSearchPaths(globalSearch bool) []string {
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
-		paths = append(paths,
+		paths = append(
+			paths,
 			filepath.Join(homeDir, "dev"),
 			filepath.Join(homeDir, "projects"),
 			filepath.Join(homeDir, "work"),
@@ -92,7 +93,8 @@ func (d *LegacyConfigDiscovery) createSearchProgressBar(total int) *progressbar.
 	if d.verbose {
 		return nil
 	}
-	return progressbar.NewOptions(total,
+	return progressbar.NewOptions(
+		total,
 		progressbar.OptionSetDescription("Searching for configs..."),
 		progressbar.OptionSetWidth(40),
 		progressbar.OptionShowCount(),
@@ -194,7 +196,8 @@ func (d *LegacyConfigDiscovery) MigrateConfigs(configs map[string]string, dryRun
 		if dryRun {
 			action = "Checking"
 		}
-		bar = progressbar.NewOptions(len(keys),
+		bar = progressbar.NewOptions(
+			len(keys),
 			progressbar.OptionSetDescription(action+" configs..."),
 			progressbar.OptionSetWidth(40),
 			progressbar.OptionShowCount(),

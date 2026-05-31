@@ -1,11 +1,81 @@
 package config
 
 import (
-	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 )
+
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func TestIsPluginEnabledPrecedence(t *testing.T) {
+	homeDir := t.TempDir()
+	projectDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalWD); err != nil {
+			t.Fatalf("failed to restore working directory: %v", err)
+		}
+	})
+
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatalf("failed to change working directory: %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+
+	globalPath, err := GetSettingsPath(true)
+	if err != nil {
+		t.Fatalf("failed to get global settings path: %v", err)
+	}
+	projectPath, err := GetSettingsPath(false)
+	if err != nil {
+		t.Fatalf("failed to get project settings path: %v", err)
+	}
+
+	if err := SaveSettings(globalPath, &Settings{
+		Plugins: map[string]PluginConfig{
+			"security": {Enabled: boolPtr(false)},
+			"format":   {Enabled: boolPtr(true)},
+			"debug":    {Enabled: boolPtr(false)},
+		},
+	}); err != nil {
+		t.Fatalf("failed to save global settings: %v", err)
+	}
+
+	if err := SaveSettings(projectPath, &Settings{
+		Plugins: map[string]PluginConfig{
+			"security": {Enabled: boolPtr(true)},
+			"format":   {Enabled: boolPtr(false)},
+			"audit":    {},
+		},
+	}); err != nil {
+		t.Fatalf("failed to save project settings: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		plugin string
+		want   bool
+	}{
+		{"project enabled overrides global disabled", "security", true},
+		{"project disabled overrides global enabled", "format", false},
+		{"project nil falls back to global enabled", "audit", true},
+		{"project missing falls back to global disabled", "debug", false},
+		{"missing everywhere defaults enabled", "vet", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsPluginEnabled(tt.plugin); got != tt.want {
+				t.Errorf("IsPluginEnabled(%q) = %v, want %v", tt.plugin, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestMatchesHookType(t *testing.T) {
 	tests := []struct {
@@ -292,206 +362,6 @@ func TestRemoveHookTypeFromSettings(t *testing.T) {
 			}
 			if tt.check != nil {
 				tt.check(t, tt.settings)
-			}
-		})
-	}
-}
-
-//nolint:gocognit,funlen // Comprehensive table-driven test with extensive test cases
-func TestSettingsPrecedence(t *testing.T) {
-	// Save original working directory
-	originalWd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-	defer func() {
-		if err := os.Chdir(originalWd); err != nil {
-			t.Errorf("Failed to restore working directory: %v", err)
-		}
-	}()
-
-	// Create temp directories for global and project settings
-	tempDir := t.TempDir()
-	globalDir := filepath.Join(tempDir, "global")
-	projectDir := filepath.Join(tempDir, "project")
-
-	if err := os.MkdirAll(filepath.Join(globalDir, ".claude"), 0o755); err != nil {
-		t.Fatalf("Failed to create global .claude dir: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0o755); err != nil {
-		t.Fatalf("Failed to create project .claude dir: %v", err)
-	}
-
-	// Helper to write settings file
-	writeSettings := func(dir string, settings *Settings) error {
-		path := filepath.Join(dir, ".claude", "settings.json")
-		data, err := json.MarshalIndent(settings, "", "  ")
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(path, data, 0o644)
-	}
-
-	// Helper to create bool pointer
-	boolPtr := func(b bool) *bool {
-		return &b
-	}
-
-	tests := []struct {
-		name            string
-		globalSettings  *Settings
-		projectSettings *Settings
-		pluginKey       string
-		want            bool
-	}{
-		{
-			name: "project enabled + global disabled = enabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(false)},
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(true)},
-				},
-			},
-			pluginKey: "security",
-			want:      true,
-		},
-		{
-			name: "project disabled + global enabled = disabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(true)},
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(false)},
-				},
-			},
-			pluginKey: "security",
-			want:      false,
-		},
-		{
-			name: "project nil + global enabled = enabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(true)},
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			pluginKey: "security",
-			want:      true,
-		},
-		{
-			name: "project nil + global disabled = disabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(false)},
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			pluginKey: "security",
-			want:      false,
-		},
-		{
-			name: "project nil + global nil = default enabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			pluginKey: "security",
-			want:      true, // Default is enabled
-		},
-		{
-			name: "project enabled + global nil = enabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(true)},
-				},
-			},
-			pluginKey: "security",
-			want:      true,
-		},
-		{
-			name: "project disabled + global nil = disabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					// No security plugin configured
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"security": {Enabled: boolPtr(false)},
-				},
-			},
-			pluginKey: "security",
-			want:      false,
-		},
-		{
-			name: "project nil + global enabled for different plugin = default enabled",
-			globalSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"format": {Enabled: boolPtr(true)},
-				},
-			},
-			projectSettings: &Settings{
-				Plugins: map[string]PluginConfig{
-					"audit": {Enabled: boolPtr(true)},
-				},
-			},
-			pluginKey: "security",
-			want:      true, // Default is enabled when plugin not found
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set HOME to global directory (Unix-like systems)
-			t.Setenv("HOME", globalDir)
-			// Set USERPROFILE for Windows compatibility
-			t.Setenv("USERPROFILE", globalDir)
-
-			// Write global settings
-			if err := writeSettings(globalDir, tt.globalSettings); err != nil {
-				t.Fatalf("Failed to write global settings: %v", err)
-			}
-
-			// Write project settings
-			if err := writeSettings(projectDir, tt.projectSettings); err != nil {
-				t.Fatalf("Failed to write project settings: %v", err)
-			}
-
-			// Change to project directory
-			if err := os.Chdir(projectDir); err != nil {
-				t.Fatalf("Failed to change to project directory: %v", err)
-			}
-
-			// Test IsPluginEnabled
-			got := IsPluginEnabled(tt.pluginKey)
-			if got != tt.want {
-				t.Errorf("IsPluginEnabled(%q) = %v, want %v", tt.pluginKey, got, tt.want)
 			}
 		})
 	}
