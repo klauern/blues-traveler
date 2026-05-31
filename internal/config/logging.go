@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/klauern/blues-traveler/internal/constants"
@@ -169,6 +170,7 @@ func CleanupOldLogs(logDir string, maxAgeDays int) error {
 		return nil // No cleanup if maxAge is 0 or negative
 	}
 
+	logDir = filepath.Clean(logDir)
 	cutoff := time.Now().AddDate(0, 0, -maxAgeDays)
 
 	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
@@ -184,7 +186,15 @@ func CleanupOldLogs(logDir string, maxAgeDays int) error {
 		// Only consider .log files and compressed log files
 		if filepath.Ext(path) == ".log" || filepath.Ext(path) == ".gz" {
 			if info.ModTime().Before(cutoff) {
-				if err := os.Remove(path); err != nil {
+				cleanPath := filepath.Clean(path)
+				relPath, err := filepath.Rel(logDir, cleanPath)
+				if err != nil || relPath == "." || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+					return fmt.Errorf("refusing to remove log outside log directory: %s", path)
+				}
+				if info.Mode()&os.ModeSymlink != 0 {
+					return nil
+				}
+				if err := os.Remove(cleanPath); err != nil { // #nosec G122 - cleanPath is verified under logDir and symlinks are skipped
 					log.Printf("Failed to remove old log file %s: %v", path, err)
 				} else {
 					log.Printf("Removed old log file: %s", path)
