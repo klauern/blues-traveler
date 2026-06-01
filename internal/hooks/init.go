@@ -17,7 +17,7 @@ func init() {
 		"vet":           NewVetHook,
 		"fetch-blocker": NewFetchBlockerHook,
 		"find-blocker":  NewFindBlockerHook,
-		// "performance": NewPerformanceHook, // TODO: Enable when performance.go is properly integrated
+		"performance":   NewPerformanceHook,
 	}
 	core.RegisterBuiltinHooks(builtinHooks)
 

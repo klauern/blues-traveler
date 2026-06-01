@@ -88,13 +88,15 @@ func addProjectPaths(baseDir string) []string {
 	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
 
 	// Prefer new canonical file under hooks/
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(baseDir, "hooks", "hooks.yml"),
 		filepath.Join(baseDir, "hooks", "hooks.yaml"),
 	)
 
 	// Legacy locations for backward compatibility
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(baseDir, "hooks.yml"),
 		filepath.Join(baseDir, "hooks.yaml"),
 		filepath.Join(baseDir, "hooks.json"),
@@ -113,13 +115,15 @@ func addGlobalPaths(baseDir string) []string {
 	// Global local override (highest precedence)
 	paths = append(paths, filepath.Join(baseDir, "hooks-local.yml"))
 
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(baseDir, "hooks", "hooks.yml"),
 		filepath.Join(baseDir, "hooks", "hooks.yaml"),
 	)
 
 	// Legacy top-level
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(baseDir, "hooks.yml"),
 		filepath.Join(baseDir, "hooks.yaml"),
 		filepath.Join(baseDir, "hooks.json"),

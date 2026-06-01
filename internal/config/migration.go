@@ -77,7 +77,8 @@ func (d *LegacyConfigDiscovery) getSearchPaths(globalSearch bool) []string {
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
-		paths = append(paths,
+		paths = append(
+			paths,
 			filepath.Join(homeDir, "dev"),
 			filepath.Join(homeDir, "projects"),
 			filepath.Join(homeDir, "work"),
@@ -92,7 +93,8 @@ func (d *LegacyConfigDiscovery) createSearchProgressBar(total int) *progressbar.
 	if d.verbose {
 		return nil
 	}
-	return progressbar.NewOptions(total,
+	return progressbar.NewOptions(
+		total,
 		progressbar.OptionSetDescription("Searching for configs..."),
 		progressbar.OptionSetWidth(40),
 		progressbar.OptionShowCount(),
@@ -194,7 +196,8 @@ func (d *LegacyConfigDiscovery) MigrateConfigs(configs map[string]string, dryRun
 		if dryRun {
 			action = "Checking"
 		}
-		bar = progressbar.NewOptions(len(keys),
+		bar = progressbar.NewOptions(
+			len(keys),
 			progressbar.OptionSetDescription(action+" configs..."),
 			progressbar.OptionSetWidth(40),
 			progressbar.OptionShowCount(),
@@ -294,12 +297,24 @@ func (d *LegacyConfigDiscovery) migrateConfig(projectPath, configPath string, dr
 
 // copyFile creates a copy of a file
 func copyFile(src, dst string) error {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
+	if src == "." || dst == "." {
+		return fmt.Errorf("source and destination paths must be non-empty")
+	}
+	if filepath.Dir(src) != filepath.Dir(dst) {
+		return fmt.Errorf("backup destination must stay in source directory")
+	}
+	if filepath.Base(dst) != filepath.Base(src)+".backup."+strings.TrimPrefix(filepath.Base(dst), filepath.Base(src)+".backup.") {
+		return fmt.Errorf("backup destination must use the expected backup filename")
+	}
+
 	data, err := os.ReadFile(src) // #nosec G304 - src is validated config file path for backup
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(dst, data, 0o600)
+	return os.WriteFile(dst, data, 0o600) // #nosec G703 - dst is constrained to src directory with backup filename
 }
 
 // GetLegacyConfigPath returns the legacy config path for a project

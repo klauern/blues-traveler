@@ -32,7 +32,8 @@ func TestLogHookEvent_JSONLFormat(t *testing.T) {
 	ctx.LoggingDir = t.TempDir()
 	ctx.LoggingFormat = config.LoggingFormatJSONL
 
-	logHookEvent(ctx, "testhook", "test_event", "ToolX",
+	logHookEvent(
+		ctx, "testhook", "test_event", "ToolX",
 		map[string]interface{}{"k": "v"},
 		map[string]interface{}{"d": 1},
 	)
@@ -65,7 +66,8 @@ func TestLogHookEvent_PrettyFormat(t *testing.T) {
 	ctx.LoggingDir = t.TempDir()
 	ctx.LoggingFormat = config.LoggingFormatPretty
 
-	logHookEvent(ctx, "prettyhook", "pretty_event", "ToolY",
+	logHookEvent(
+		ctx, "prettyhook", "pretty_event", "ToolY",
 		map[string]interface{}{"a": "b"},
 		map[string]interface{}{"x": 42},
 	)

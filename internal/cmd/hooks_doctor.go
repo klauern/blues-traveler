@@ -306,7 +306,8 @@ func getCandidateConfigPaths() ([]string, error) {
 	proj := filepath.Join(cwd, ".claude")
 
 	// Main hooks config files
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(proj, "hooks", "hooks.yml"),
 		filepath.Join(proj, "hooks", "hooks.yaml"),
 		filepath.Join(proj, "hooks.yml"),
@@ -321,7 +322,8 @@ func getCandidateConfigPaths() ([]string, error) {
 	}
 	glob := filepath.Join(home, ".claude")
 
-	paths = append(paths,
+	paths = append(
+		paths,
 		filepath.Join(glob, "hooks", "hooks.yml"),
 		filepath.Join(glob, "hooks", "hooks.yaml"),
 		filepath.Join(glob, "hooks.yml"),
