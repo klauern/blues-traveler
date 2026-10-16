@@ -4,7 +4,7 @@ Get up and running with Blues Traveler in minutes.
 
 ## Prerequisites
 
-- Go 1.25.4 or later
+- Go 1.26.9 or later
 - Claude Code installed and configured
 
 ## Installation
