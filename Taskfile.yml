@@ -241,3 +241,20 @@ tasks:
         go install golang.org/x/tools/cmd/deadcode@latest
     status:
       - command -v deadcode >/dev/null 2>&1
+
+  test-homebrew-cask:
+    desc: Validate generated cask with Homebrew without executing install commands
+    vars:
+      CASK_FILE: '{{.CASK_FILE | default "dist/homebrew/Casks/blues-traveler.rb"}}'
+    cmds:
+      - brew ruby scripts/check-homebrew-cask.rb '{{.CASK_FILE}}'
+
+  test-homebrew:
+    desc: Generate a local snapshot and regression-test its Homebrew cask (requires GoReleaser and Homebrew)
+    env:
+      # Snapshot mode never publishes; satisfy the deploy-key template without secrets.
+      HOMEBREW_DEPLOY_SECRET: unused-snapshot-placeholder
+    cmds:
+      # Skip release hooks that install formatters or rewrite the source tree.
+      - goreleaser release --snapshot --skip=before --clean
+      - task: test-homebrew-cask
