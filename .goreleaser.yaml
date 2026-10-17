@@ -100,12 +100,13 @@ homebrew_casks:
         private_key: "{{ .Env.HOMEBREW_DEPLOY_SECRET }}"
     homepage: "https://github.com/klauern/blues-traveler"
     description: "Claude Code hooks management tool - 'The hook brings you back'"
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/blues-traveler"]
-          end
+    # hooks.post.install emits deprecated `postflight` in GoReleaser v2.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/blues-traveler"]
+        end
+      end
     commit_author:
       name: goreleaserbot
       email: goreleaser@blues-traveler.dev

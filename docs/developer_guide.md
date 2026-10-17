@@ -347,7 +347,7 @@ git push
 | Hook not found | Not registered in init.go | Add to builtinHooks map |
 | Hook disabled | Settings configuration | Check plugins section |
 | Tests failing | Missing dependencies | Run `task deps` |
-| Build errors | Go version mismatch | Use Go 1.25+ |
+| Build errors | Go version mismatch | Use Go 1.26.9+ |
 
 ### Debugging
 

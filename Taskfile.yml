@@ -197,8 +197,8 @@ tasks:
         echo "Installing security tools..."
         echo "Installing gosec..."
         go install github.com/securego/gosec/v2/cmd/gosec@latest
-        echo "Installing govulncheck (rebuilding for Go 1.25)..."
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        echo "Installing govulncheck with its required build toolchain..."
+        GOTOOLCHAIN=auto go install golang.org/x/vuln/cmd/govulncheck@latest
     status:
       - command -v gosec >/dev/null 2>&1
       - command -v govulncheck >/dev/null 2>&1
@@ -212,18 +212,11 @@ tasks:
         echo "✅ No security issues found by gosec"
 
   security-govulncheck:
-    desc: Run govulncheck vulnerability scanner  
+    desc: Scan vulnerabilities using the application's selected Go toolchain
+    env:
+      GOTOOLCHAIN: local
     cmds:
-      - |
-        echo "🔍 Running govulncheck vulnerability scanner..."
-        if govulncheck ./... 2>&1 | grep -q "Loading packages failed"; then
-          echo "⚠️  govulncheck compatibility issue with Go 1.25 - see CI for authoritative vulnerability checks"
-          echo "ℹ️  This is a known issue with govulncheck and Go 1.25's new language features"
-          exit 1
-        else
-          govulncheck ./...
-          echo "✅ No vulnerabilities found"
-        fi
+      - govulncheck ./...
 
   deadcode:
     desc: Find and report unreachable Go code using golang.org/x/tools/cmd/deadcode
@@ -241,3 +234,20 @@ tasks:
         go install golang.org/x/tools/cmd/deadcode@latest
     status:
       - command -v deadcode >/dev/null 2>&1
+
+  test-homebrew-cask:
+    desc: Validate generated cask with Homebrew without executing install commands
+    vars:
+      CASK_FILE: '{{.CASK_FILE | default "dist/homebrew/Casks/blues-traveler.rb"}}'
+    cmds:
+      - brew ruby scripts/check-homebrew-cask.rb '{{.CASK_FILE}}'
+
+  test-homebrew:
+    desc: Generate a local snapshot and regression-test its Homebrew cask (requires GoReleaser and Homebrew)
+    env:
+      # Snapshot mode never publishes; satisfy the deploy-key template without secrets.
+      HOMEBREW_DEPLOY_SECRET: unused-snapshot-placeholder
+    cmds:
+      # Skip release hooks that install formatters or rewrite the source tree.
+      - goreleaser release --snapshot --skip=before --clean
+      - task: test-homebrew-cask
